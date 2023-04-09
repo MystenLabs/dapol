@@ -1,6 +1,6 @@
 # DAPOL+ implementation
 Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos 
-Chalkias paper: https://eprint.iacr.org/2021/1350
+Chalkias ACM CCS 2021 paper, available here: https://eprint.iacr.org/2021/1350
 
 *Note: This is a work in progress, and is not yet ready for production use.
 
