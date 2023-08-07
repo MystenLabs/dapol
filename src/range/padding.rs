@@ -13,6 +13,17 @@ use super::{
     RangeProvable, RangeVerifiable, INDIVIDUAL_NUM_BYTE_NUM, PROOF_SIZE_BYTE_NUM,
 };
 
+//Error handling for empty proof
+pub struct AggProofEmpty {}
+
+impl AggProofEmpty {
+    pub fn new(a: &[RangeProof]) {
+        if a.is_empty() {
+            panic!("The aggregated proof is empty!");
+        }
+    }
+}
+
 // RANGE PROOF PADDING
 // ================================================================================================
 
@@ -24,9 +35,7 @@ pub struct RangeProofPadding {
 
 impl RangeProofPadding {
     pub fn get_aggregated(&self) -> &RangeProof {
-        if self.aggregated.is_empty() {
-            panic!(); // TODO
-        }
+        AggProofEmpty::new(&self.aggregated);
         &self.aggregated[0]
     }
 
