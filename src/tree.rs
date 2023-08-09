@@ -44,7 +44,7 @@ impl SparseSummationMerkleTree {
 }
 
 // STENT why have an array of u8 as apposed to an array of u64?
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct H256([u8; 32]);
 
 // STENT TODO do we really need default?
@@ -323,6 +323,7 @@ impl SparseSummationMerkleTree {
                 .expect("Parent node not in the tree");
         }
         InclusionProof {
+            leaf: leaf.clone(),
             siblings,
             root: self.root.clone(),
         }
@@ -330,8 +331,28 @@ impl SparseSummationMerkleTree {
 }
 
 pub struct InclusionProof {
+    leaf: Node,
     siblings: Vec<Node>,
     root: Node,
+}
+
+impl InclusionProof {
+    fn verify(&self) {
+        let mut parent = self.leaf.clone();
+
+        for node in &self.siblings {
+            let (left_child, right_child) = if parent.is_right_sibling() {
+                (node, &parent)
+            } else {
+                (&parent, node)
+            };
+            parent = right_child.merge_with_left_sibling(left_child);
+        }
+
+        if parent.hash != self.root.hash {
+            panic!("Verify failed");
+        }
+    }
 }
 
 #[test]
@@ -364,4 +385,7 @@ pub fn stent_tree_test() {
     for item in &proof.siblings {
         println!("{:?}", item);
     }
+
+    println!("\n");
+    proof.verify();
 }
