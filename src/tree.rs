@@ -164,6 +164,13 @@ impl Node {
             x: self.coord.x + 1,
         }
     }
+
+    fn get_parent_coord(&self) -> Coordinate {
+        Coordinate {
+            y: self.coord.y + 1,
+            x: self.coord.x / 2,
+        }
+    }
 }
 
 // since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2
@@ -292,6 +299,39 @@ impl SparseSummationMerkleTree {
         tree.store.insert(root_node.coord.clone(), root_node);
         Some(tree)
     }
+
+    fn create_inclusion_proof(&self, leaf: &Node) -> InclusionProof {
+        self.get_node(&leaf.coord)
+            .expect("Provided leaf node is not part of the tree");
+        let mut siblings = Vec::<Node>::new();
+        let mut current_node = leaf;
+
+        for y in 0..self.height - 1 {
+            let x_coord = if current_node.is_right_sibling() {
+                current_node.coord.x - 1
+            } else {
+                current_node.coord.x + 1
+            };
+            let sibling_coord = Coordinate { y, x: x_coord };
+            siblings.push(
+                self.get_node(&sibling_coord)
+                    .expect("Sibling node not in the tree")
+                    .clone(),
+            );
+            current_node = &self
+                .get_node(&current_node.get_parent_coord())
+                .expect("Parent node not in the tree");
+        }
+        InclusionProof {
+            siblings,
+            root: self.root.clone(),
+        }
+    }
+}
+
+pub struct InclusionProof {
+    siblings: Vec<Node>,
+    root: Node,
 }
 
 #[test]
@@ -300,30 +340,28 @@ pub fn stent_tree_test() {
     let leaf_1 = Node {
         hash: H256::default(),
         value: 1,
-        coord: Coordinate {
-            y: 0,
-            x: 0
-        }
+        coord: Coordinate { y: 0, x: 0 },
     };
     let leaf_2 = Node {
         hash: H256::default(),
         value: 2,
-        coord: Coordinate {
-            y: 0,
-            x: 4
-        }
+        coord: Coordinate { y: 0, x: 4 },
     };
     let leaf_3 = Node {
         hash: H256::default(),
         value: 3,
-        coord: Coordinate {
-            y: 0,
-            x: 7
-        }
+        coord: Coordinate { y: 0, x: 7 },
     };
     let input: Vec<Node> = vec![leaf_1, leaf_2, leaf_3];
     let tree = SparseSummationMerkleTree::new(&input, height).unwrap();
-    for item in tree.store {
+    for item in &tree.store {
+        println!("{:?}", item);
+    }
+
+    println!("\n");
+
+    let proof = tree.create_inclusion_proof(&input[0]);
+    for item in &proof.siblings {
         println!("{:?}", item);
     }
 }
