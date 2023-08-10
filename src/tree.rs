@@ -1,5 +1,8 @@
 use ::std::collections::HashMap;
 
+// STENT TODO need to make the hash function generic
+// STENT TODO the hash function should have a trait that includes function for computing padding, merge, etc hashes
+
 pub struct SparseSummationMerkleTree {
     root: Node,
     store: HashMap<Coordinate, Node>,
@@ -47,8 +50,7 @@ impl SparseSummationMerkleTree {
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct H256([u8; 32]);
 
-// STENT TODO do we really need default?
-#[derive(Default, PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     // STENT TODO make these bounded, which depends on tree height
     y: u64, // from 0 to height
@@ -56,8 +58,7 @@ pub struct Coordinate {
 }
 
 // STENT TODO maybe turn into enum with Internal, Padding, Node as options
-// STENT TODO we should not have default here
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Node {
     hash: H256, // STENT do we really need this? Is this the best type?
     value: u64, // STENT change to Pedersen commitment
@@ -67,6 +68,14 @@ pub struct Node {
 impl Node {
     fn get_hash_bytes(&self) -> &[u8] {
         &self.hash.0
+    }
+
+    fn default_root(height: u64) -> Self {
+        Node {
+            hash: H256::default(),
+            value: 0,
+            coord: Coordinate {y:height, x:0},
+        }
     }
 
     // STENT TODO doesn't workout with the type system because the data is not stored as bytes,
@@ -147,7 +156,7 @@ impl Node {
     // self must be a right sibling, otherwise will panic
     fn get_left_sibling_coord(&self) -> Coordinate {
         if !self.is_right_sibling() {
-            panic!("Cannot call this function on a left node");
+            panic!("Cannot call this function on a left sibling");
         }
         Coordinate {
             y: self.coord.y,
@@ -157,7 +166,7 @@ impl Node {
 
     fn get_right_sibling_coord(&self) -> Coordinate {
         if !self.is_left_sibling() {
-            panic!("Cannot call this function on a left sibling");
+            panic!("Cannot call this function on a right sibling");
         }
         Coordinate {
             y: self.coord.y,
@@ -188,9 +197,11 @@ impl SparseSummationMerkleTree {
     // STENT TODO make this return a Result instead
     //   do we actually want it to return an option? why not just return the tree straight?
     pub fn new(leaves: &Vec<Node>, height: u64) -> Option<SparseSummationMerkleTree> {
-        // STENT TODO check all leaves have the same y coord of 0
+        for leaf in leaves {
+            assert!(leaf.coord.y == 0, "Leaf nodes must all have y-coord of 0");
+        }
         let mut tree = SparseSummationMerkleTree {
-            root: Node::default(), // STENT TODO get the correct node
+            root: Node::default_root(height),
             store: HashMap::new(),
             height,
         };
@@ -281,7 +292,9 @@ impl SparseSummationMerkleTree {
             }
         }
 
-        // STENT TODO we need to make sure the height of the tree is at least 3 for this to work
+        // needs to be checked for the next line of code to work
+        assert!(height >= 3, "Tree too small for constructor logic to handle");
+
         let left_child = tree
             .get_node(&Coordinate {
                 y: height - 2,
