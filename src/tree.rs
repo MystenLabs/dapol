@@ -1,16 +1,101 @@
 use ::std::collections::HashMap;
+use bulletproofs::PedersenGens;
+use curve25519_dalek_ng::{
+    ristretto::RistrettoPoint, scalar::Scalar,
+};
+use digest::{Digest};
+use std::marker::PhantomData;
 
-// STENT TODO need to make the hash function generic
-// STENT TODO the hash function should have a trait that includes function for computing padding, merge, etc hashes
+// STENT TODO need to have the master secret as input somewhere
+// STENT TODO what are the commonalities between all the different accumulator types in the paper?
 
-pub struct SparseSummationMerkleTree {
-    root: Node,
-    store: HashMap<Coordinate, Node>,
+/// Trait for merging two child nodes to extract the parent node in the SMT.
+pub trait Mergeable {
+    /// A function to merge two child nodes as the parent node in the SMT.
+    fn merge_with_left_sibling(&self, right_child: &Self) -> Self;
+}
+
+/// Trait for generating a padding node in the SMT.
+// STENT TODO maybe rename because I don't think you can say a node is paddable
+pub trait Paddable {
+    /// When the tree node of the input index doesn't exist,
+    /// we need to construct a padding node at that position.
+    fn new_pad(// idx: &TreeIndex, secret: &Secret
+    ) -> Self;
+}
+
+/// Node content data for the DAPOL+ protocol, consisting of the Pedersen commitment and the hash.
+#[derive(Default, Clone, Debug)]
+// STENT TODO change D to H
+pub struct DapolNodeContent<D> {
+    commitment: RistrettoPoint,
+    hash: H256,
+    _phantom_hash_function: PhantomData<D>,
+}
+
+impl<D> PartialEq for DapolNodeContent<D> {
+    fn eq(&self, other: &Self) -> bool {
+            self.commitment == other.commitment && self.hash == other.hash
+    }
+}
+
+
+impl<D> Paddable for DapolNodeContent<D> {
+    fn new_pad() -> Self {
+        DapolNodeContent {
+            commitment: PedersenGens::default().commit(Scalar::from(3_u32), Scalar::from(0_u32)),
+            hash: H256::default(),
+            _phantom_hash_function: PhantomData,
+        }
+    }
+}
+
+pub trait H256Convertable {
+    fn finalize_as_h256(&self) -> H256;
+}
+
+impl H256Convertable for blake3::Hasher {
+    fn finalize_as_h256(&self) -> H256 {
+        H256(self.finalize().as_bytes().clone())
+    }
+}
+
+impl<D: Digest + H256Convertable> Mergeable for DapolNodeContent<D> {
+    /// Returns the parent node by merging two child nodes.
+    ///
+    /// The commitment of the parent is the homomorphic sum of the two children.
+    /// The hash of the parent is computed by hashing the concatenated commitments and hashes of two children.
+    fn merge_with_left_sibling(&self, right_child: &Self) -> Self {
+        // C(parent) = C(L) + C(R)
+        let parent_commitment = self.commitment + right_child.commitment;
+
+        // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
+        let parent_hash = {
+            // STENT TODO test with: let mut hasher = blake3::Hasher::new();
+            let mut hasher = D::new();
+            hasher.update(self.commitment.compress().as_bytes());
+            hasher.update(right_child.commitment.compress().as_bytes());
+            hasher.update(self.hash.as_bytes());
+            hasher.update(right_child.hash.as_bytes());
+            hasher.finalize_as_h256() // STENT TODO double check the output of this thing
+        };
+
+        DapolNodeContent {
+            commitment: parent_commitment,
+            hash: parent_hash,
+            _phantom_hash_function: PhantomData,
+        }
+    }
+}
+
+pub struct SparseSummationMerkleTree<C: Clone> {
+    root: Node<C>,
+    store: HashMap<Coordinate, Node<C>>,
     height: u64,
 }
 
-impl SparseSummationMerkleTree {
-    fn insert_node(&mut self, node: Node) {
+impl<C: Mergeable + Paddable + Clone> SparseSummationMerkleTree<C> {
+    fn insert_node(&mut self, node: Node<C>) {
         self.store.insert(node.coord.clone(), node);
     }
 
@@ -30,7 +115,7 @@ impl SparseSummationMerkleTree {
     }
 
     // create a padding node as the right child, then merge to get the parent; insert both into the store
-    fn create_parent_from_only_left_child(&mut self, left_child: &Node) -> u64 {
+    fn create_parent_from_only_left_child(&mut self, left_child: &Node<C>) -> u64 {
         let right_child = left_child.new_right_sibling_padding_node();
         let parent_node = right_child.merge_with_left_sibling(left_child);
         let parrent_node_x_coord = parent_node.coord.x;
@@ -40,16 +125,23 @@ impl SparseSummationMerkleTree {
     }
 }
 
-impl SparseSummationMerkleTree {
-    fn get_node(&self, coord: &Coordinate) -> Option<&Node> {
+impl<C: Clone> SparseSummationMerkleTree<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
         self.store.get(coord)
     }
 }
 
-// STENT why have an array of u8 as apposed to an array of u64?
+// STENT TODO why have an array of u8 as apposed to an array of u64?
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct H256([u8; 32]);
 
+impl H256 {
+    fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
+
+// STENT TODO maybe rename this to TreeIndex
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     // STENT TODO make these bounded, which depends on tree height
@@ -59,22 +151,16 @@ pub struct Coordinate {
 
 // STENT TODO maybe turn into enum with Internal, Padding, Node as options
 #[derive(Clone, Debug)]
-pub struct Node {
-    hash: H256, // STENT do we really need this? Is this the best type?
-    value: u64, // STENT change to Pedersen commitment
+pub struct Node<C: Clone> {
     coord: Coordinate,
+    content: C,
 }
 
-impl Node {
-    fn get_hash_bytes(&self) -> &[u8] {
-        &self.hash.0
-    }
-
+impl<C: Default + Clone> Node<C> {
     fn default_root(height: u64) -> Self {
         Node {
-            hash: H256::default(),
-            value: 0,
-            coord: Coordinate {y:height, x:0},
+            coord: Coordinate { y: height, x: 0 },
+            content: C::default(),
         }
     }
 
@@ -86,49 +172,38 @@ impl Node {
     // }
 }
 
-impl Node {
+// STENT TODO do padding trait
+impl<C: Mergeable + Paddable + Clone> Node<C> {
     fn new_right_sibling_padding_node(&self) -> Self {
         Node {
-            hash: H256::default(), // STENT TODO make this match the paper
-            value: 0,
             coord: self.get_right_sibling_coord(),
+            content: Paddable::new_pad(),
         }
     }
 
     fn new_left_sibling_padding_node(&self) -> Self {
         Node {
-            hash: H256::default(), // STENT TODO make this match the paper
-            value: 0,
             coord: self.get_left_sibling_coord(),
+            content: Paddable::new_pad(),
         }
     }
 
     // create a parent node by merging this node with it's left sibling node
-    fn merge_with_left_sibling(&self, left_sibling: &Node) -> Self {
+    fn merge_with_left_sibling(&self, left_sibling: &Node<C>) -> Self {
         if !self.is_right_sibling() {
             panic!("This node is not a right sibling");
         }
-        let h = {
-            let mut hasher = blake3::Hasher::new();
-            // STENT TODO is little endian correct here?
-            hasher.update(&left_sibling.value.to_le_bytes());
-            hasher.update(&self.value.to_le_bytes());
-            hasher.update(left_sibling.get_hash_bytes());
-            hasher.update(self.get_hash_bytes());
-            *hasher.finalize().as_bytes() // STENT TODO double check the output of this thing
-        };
         Node {
-            hash: H256(h),
-            value: left_sibling.value + self.value,
             coord: Coordinate {
                 y: self.coord.y + 1,
                 x: self.coord.x / 2,
             },
+            content: self.content.merge_with_left_sibling(&left_sibling.content),
         }
     }
 }
 
-impl Node {
+impl<C: Clone> Node<C> {
     // returns true if this node is a right sibling
     // since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2
     // since x_coord starts from 0 we check if the modulus is equal to 1
@@ -144,12 +219,12 @@ impl Node {
     }
 
     // return true if the given node lives just to the right of self
-    fn is_left_sibling_of(&self, other: &Node) -> bool {
+    fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         self.coord.y == other.coord.y && self.coord.x - 1 == other.coord.x
     }
 
     // return true if the given node lives just to the left of self
-    fn is_right_sibling_of(&self, other: &Node) -> bool {
+    fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
         self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
     }
 
@@ -193,10 +268,11 @@ fn are_siblings(left_x_coord: u64, right_x_coord: u64) -> bool {
     left_x_coord + 1 == right_x_coord
 }
 
-impl SparseSummationMerkleTree {
+impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
     // STENT TODO make this return a Result instead
     //   do we actually want it to return an option? why not just return the tree straight?
-    pub fn new(leaves: &Vec<Node>, height: u64) -> Option<SparseSummationMerkleTree> {
+    pub fn new(leaves: &Vec<Node<C>>, height: u64) -> Option<SparseSummationMerkleTree<C>> {
+        // STENT TODO need to make sure the number of leaves is less than 2^height
         for leaf in leaves {
             assert!(leaf.coord.y == 0, "Leaf nodes must all have y-coord of 0");
         }
@@ -240,6 +316,7 @@ impl SparseSummationMerkleTree {
                 parent_layer.push(parent_node_x_coord);
             }
 
+            // STENT TODO try avoid using clone here, we can probably do that by using an into_iter and taking ownership of the leaf nodes given as a parameter
             tree.insert_node(current_leaf_node.clone());
         }
 
@@ -293,7 +370,10 @@ impl SparseSummationMerkleTree {
         }
 
         // needs to be checked for the next line of code to work
-        assert!(height >= 3, "Tree too small for constructor logic to handle");
+        assert!(
+            height >= 3,
+            "Tree too small for constructor logic to handle"
+        );
 
         let left_child = tree
             .get_node(&Coordinate {
@@ -313,10 +393,10 @@ impl SparseSummationMerkleTree {
         Some(tree)
     }
 
-    fn create_inclusion_proof(&self, leaf: &Node) -> InclusionProof {
+    fn create_inclusion_proof(&self, leaf: &Node<C>) -> InclusionProof<C> {
         self.get_node(&leaf.coord)
             .expect("Provided leaf node is not part of the tree");
-        let mut siblings = Vec::<Node>::new();
+        let mut siblings = Vec::<Node<C>>::new();
         let mut current_node = leaf;
 
         for y in 0..self.height - 1 {
@@ -343,13 +423,13 @@ impl SparseSummationMerkleTree {
     }
 }
 
-pub struct InclusionProof {
-    leaf: Node,
-    siblings: Vec<Node>,
-    root: Node,
+pub struct InclusionProof<C: Clone> {
+    leaf: Node<C>,
+    siblings: Vec<Node<C>>,
+    root: Node<C>,
 }
 
-impl InclusionProof {
+impl<C: Mergeable + Paddable + Clone + PartialEq> InclusionProof<C> {
     fn verify(&self) {
         let mut parent = self.leaf.clone();
 
@@ -362,43 +442,61 @@ impl InclusionProof {
             parent = right_child.merge_with_left_sibling(left_child);
         }
 
-        if parent.hash != self.root.hash {
+        if parent.content != self.root.content {
             panic!("Verify failed");
         }
     }
 }
 
-#[test]
-pub fn stent_tree_test() {
-    let height = 4;
-    let leaf_1 = Node {
-        hash: H256::default(),
-        value: 1,
-        coord: Coordinate { y: 0, x: 0 },
-    };
-    let leaf_2 = Node {
-        hash: H256::default(),
-        value: 2,
-        coord: Coordinate { y: 0, x: 4 },
-    };
-    let leaf_3 = Node {
-        hash: H256::default(),
-        value: 3,
-        coord: Coordinate { y: 0, x: 7 },
-    };
-    let input: Vec<Node> = vec![leaf_1, leaf_2, leaf_3];
-    let tree = SparseSummationMerkleTree::new(&input, height).unwrap();
-    for item in &tree.store {
-        println!("{:?}", item);
+#[cfg(test)]
+mod tests {
+    use curve25519_dalek_ng::scalar::Scalar;
+
+    use super::*;
+
+    #[test]
+    pub fn stent_tree_test() {
+        let height = 4;
+        let v_blinding = Scalar::from(8_u32);
+
+        let leaf_1 = Node::<DapolNodeContent<blake3::Hasher>> {
+            coord: Coordinate { y: 0, x: 0 },
+            content: DapolNodeContent {
+                hash: H256::default(),
+                commitment: PedersenGens::default().commit(Scalar::from(0_u32), v_blinding),
+                _phantom_hash_function: PhantomData,
+            },
+        };
+        let leaf_2 = Node::<DapolNodeContent<blake3::Hasher>> {
+            coord: Coordinate { y: 0, x: 4 },
+            content: DapolNodeContent {
+                hash: H256::default(),
+                commitment: PedersenGens::default().commit(Scalar::from(2_u32), v_blinding),
+                _phantom_hash_function: PhantomData,
+            },
+        };
+        let leaf_3 = Node::<DapolNodeContent<blake3::Hasher>> {
+            coord: Coordinate { y: 0, x: 7 },
+            content: DapolNodeContent {
+                hash: H256::default(),
+                commitment: PedersenGens::default().commit(Scalar::from(3_u32), v_blinding),
+                _phantom_hash_function: PhantomData,
+            },
+        };
+        let input: Vec<Node<DapolNodeContent<blake3::Hasher>>> = vec![leaf_1, leaf_2, leaf_3];
+        let tree = SparseSummationMerkleTree::new(&input, height).unwrap();
+        for item in &tree.store {
+            println!("{:?}", item);
+        }
+
+        println!("\n");
+
+        let proof = tree.create_inclusion_proof(&input[0]);
+        for item in &proof.siblings {
+            println!("{:?}", item);
+        }
+
+        println!("\n");
+        proof.verify();
     }
-
-    println!("\n");
-
-    let proof = tree.create_inclusion_proof(&input[0]);
-    for item in &proof.siblings {
-        println!("{:?}", item);
-    }
-
-    println!("\n");
-    proof.verify();
 }
