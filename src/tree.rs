@@ -516,14 +516,14 @@ mod tests {
         let tree =
             SparseSummationMerkleTree::new(&input, height, &new_padding_node_content).unwrap();
         for item in &tree.store {
-            println!("{:?}", item);
+            println!("coord {:?} hash {:?}", item.1.coord, item.1.content.hash);
         }
 
         println!("\n");
 
         let proof = tree.create_inclusion_proof(&input[0]);
         for item in &proof.siblings {
-            println!("{:?}", item);
+            println!("coord {:?} hash {:?}", item.coord, item.content.hash);
         }
 
         println!("\n");
