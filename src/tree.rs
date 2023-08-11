@@ -1,9 +1,6 @@
 use ::std::collections::HashMap;
-use bulletproofs::PedersenGens;
-use curve25519_dalek_ng::{
-    ristretto::RistrettoPoint, scalar::Scalar,
-};
-use digest::{Digest};
+use curve25519_dalek_ng::ristretto::RistrettoPoint;
+use digest::Digest;
 use std::marker::PhantomData;
 
 // STENT TODO need to have the master secret as input somewhere
@@ -15,38 +12,17 @@ pub trait Mergeable {
     fn merge_with_left_sibling(&self, right_child: &Self) -> Self;
 }
 
-/// Trait for generating a padding node in the SMT.
-// STENT TODO maybe rename because I don't think you can say a node is paddable
-pub trait Paddable {
-    /// When the tree node of the input index doesn't exist,
-    /// we need to construct a padding node at that position.
-    fn new_pad(// idx: &TreeIndex, secret: &Secret
-    ) -> Self;
-}
-
 /// Node content data for the DAPOL+ protocol, consisting of the Pedersen commitment and the hash.
 #[derive(Default, Clone, Debug)]
-// STENT TODO change D to H
-pub struct DapolNodeContent<D> {
+pub struct DapolNodeContent<H> {
     commitment: RistrettoPoint,
     hash: H256,
-    _phantom_hash_function: PhantomData<D>,
+    _phantom_hash_function: PhantomData<H>,
 }
 
-impl<D> PartialEq for DapolNodeContent<D> {
+impl<H> PartialEq for DapolNodeContent<H> {
     fn eq(&self, other: &Self) -> bool {
-            self.commitment == other.commitment && self.hash == other.hash
-    }
-}
-
-
-impl<D> Paddable for DapolNodeContent<D> {
-    fn new_pad() -> Self {
-        DapolNodeContent {
-            commitment: PedersenGens::default().commit(Scalar::from(3_u32), Scalar::from(0_u32)),
-            hash: H256::default(),
-            _phantom_hash_function: PhantomData,
-        }
+        self.commitment == other.commitment && self.hash == other.hash
     }
 }
 
@@ -60,7 +36,7 @@ impl H256Convertable for blake3::Hasher {
     }
 }
 
-impl<D: Digest + H256Convertable> Mergeable for DapolNodeContent<D> {
+impl<H: Digest + H256Convertable> Mergeable for DapolNodeContent<H> {
     /// Returns the parent node by merging two child nodes.
     ///
     /// The commitment of the parent is the homomorphic sum of the two children.
@@ -72,7 +48,7 @@ impl<D: Digest + H256Convertable> Mergeable for DapolNodeContent<D> {
         // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
         let parent_hash = {
             // STENT TODO test with: let mut hasher = blake3::Hasher::new();
-            let mut hasher = D::new();
+            let mut hasher = H::new();
             hasher.update(self.commitment.compress().as_bytes());
             hasher.update(right_child.commitment.compress().as_bytes());
             hasher.update(self.hash.as_bytes());
@@ -94,19 +70,26 @@ pub struct SparseSummationMerkleTree<C: Clone> {
     height: u64,
 }
 
-impl<C: Mergeable + Paddable + Clone> SparseSummationMerkleTree<C> {
+impl<C: Mergeable + Clone> SparseSummationMerkleTree<C> {
     fn insert_node(&mut self, node: Node<C>) {
         self.store.insert(node.coord.clone(), node);
     }
 
     // create a padding node as the right child, then merge to get the parent; insert both into the store
-    fn create_parent_from_only_left_child_coord(&mut self, left_child_coord: &Coordinate) -> u64 {
+    fn create_parent_from_only_left_child_coord<F>(
+        &mut self,
+        left_child_coord: &Coordinate,
+        new_padding_node_content: &F,
+    ) -> u64
+    where
+        F: Fn(&Coordinate) -> C,
+    {
         // if this is not in the store then there is a bug, so definitely panic
         let left_child = self
             .store
             .get(&left_child_coord)
             .expect("Left child coordinates given to do match a node in the store");
-        let right_child = left_child.new_right_sibling_padding_node();
+        let right_child = left_child.new_right_sibling_padding_node(new_padding_node_content);
         let parent_node = right_child.merge_with_left_sibling(left_child);
         let parrent_node_x_coord = parent_node.coord.x;
         self.insert_node(parent_node);
@@ -115,8 +98,15 @@ impl<C: Mergeable + Paddable + Clone> SparseSummationMerkleTree<C> {
     }
 
     // create a padding node as the right child, then merge to get the parent; insert both into the store
-    fn create_parent_from_only_left_child(&mut self, left_child: &Node<C>) -> u64 {
-        let right_child = left_child.new_right_sibling_padding_node();
+    fn create_parent_from_only_left_child<F>(
+        &mut self,
+        left_child: &Node<C>,
+        new_padding_node_content: &F,
+    ) -> u64
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let right_child = left_child.new_right_sibling_padding_node(new_padding_node_content);
         let parent_node = right_child.merge_with_left_sibling(left_child);
         let parrent_node_x_coord = parent_node.coord.x;
         self.insert_node(parent_node);
@@ -172,20 +162,36 @@ impl<C: Default + Clone> Node<C> {
     // }
 }
 
-// STENT TODO do padding trait
-impl<C: Mergeable + Paddable + Clone> Node<C> {
-    fn new_right_sibling_padding_node(&self) -> Self {
-        Node {
-            coord: self.get_right_sibling_coord(),
-            content: Paddable::new_pad(),
+impl<C: Mergeable + Clone> Node<C> {
+    // STENT TODO this closure's implementation of the padding functionality is experimental. Should we rather have a struct-wide generic type? what about the hash function for the merge? it has a similar situation
+    //  it seems this is the best way because it can take _multiple_ contexts (coord + whatever context where it is defined)
+    fn new_right_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Self
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        if !self.is_left_sibling() {
+            panic!(
+                "This node is not a left sibling so a right sibling padding node cannot be created"
+            );
         }
+        let coord = self.get_right_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        Node { coord, content }
     }
 
-    fn new_left_sibling_padding_node(&self) -> Self {
-        Node {
-            coord: self.get_left_sibling_coord(),
-            content: Paddable::new_pad(),
+    fn new_left_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Self
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        // STENT TODO we can potentially get rid of these panics by having a left and right sibling type (enums)
+        if !self.is_right_sibling() {
+            panic!(
+                "This node is not a right sibling so a left sibling padding node cannot be created"
+            );
         }
+        let coord = self.get_left_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        Node { coord, content }
     }
 
     // create a parent node by merging this node with it's left sibling node
@@ -268,10 +274,17 @@ fn are_siblings(left_x_coord: u64, right_x_coord: u64) -> bool {
     left_x_coord + 1 == right_x_coord
 }
 
-impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
+impl<C: Mergeable + Default + Clone> SparseSummationMerkleTree<C> {
     // STENT TODO make this return a Result instead
     //   do we actually want it to return an option? why not just return the tree straight?
-    pub fn new(leaves: &Vec<Node<C>>, height: u64) -> Option<SparseSummationMerkleTree<C>> {
+    pub fn new<F>(
+        leaves: &Vec<Node<C>>,
+        height: u64,
+        new_padding_node_content: &F,
+    ) -> Option<SparseSummationMerkleTree<C>>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
         // STENT TODO need to make sure the number of leaves is less than 2^height
         for leaf in leaves {
             assert!(leaf.coord.y == 0, "Leaf nodes must all have y-coord of 0");
@@ -297,7 +310,8 @@ impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
                     right_child.merge_with_left_sibling(&leaves[i - 1])
                 } else {
                     // ...otherwise create a padding node
-                    let left_child = right_child.new_left_sibling_padding_node();
+                    let left_child =
+                        right_child.new_left_sibling_padding_node(new_padding_node_content);
                     let parent_node = right_child.merge_with_left_sibling(&left_child);
                     tree.insert_node(left_child);
                     parent_node
@@ -311,8 +325,10 @@ impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
                 // this leaf is a left sibling AND needs a padding node
                 // if this leaf is a left sibling and does not need a padding node (i.e. right sibling is in leaves) then it will be caught by the previous if-statement in the next loop iteration
 
-                let parent_node_x_coord =
-                    tree.create_parent_from_only_left_child(&current_leaf_node);
+                let parent_node_x_coord = tree.create_parent_from_only_left_child(
+                    &current_leaf_node,
+                    new_padding_node_content,
+                );
                 parent_layer.push(parent_node_x_coord);
             }
 
@@ -348,7 +364,8 @@ impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
                         right_child.merge_with_left_sibling(&left_child)
                     } else {
                         // ...otherwise create a padding node
-                        let left_child = right_child.new_left_sibling_padding_node();
+                        let left_child =
+                            right_child.new_left_sibling_padding_node(new_padding_node_content);
                         let node = right_child.merge_with_left_sibling(&left_child);
                         tree.insert_node(left_child);
                         node
@@ -362,8 +379,10 @@ impl<C: Mergeable + Paddable + Default + Clone> SparseSummationMerkleTree<C> {
                     // this node is a left sibling AND needs a padding node
                     // if this leaf is a left sibling and does not need a padding node (i.e. right sibling is in leaves) then it will be caught by the previous if-statement in the next loop iteration
 
-                    let parent_node_x_coord =
-                        tree.create_parent_from_only_left_child_coord(&current_coord);
+                    let parent_node_x_coord = tree.create_parent_from_only_left_child_coord(
+                        &current_coord,
+                        new_padding_node_content,
+                    );
                     parent_layer.push(parent_node_x_coord);
                 }
             }
@@ -429,7 +448,7 @@ pub struct InclusionProof<C: Clone> {
     root: Node<C>,
 }
 
-impl<C: Mergeable + Paddable + Clone + PartialEq> InclusionProof<C> {
+impl<C: Mergeable + Clone + PartialEq> InclusionProof<C> {
     fn verify(&self) {
         let mut parent = self.leaf.clone();
 
@@ -450,6 +469,7 @@ impl<C: Mergeable + Paddable + Clone + PartialEq> InclusionProof<C> {
 
 #[cfg(test)]
 mod tests {
+    use bulletproofs::PedersenGens;
     use curve25519_dalek_ng::scalar::Scalar;
 
     use super::*;
@@ -458,6 +478,15 @@ mod tests {
     pub fn stent_tree_test() {
         let height = 4;
         let v_blinding = Scalar::from(8_u32);
+
+        let new_padding_node_content = |coord: &Coordinate| -> DapolNodeContent<blake3::Hasher> {
+            DapolNodeContent {
+                commitment: PedersenGens::default()
+                    .commit(Scalar::from(3_u32), Scalar::from(0_u32)),
+                hash: H256::default(),
+                _phantom_hash_function: PhantomData,
+            }
+        };
 
         let leaf_1 = Node::<DapolNodeContent<blake3::Hasher>> {
             coord: Coordinate { y: 0, x: 0 },
@@ -484,7 +513,8 @@ mod tests {
             },
         };
         let input: Vec<Node<DapolNodeContent<blake3::Hasher>>> = vec![leaf_1, leaf_2, leaf_3];
-        let tree = SparseSummationMerkleTree::new(&input, height).unwrap();
+        let tree =
+            SparseSummationMerkleTree::new(&input, height, &new_padding_node_content).unwrap();
         for item in &tree.store {
             println!("{:?}", item);
         }
