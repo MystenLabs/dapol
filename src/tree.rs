@@ -47,7 +47,6 @@ impl<H: Digest + H256Convertable> Mergeable for DapolNodeContent<H> {
 
         // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
         let parent_hash = {
-            // STENT TODO test with: let mut hasher = blake3::Hasher::new();
             let mut hasher = H::new();
             hasher.update(self.commitment.compress().as_bytes());
             hasher.update(right_child.commitment.compress().as_bytes());
@@ -121,7 +120,6 @@ impl<C: Clone> SparseSummationMerkleTree<C> {
     }
 }
 
-// STENT TODO why have an array of u8 as apposed to an array of u64?
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct H256([u8; 32]);
 
@@ -147,19 +145,12 @@ pub struct Node<C: Clone> {
 }
 
 impl<C: Default + Clone> Node<C> {
-    fn default_root(height: u64) -> Self {
+    fn default_root_node(height: u64) -> Self {
         Node {
             coord: Coordinate { y: height, x: 0 },
             content: C::default(),
         }
     }
-
-    // STENT TODO doesn't workout with the type system because the data is not stored as bytes,
-    //   so the ref is created for data that immediately goes out of scope
-    // fn get_value_bytes(&self) -> &[u8] {
-    //     // STENT TODO is little endian correct here?
-    //     &self.value.to_le_bytes()
-    // }
 }
 
 impl<C: Mergeable + Clone> Node<C> {
@@ -274,149 +265,134 @@ fn are_siblings(left_x_coord: u64, right_x_coord: u64) -> bool {
     left_x_coord + 1 == right_x_coord
 }
 
+pub struct InputLeafNode<C> {
+    content: C,
+    x_coord: u64,
+}
+
+impl<C: Clone> InputLeafNode<C> {
+    fn to_node(self) -> Node<C> {
+        Node {
+            content: self.content,
+            coord: Coordinate {
+                x: self.x_coord,
+                y: 0,
+            },
+        }
+    }
+}
+
+struct MaybeUnmatchedPair<C: Clone> {
+    left: Option<Node<C>>,
+    right: Option<Node<C>>,
+}
+
+struct MatchedPair<C: Clone> {
+    left: Node<C>,
+    right: Node<C>,
+}
+
 impl<C: Mergeable + Default + Clone> SparseSummationMerkleTree<C> {
     // STENT TODO make this return a Result instead
     //   do we actually want it to return an option? why not just return the tree straight?
     pub fn new<F>(
-        leaves: &Vec<Node<C>>,
+        // STENT TODO need to make sure the number of leaves is less than 2^height
+        leaves: Vec<InputLeafNode<C>>,
         height: u64,
         new_padding_node_content: &F,
     ) -> Option<SparseSummationMerkleTree<C>>
     where
         F: Fn(&Coordinate) -> C,
     {
-        // STENT TODO need to make sure the number of leaves is less than 2^height
-        for leaf in leaves {
-            assert!(leaf.coord.y == 0, "Leaf nodes must all have y-coord of 0");
-        }
         let mut tree = SparseSummationMerkleTree {
-            root: Node::default_root(height),
+            root: Node::default_root_node(height),
             store: HashMap::new(),
             height,
         };
-        let mut parent_layer = Vec::<u64>::new();
+        let mut parent_layer = Vec::<Node<C>>::new();
 
-        // put all the leaves in the tree
-        for i in 0..leaves.len() {
-            let current_leaf_node = &leaves[i];
+        // STENT TODO make sure leaves are sorted by x_coord
 
-            if current_leaf_node.is_right_sibling() {
-                // this leaf is a right sibling (x starts at 0)
-
-                let right_child = current_leaf_node;
-
-                let parent_node = if i > 0 && right_child.is_left_sibling_of(&leaves[i - 1]) {
-                    // if the sibling leaf is available then use that..
-                    right_child.merge_with_left_sibling(&leaves[i - 1])
-                } else {
-                    // ...otherwise create a padding node
-                    let left_child =
-                        right_child.new_left_sibling_padding_node(new_padding_node_content);
-                    let parent_node = right_child.merge_with_left_sibling(&left_child);
-                    tree.insert_node(left_child);
-                    parent_node
-                };
-
-                parent_layer.push(parent_node.coord.x);
-                tree.insert_node(parent_node);
-            } else if i == leaves.len() - 1
-                || !current_leaf_node.is_right_sibling_of(&leaves[i + 1])
-            {
-                // this leaf is a left sibling AND needs a padding node
-                // if this leaf is a left sibling and does not need a padding node (i.e. right sibling is in leaves) then it will be caught by the previous if-statement in the next loop iteration
-
-                let parent_node_x_coord = tree.create_parent_from_only_left_child(
-                    &current_leaf_node,
-                    new_padding_node_content,
-                );
-                parent_layer.push(parent_node_x_coord);
-            }
-
-            // STENT TODO try avoid using clone here, we can probably do that by using an into_iter and taking ownership of the leaf nodes given as a parameter
-            tree.insert_node(current_leaf_node.clone());
-        }
-
-        // calculate nodes in the upper layers and put them in the tree
-        // loop over all the layers (except the bottom layer), bottom to top
-        for y in 1..height - 1 {
-            let current_layer = parent_layer;
-            parent_layer = Vec::<u64>::new();
-
-            // loop over all the nodes
-            for i in 0..current_layer.len() {
-                let current_coord = Coordinate {
-                    y,
-                    x: current_layer[i],
-                };
-
-                if is_right_sibling(current_coord.x) {
-                    // this node is a right sibling
-
-                    // if this is not in the tree then there is a bug in the above loop, so definitely panic
-                    let right_child = tree
-                        .get_node(&current_coord)
-                        .expect("Right sibling node should have been in the store");
-
-                    let parent_node = if let Some(left_child) =
-                        tree.get_node(&right_child.get_left_sibling_coord())
-                    {
-                        // if the sibling node exists in the tree then use that..
-                        right_child.merge_with_left_sibling(&left_child)
+        // translate InputLeafNode to Node
+        let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+        while nodes.len() > 1 {
+            nodes = nodes
+                .into_iter()
+                // sort nodes into pairs (left & right siblings)
+                .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
+                    if node.is_left_sibling() {
+                        pairs.push(MaybeUnmatchedPair {
+                            left: Some(node),
+                            right: Option::None,
+                        });
                     } else {
-                        // ...otherwise create a padding node
-                        let left_child =
-                            right_child.new_left_sibling_padding_node(new_padding_node_content);
-                        let node = right_child.merge_with_left_sibling(&left_child);
-                        tree.insert_node(left_child);
-                        node
-                    };
-
-                    parent_layer.push(parent_node.coord.x);
-                    tree.insert_node(parent_node);
-                } else if i == current_layer.len() - 1
-                    || !are_siblings(current_coord.x, current_layer[i + 1])
-                {
-                    // this node is a left sibling AND needs a padding node
-                    // if this leaf is a left sibling and does not need a padding node (i.e. right sibling is in leaves) then it will be caught by the previous if-statement in the next loop iteration
-
-                    let parent_node_x_coord = tree.create_parent_from_only_left_child_coord(
-                        &current_coord,
-                        new_padding_node_content,
-                    );
-                    parent_layer.push(parent_node_x_coord);
-                }
-            }
+                        let is_right_sibling_of_prev_node = pairs
+                            .last_mut()
+                            .map(|pair| (&pair.left).as_ref())
+                            .flatten()
+                            .is_some_and(|left| left.coord.x + 1 == node.coord.x);
+                        if is_right_sibling_of_prev_node {
+                            pairs
+                                .last_mut()
+                                // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                .expect("[Bug in tree constructor] Previous node not found")
+                                .right = Option::Some(node);
+                        } else {
+                            pairs.push(MaybeUnmatchedPair {
+                                left: Option::None,
+                                right: Some(node),
+                            });
+                        }
+                    }
+                    pairs
+                })
+                .into_iter()
+                // add padding nodes to unmatched pairs
+                .map(|pair| match (pair.left, pair.right) {
+                    (Some(left), Some(right)) => MatchedPair { left, right },
+                    (Some(left), None) => MatchedPair {
+                        right: left.new_right_sibling_padding_node(new_padding_node_content),
+                        left,
+                    },
+                    (None, Some(right)) => MatchedPair {
+                        left: right.new_left_sibling_padding_node(new_padding_node_content),
+                        right,
+                    },
+                    // if this case is reached then there is a bug in the above fold
+                    (None, None) => {
+                        panic!("[Bug in tree constructor] Invalid pair (None, None) found")
+                    }
+                })
+                // create parents for the next loop iteration, and add the pairs to the tree
+                .map(|pair| {
+                    let parent = pair.right.merge_with_left_sibling(&pair.left);
+                    tree.insert_node(pair.left);
+                    tree.insert_node(pair.right);
+                    parent
+                })
+                .collect();
         }
 
-        // needs to be checked for the next line of code to work
-        assert!(
-            height >= 3,
-            "Tree too small for constructor logic to handle"
-        );
-
-        let left_child = tree
-            .get_node(&Coordinate {
-                y: height - 2,
-                x: 0,
-            })
-            .expect("Left child for root node not in tree");
-        let right_child = tree
-            .get_node(&Coordinate {
-                y: height - 2,
-                x: 1,
-            })
-            .expect("Right child for root node not in tree");
-        let root_node = right_child.merge_with_left_sibling(left_child);
-        tree.root = root_node.clone();
-        tree.store.insert(root_node.coord.clone(), root_node);
+        let root = nodes.pop().expect("Unable to find root node");
+        tree.root = root.clone();
+        tree.store.insert(root.coord.clone(), root);
         Some(tree)
     }
 
-    fn create_inclusion_proof(&self, leaf: &Node<C>) -> InclusionProof<C> {
-        self.get_node(&leaf.coord)
-            .expect("Provided leaf node is not part of the tree");
-        let mut siblings = Vec::<Node<C>>::new();
+    // STENT TODO maybe we can compress by using something smaller than u64 for coords
+    fn create_inclusion_proof(&self, leaf_x_coord: u64) -> InclusionProof<C> {
+        let coord = Coordinate {
+            x: leaf_x_coord,
+            y: 0,
+        };
+
+        let leaf = self
+            .get_node(&coord)
+            // STENT TODO better error message
+            .expect("Cannot find leaf node in the tree");
+
         let mut current_node = leaf;
+        let mut siblings = Vec::<Node<C>>::new();
 
         for y in 0..self.height - 1 {
             let x_coord = if current_node.is_right_sibling() {
@@ -432,6 +408,7 @@ impl<C: Mergeable + Default + Clone> SparseSummationMerkleTree<C> {
             );
             current_node = &self
                 .get_node(&current_node.get_parent_coord())
+                // STENT TODO better error message
                 .expect("Parent node not in the tree");
         }
         InclusionProof {
@@ -488,40 +465,40 @@ mod tests {
             }
         };
 
-        let leaf_1 = Node::<DapolNodeContent<blake3::Hasher>> {
-            coord: Coordinate { y: 0, x: 0 },
+        let leaf_1 = InputLeafNode::<DapolNodeContent<blake3::Hasher>> {
+            x_coord: 0,
             content: DapolNodeContent {
                 hash: H256::default(),
                 commitment: PedersenGens::default().commit(Scalar::from(0_u32), v_blinding),
                 _phantom_hash_function: PhantomData,
             },
         };
-        let leaf_2 = Node::<DapolNodeContent<blake3::Hasher>> {
-            coord: Coordinate { y: 0, x: 4 },
+        let leaf_2 = InputLeafNode::<DapolNodeContent<blake3::Hasher>> {
+            x_coord: 4,
             content: DapolNodeContent {
                 hash: H256::default(),
                 commitment: PedersenGens::default().commit(Scalar::from(2_u32), v_blinding),
                 _phantom_hash_function: PhantomData,
             },
         };
-        let leaf_3 = Node::<DapolNodeContent<blake3::Hasher>> {
-            coord: Coordinate { y: 0, x: 7 },
+        let leaf_3 = InputLeafNode::<DapolNodeContent<blake3::Hasher>> {
+            x_coord: 7,
             content: DapolNodeContent {
                 hash: H256::default(),
                 commitment: PedersenGens::default().commit(Scalar::from(3_u32), v_blinding),
                 _phantom_hash_function: PhantomData,
             },
         };
-        let input: Vec<Node<DapolNodeContent<blake3::Hasher>>> = vec![leaf_1, leaf_2, leaf_3];
+        let input = vec![leaf_1, leaf_2, leaf_3];
         let tree =
-            SparseSummationMerkleTree::new(&input, height, &new_padding_node_content).unwrap();
+            SparseSummationMerkleTree::new(input, height, &new_padding_node_content).unwrap();
         for item in &tree.store {
             println!("coord {:?} hash {:?}", item.1.coord, item.1.content.hash);
         }
 
         println!("\n");
 
-        let proof = tree.create_inclusion_proof(&input[0]);
+        let proof = tree.create_inclusion_proof(0);
         for item in &proof.siblings {
             println!("coord {:?} hash {:?}", item.coord, item.content.hash);
         }
