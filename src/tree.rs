@@ -66,7 +66,7 @@ impl<H: Digest + H256Convertable> Mergeable for DapolNodeContent<H> {
 pub struct SparseSummationMerkleTree<C: Clone> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
-    height: u64,
+    height: u32,
 }
 
 impl<C: Mergeable + Clone> SparseSummationMerkleTree<C> {
@@ -133,11 +133,10 @@ impl H256 {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     // STENT TODO make these bounded, which depends on tree height
-    y: u64, // from 0 to height
+    y: u32, // from 0 to height
     x: u64, // from 0 to 2^y
 }
 
-// STENT TODO maybe turn into enum with Internal, Padding, Node as options
 #[derive(Clone, Debug)]
 pub struct Node<C: Clone> {
     coord: Coordinate,
@@ -145,7 +144,7 @@ pub struct Node<C: Clone> {
 }
 
 impl<C: Default + Clone> Node<C> {
-    fn default_root_node(height: u64) -> Self {
+    fn default_root_node(height: u32) -> Self {
         Node {
             coord: Coordinate { y: height, x: 0 },
             content: C::default(),
@@ -162,7 +161,7 @@ impl<C: Mergeable + Clone> Node<C> {
     {
         if !self.is_left_sibling() {
             panic!(
-                "This node is not a left sibling so a right sibling padding node cannot be created"
+                "[Bug in tree constructor] This node is not a left sibling so a right sibling padding node cannot be created"
             );
         }
         let coord = self.get_right_sibling_coord();
@@ -174,10 +173,9 @@ impl<C: Mergeable + Clone> Node<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
-        // STENT TODO we can potentially get rid of these panics by having a left and right sibling type (enums)
         if !self.is_right_sibling() {
             panic!(
-                "This node is not a right sibling so a left sibling padding node cannot be created"
+                "[Bug in tree constructor] This node is not a right sibling so a left sibling padding node cannot be created"
             );
         }
         let coord = self.get_left_sibling_coord();
@@ -188,7 +186,7 @@ impl<C: Mergeable + Clone> Node<C> {
     // create a parent node by merging this node with it's left sibling node
     fn merge_with_left_sibling(&self, left_sibling: &Node<C>) -> Self {
         if !self.is_right_sibling() {
-            panic!("This node is not a right sibling");
+            panic!("[Bug in tree constructor] This node is not a right sibling");
         }
         Node {
             coord: Coordinate {
@@ -296,14 +294,16 @@ impl<C: Mergeable + Default + Clone> SparseSummationMerkleTree<C> {
     // STENT TODO make this return a Result instead
     //   do we actually want it to return an option? why not just return the tree straight?
     pub fn new<F>(
-        // STENT TODO need to make sure the number of leaves is less than 2^height
         leaves: Vec<InputLeafNode<C>>,
-        height: u64,
+        height: u32,
         new_padding_node_content: &F,
     ) -> Option<SparseSummationMerkleTree<C>>
     where
         F: Fn(&Coordinate) -> C,
     {
+        let max_leaves = 2usize.pow(height);
+        assert!(leaves.len() < max_leaves);
+
         let mut tree = SparseSummationMerkleTree {
             root: Node::default_root_node(height),
             store: HashMap::new(),
