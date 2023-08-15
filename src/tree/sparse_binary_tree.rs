@@ -79,12 +79,12 @@ impl<C: Clone> Node<C> {
 
     // return true if the given node lives just to the right of self
     fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
-        self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
+        self.is_left_sibling() && self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
     }
 
     // return true if the given node lives just to the left of self
     fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
-        self.coord.x > 0 && self.coord.y == other.coord.y && self.coord.x - 1 == other.coord.x
+        self.is_right_sibling() && self.coord.x > 0 && self.coord.y == other.coord.y && self.coord.x - 1 == other.coord.x
     }
 
     // self must be a right sibling, otherwise will panic
