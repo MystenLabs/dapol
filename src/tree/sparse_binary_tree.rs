@@ -132,46 +132,90 @@ impl<C: Clone> InputLeafNode<C> {
     }
 }
 
+struct LeftSibling<C: Clone>(Node<C>);
+struct RightSibling<C: Clone>(Node<C>);
+
+impl<C: Clone> LeftSibling<C> {
+    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let coord = self.0.get_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        let node = Node { coord, content };
+        RightSibling(node)
+    }
+}
+
+impl<C: Clone> RightSibling<C> {
+    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let coord = self.0.get_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        let node = Node { coord, content };
+        LeftSibling(node)
+    }
+}
+
+enum Sibling<C: Clone> {
+    Left(LeftSibling<C>),
+    Right(RightSibling<C>),
+}
+
+impl<C: Clone> Sibling<C> {
+    fn from_node(node: Node<C>) -> Self {
+        if node.is_left_sibling() {
+            Sibling::Left(LeftSibling(node))
+        } else {
+            Sibling::Right(RightSibling(node))
+        }
+    }
+}
+
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
-    left: Option<Node<C>>,
-    right: Option<Node<C>>,
+    left: Option<LeftSibling<C>>,
+    right: Option<RightSibling<C>>,
 }
 
 struct MatchedPair<C: Mergeable + Clone> {
-    left: Node<C>,
-    right: Node<C>,
+    left: LeftSibling<C>,
+    right: RightSibling<C>,
 }
 
+struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
+struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
+
 struct MatchedPairRef<'a, C: Mergeable + Clone> {
-    left: &'a Node<C>,
-    right: &'a Node<C>,
+    left: LeftSiblingRef<'a, C>,
+    right: RightSiblingRef<'a, C>,
 }
 
 impl<C: Mergeable + Clone> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
-        MatchedPairRef {
-            left: &self.left,
-            right: &self.right,
+        Node {
+            coord: Coordinate {
+                y: self.left.0.coord.y + 1,
+                x: self.left.0.coord.x / 2,
+            },
+            content: C::merge(&self.left.0.content, &self.right.0.content),
         }
-        .merge()
     }
 }
 
 impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
-        // STENT TODO should we rather return a result here? Because this function is called in more places than the tree constructor
-        assert!(
-            self.left.is_left_sibling_of(self.right),
-            "[Bug in tree merge] Attempted merge for non-siblings"
-        );
         Node {
             coord: Coordinate {
-                y: self.left.coord.y + 1,
-                x: self.left.coord.x / 2,
+                y: self.left.0.coord.y + 1,
+                x: self.left.0.coord.x / 2,
             },
-            content: C::merge(&self.left.content, &self.right.content),
+            content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
 }
@@ -242,28 +286,30 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
                 .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
-                    if node.is_left_sibling() {
-                        pairs.push(MaybeUnmatchedPair {
-                            left: Some(node),
+                    let sibling = Sibling::from_node(node);
+                    match sibling {
+                        Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                            left: Some(left_sibling),
                             right: Option::None,
-                        });
-                    } else {
-                        let is_right_sibling_of_prev_node = pairs
-                            .last_mut()
-                            .map(|pair| (&pair.left).as_ref())
-                            .flatten()
-                            .is_some_and(|left| left.coord.x + 1 == node.coord.x);
-                        if is_right_sibling_of_prev_node {
-                            pairs
+                        }),
+                        Sibling::Right(right_sibling) => {
+                            let is_right_sibling_of_prev_node = pairs
                                 .last_mut()
-                                // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                                .expect("[Bug in tree constructor] Previous node not found")
-                                .right = Option::Some(node);
-                        } else {
-                            pairs.push(MaybeUnmatchedPair {
-                                left: Option::None,
-                                right: Some(node),
-                            });
+                                .map(|pair| (&pair.left).as_ref())
+                                .flatten()
+                                .is_some_and(|left| left.0.coord.x + 1 == right_sibling.0.coord.x);
+                            if is_right_sibling_of_prev_node {
+                                pairs
+                                    .last_mut()
+                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                    .expect("[Bug in tree constructor] Previous node not found")
+                                    .right = Option::Some(right_sibling);
+                            } else {
+                                pairs.push(MaybeUnmatchedPair {
+                                    left: Option::None,
+                                    right: Some(right_sibling),
+                                });
+                            }
                         }
                     }
                     pairs
@@ -289,8 +335,8 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 .map(|pair| {
                     let parent = pair.merge();
                     // STENT TODO not sure if we can get rid of these clones
-                    store.insert(pair.left.coord.clone(), pair.left);
-                    store.insert(pair.right.coord.clone(), pair.right);
+                    store.insert(pair.left.0.coord.clone(), pair.left.0);
+                    store.insert(pair.right.0.coord.clone(), pair.right.0);
                     parent
                 })
                 .collect();
@@ -403,13 +449,13 @@ impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
         for node in &self.siblings {
             let pair = if parent.is_right_sibling_of(node) {
                 Ok(MatchedPairRef {
-                    left: node,
-                    right: &parent,
+                    left: LeftSiblingRef(node),
+                    right: RightSiblingRef(&parent),
                 })
             } else if parent.is_left_sibling_of(node) {
                 Ok(MatchedPairRef {
-                    left: &parent,
-                    right: node,
+                    left: LeftSiblingRef(&parent),
+                    right: RightSiblingRef(node),
                 })
             } else {
                 Err(InclusionProofError::InvalidSibling {
@@ -685,11 +731,7 @@ mod tests {
             },
         };
 
-        let tree = SparseBinaryTree::new(
-            vec![leaf_0],
-            height,
-            &get_padding_function(),
-        );
+        let tree = SparseBinaryTree::new(vec![leaf_0], height, &get_padding_function());
 
         assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
     }
