@@ -2,18 +2,31 @@ use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
-use crate::tree::errors::{TreeError, TreeResult};
-
-static MIN_HEIGHT: usize = 2;
+static MIN_HEIGHT: u32 = 2;
 
 pub trait Mergeable {
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
 }
 
+#[derive(Debug)]
 pub struct SparseBinaryTree<C: Clone> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
     height: u32,
+}
+
+#[derive(Error, Debug)]
+pub enum SparseBinaryTreeError {
+    #[error("Too many leaves for the given height")]
+    TooManyLeaves,
+    #[error("Must provide at least 1 leaf")]
+    EmptyInput,
+    #[error("X coords for leaves must be less than 2^height")]
+    InvalidXCoord,
+    #[error("Height cannot be smaller than {MIN_HEIGHT:?}")]
+    HeightTooSmall,
+    #[error("Not allowed to have more than 1 leaf with the same x-coord")]
+    DuplicateLeaves,
 }
 
 impl<C: Mergeable + Clone> SparseBinaryTree<C> {
@@ -84,7 +97,10 @@ impl<C: Clone> Node<C> {
 
     // return true if the given node lives just to the left of self
     fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
-        self.is_right_sibling() && self.coord.x > 0 && self.coord.y == other.coord.y && self.coord.x - 1 == other.coord.x
+        self.is_right_sibling()
+            && self.coord.x > 0
+            && self.coord.y == other.coord.y
+            && self.coord.x - 1 == other.coord.x
     }
 
     // self must be a right sibling, otherwise will panic
@@ -164,7 +180,11 @@ struct MatchedPairRef<'a, C: Mergeable + Clone> {
 impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     // create a parent node by merging this node with it's sibling
     fn merge(&self) -> Node<C> {
-        assert!(self.left.is_left_sibling_of(self.right), "STENT TODO");
+        // STENT TODO should we rather return a result here? Because this function is called in more places than the tree constructor
+        assert!(
+            self.left.is_left_sibling_of(self.right),
+            "[Bug in tree merge] Attempted merge for non-siblings"
+        );
         Node {
             coord: Coordinate {
                 y: self.left.coord.y + 1,
@@ -180,22 +200,57 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         leaves: Vec<InputLeafNode<C>>,
         height: u32,
         new_padding_node_content: &F,
-    ) -> SparseBinaryTree<C>
+    ) -> Result<SparseBinaryTree<C>, SparseBinaryTreeError>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let max_leaves = 2usize.pow(height - 1);
-        // STENT TODO possibly return Result instead
-        assert!(
-            leaves.len() <= max_leaves,
-            "Too many leaves for the given height"
-        );
-        let mut store = HashMap::new();
+        // construct sorted vector of leaf nodes and perform data correctness checks
+        let mut nodes = {
+            let max_leaves = 2u64.pow(height - 1);
+            if leaves.len() as u64 > max_leaves {
+                return Err(SparseBinaryTreeError::TooManyLeaves);
+            }
 
-        // translate InputLeafNode to Node
-        let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
-        // STENT TODO check this sorts in the correct direction
-        nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+            if leaves.len() < 1 {
+                return Err(SparseBinaryTreeError::EmptyInput);
+            }
+
+            if height < MIN_HEIGHT {
+                return Err(SparseBinaryTreeError::HeightTooSmall);
+            }
+
+            // translate InputLeafNode to Node
+            let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+
+            // sort by x_coord ascending
+            nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+            // make sure all x_coord < max
+            if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+                return Err(SparseBinaryTreeError::InvalidXCoord);
+            }
+
+            let duplicate_found = nodes
+                .iter()
+                .fold(
+                    (max_leaves, false),
+                    |(prev_x_coord, duplicate_found), node| {
+                        if duplicate_found || node.coord.x == prev_x_coord {
+                            (0, true)
+                        } else {
+                            (node.coord.x, false)
+                        }
+                    },
+                )
+                .1;
+            if duplicate_found {
+                return Err(SparseBinaryTreeError::DuplicateLeaves);
+            }
+
+            nodes
+        };
+
+        let mut store = HashMap::new();
 
         for _i in 0..height - 1 {
             nodes = nodes
@@ -268,11 +323,11 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 
         store.insert(root.coord.clone(), root.clone());
 
-        SparseBinaryTree {
+        Ok(SparseBinaryTree {
             root,
             store,
             height,
-        }
+        })
     }
 }
 
@@ -356,7 +411,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
     fn verify(&self) -> Result<(), InclusionProofError> {
         let mut parent = self.leaf.clone();
 
-        if self.siblings.len() < MIN_HEIGHT {
+        if self.siblings.len() < MIN_HEIGHT as usize {
             return Err(InclusionProofError::TooFewSiblings);
         }
 
@@ -392,6 +447,15 @@ impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
 mod tests {
 
     use super::*;
+
+    macro_rules! assert_err {
+        ($expression:expr, $($pattern:tt)+) => {
+            match $expression {
+                $($pattern)+ => (),
+                ref e => panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
+            }
+        }
+    }
 
     #[derive(Default, Clone, Debug, PartialEq)]
     pub struct TestContent {
@@ -461,11 +525,9 @@ mod tests {
         assert_eq!(proof.siblings.len() as u32, tree.height - 1);
     }
 
-    // STENT TODO get rid of the prints in this test
     #[test]
     fn tree_works_for_full_base_layer() {
         let height = 4;
-
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
         for i in 0..2usize.pow(height - 1) {
@@ -477,33 +539,16 @@ mod tests {
                 },
             });
         }
-        println!("leaves size {}", leaves.len());
 
-        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function());
+        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function())
+            .expect("Tree construction should not have produced an error");
         check_tree(&tree, height);
-        for item in &tree.store {
-            println!(
-                "coord {:?} value {:?} hash {:?}",
-                item.1.coord, item.1.content.value, item.1.content.hash
-            );
-        }
-
-        println!("\n");
 
         let proof = tree
             .create_inclusion_proof(0)
             .expect("Inclusion proof generation should have been successful");
         check_inclusion_proof(&tree, &proof);
 
-        println!("num siblings in proof {:?}", proof.siblings.len());
-        for item in &proof.siblings {
-            println!(
-                "coord {:?} value {:?} hash {:?}",
-                item.coord, item.content.value, item.content.hash
-            );
-        }
-
-        println!("\n");
         proof
             .verify()
             .expect("Inclusion proof verification should have been successful");
@@ -522,7 +567,8 @@ mod tests {
                 },
             };
 
-            let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function());
+            let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function())
+                .expect("Tree construction should not have produced an error");
             check_tree(&tree, height);
 
             let proof = tree
@@ -536,6 +582,133 @@ mod tests {
         }
     }
 
-    // STENT TODO test to see if too many nodes gives error
+    #[test]
+    fn tree_works_for_sparse_leaves() {
+        let height = 5;
+
+        let leaf_0 = InputLeafNode::<TestContent> {
+            x_coord: 6,
+            content: TestContent {
+                hash: H256::default(),
+                value: 1,
+            },
+        };
+        let leaf_1 = InputLeafNode::<TestContent> {
+            x_coord: 1,
+            content: TestContent {
+                hash: H256::default(),
+                value: 2,
+            },
+        };
+        let leaf_2 = InputLeafNode::<TestContent> {
+            x_coord: 0,
+            content: TestContent {
+                hash: H256::default(),
+                value: 3,
+            },
+        };
+        let leaf_3 = InputLeafNode::<TestContent> {
+            x_coord: 5,
+            content: TestContent {
+                hash: H256::default(),
+                value: 4,
+            },
+        };
+
+        let tree = SparseBinaryTree::new(
+            vec![leaf_0, leaf_1, leaf_2, leaf_3],
+            height,
+            &get_padding_function(),
+        )
+        .expect("Tree construction should not have produced an error");
+        check_tree(&tree, height);
+
+        let proof = tree
+            .create_inclusion_proof(6)
+            .expect("Inclusion proof generation should have been successful");
+        check_inclusion_proof(&tree, &proof);
+
+        proof
+            .verify()
+            .expect("Inclusion proof verification should have been successful");
+    }
+
+    #[test]
+    fn too_many_leaf_nodes_gives_err() {
+        let height = 4;
+
+        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
+
+        for i in 0..(2usize.pow(height - 1) + 1) {
+            leaves.push(InputLeafNode::<TestContent> {
+                x_coord: i as u64,
+                content: TestContent {
+                    hash: H256::default(),
+                    value: i as u32,
+                },
+            });
+        }
+
+        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function());
+        assert_err!(tree, Err(SparseBinaryTreeError::TooManyLeaves));
+    }
+
+    #[test]
+    fn duplicate_leaves_gives_err() {
+        let height = 4;
+
+        let leaf_0 = InputLeafNode::<TestContent> {
+            x_coord: 7,
+            content: TestContent {
+                hash: H256::default(),
+                value: 1,
+            },
+        };
+        let leaf_1 = InputLeafNode::<TestContent> {
+            x_coord: 1,
+            content: TestContent {
+                hash: H256::default(),
+                value: 2,
+            },
+        };
+        let leaf_2 = InputLeafNode::<TestContent> {
+            x_coord: 7,
+            content: TestContent {
+                hash: H256::default(),
+                value: 3,
+            },
+        };
+
+        let tree = SparseBinaryTree::new(
+            vec![leaf_0, leaf_1, leaf_2],
+            height,
+            &get_padding_function(),
+        );
+
+        assert_err!(tree, Err(SparseBinaryTreeError::DuplicateLeaves));
+    }
+
+    #[test]
+    fn small_height_gives_err() {
+        let height = 1;
+
+        let leaf_0 = InputLeafNode::<TestContent> {
+            x_coord: 0,
+            content: TestContent {
+                hash: H256::default(),
+                value: 1,
+            },
+        };
+
+        let tree = SparseBinaryTree::new(
+            vec![leaf_0],
+            height,
+            &get_padding_function(),
+        );
+
+        assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
+    }
+
     // STENT TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
+    // STENT TODO have a test with the nodes shuffled
 }
