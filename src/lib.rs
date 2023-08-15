@@ -8,7 +8,6 @@ mod range;
 pub use range::{RangeProofPadding, RangeProofSplitting, RangeProvable, RangeVerifiable};
 
 mod tree;
-pub use tree::{SparseSummationMerkleTree};
 
 pub mod errors;
 pub mod utils;
