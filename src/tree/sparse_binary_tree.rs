@@ -2,6 +2,8 @@ use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
+// STENT TODO possibly use concurrency for tree construction
+
 static MIN_HEIGHT: u32 = 2;
 
 pub trait Mergeable {
@@ -49,53 +51,39 @@ pub struct Node<C: Clone> {
     content: C,
 }
 
-impl<C: Default + Clone> Node<C> {
-    fn default_root_node(height: u32) -> Self {
-        Node {
-            coord: Coordinate { y: height, x: 0 },
-            content: C::default(),
-        }
-    }
-}
-
 impl<C: Mergeable + Clone> Node<C> {
-    // STENT TODO this closure's implementation of the padding functionality is experimental. Should we rather have a struct-wide generic type? what about the hash function for the merge? it has a similar situation
-    //  it seems this is the best way because it can take _multiple_ contexts (coord + whatever context where it is defined)
+    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Self
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = if self.is_left_sibling() {
-            self.get_right_sibling_coord()
-        } else {
-            self.get_left_sibling_coord()
-        };
+        let coord = self.get_sibling_coord();
         let content = new_padding_node_content(&coord);
         Node { coord, content }
     }
 }
 
 impl<C: Clone> Node<C> {
-    // returns true if this node is a right sibling
-    // since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2
-    // since x_coord starts from 0 we check if the modulus is equal to 1
+    /// Returns true if this node is a right sibling.
+    /// Since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2.
+    /// Since x_coord starts from 0 we check if the modulus is equal to 1.
     fn is_right_sibling(&self) -> bool {
         self.coord.x % 2 == 1
     }
 
-    // returns true if this node is a left sibling
-    // since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2
-    // since x_coord starts from 0 we check if the modulus is equal to 0
+    /// Returns true if this node is a left sibling.
+    /// Since we are working with a binary tree we can tell if the node is a right sibling of the above layer by checking the x_coord modulus 2.
+    /// Since x_coord starts from 0 we check if the modulus is equal to 0.
     fn is_left_sibling(&self) -> bool {
         self.coord.x % 2 == 0
     }
 
-    // return true if the given node lives just to the right of self
+    /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
     fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         self.is_left_sibling() && self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
     }
 
-    // return true if the given node lives just to the left of self
+    /// Return true if self is a) a right sibling and b) lives just to the right of the other node.
     fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
         self.is_right_sibling()
             && self.coord.x > 0
@@ -103,27 +91,22 @@ impl<C: Clone> Node<C> {
             && self.coord.x - 1 == other.coord.x
     }
 
-    // self must be a right sibling, otherwise will panic
-    fn get_left_sibling_coord(&self) -> Coordinate {
-        if !self.is_right_sibling() {
-            panic!("Cannot call this function on a left sibling");
-        }
-        Coordinate {
-            y: self.coord.y,
-            x: self.coord.x - 1,
-        }
-    }
-
-    fn get_right_sibling_coord(&self) -> Coordinate {
-        if !self.is_left_sibling() {
-            panic!("Cannot call this function on a right sibling");
-        }
-        Coordinate {
-            y: self.coord.y,
-            x: self.coord.x + 1,
+    /// Return the coordinates of this node's sibling, whether that be a right or a left sibling.
+    fn get_sibling_coord(&self) -> Coordinate {
+        if self.is_right_sibling() {
+            Coordinate {
+                y: self.coord.y,
+                x: self.coord.x - 1,
+            }
+        } else {
+            Coordinate {
+                y: self.coord.y,
+                x: self.coord.x + 1,
+            }
         }
     }
 
+    /// Return the coordinates of this node's parent. Note that this function can be misused if tree height is not used to bound the y-coord.
     fn get_parent_coord(&self) -> Coordinate {
         Coordinate {
             y: self.coord.y + 1,
@@ -159,10 +142,13 @@ struct MatchedPair<C: Mergeable + Clone> {
     right: Node<C>,
 }
 
+struct MatchedPairRef<'a, C: Mergeable + Clone> {
+    left: &'a Node<C>,
+    right: &'a Node<C>,
+}
+
 impl<C: Mergeable + Clone> MatchedPair<C> {
-    // create a parent node by merging this node with it's sibling
-    // STENT TODO note that this makes the assumption that the other node is a sibling
-    //   maybe we can have the merge function on the pair type rather
+    /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         MatchedPairRef {
             left: &self.left,
@@ -172,13 +158,8 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     }
 }
 
-struct MatchedPairRef<'a, C: Mergeable + Clone> {
-    left: &'a Node<C>,
-    right: &'a Node<C>,
-}
-
 impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
-    // create a parent node by merging this node with it's sibling
+    /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         // STENT TODO should we rather return a result here? Because this function is called in more places than the tree constructor
         assert!(
@@ -196,6 +177,8 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 }
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
+    /// Create a new tree given the leaves, height and the padding node creation function.
+    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     pub fn new<F>(
         leaves: Vec<InputLeafNode<C>>,
         height: u32,
@@ -204,7 +187,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
-        // construct sorted vector of leaf nodes and perform data correctness checks
+        // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
             let max_leaves = 2u64.pow(height - 1);
             if leaves.len() as u64 > max_leaves {
@@ -230,6 +213,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
                 return Err(SparseBinaryTreeError::InvalidXCoord);
             }
 
+            // ensure no duplicates
             let duplicate_found = nodes
                 .iter()
                 .fold(
@@ -253,6 +237,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         let mut store = HashMap::new();
 
         for _i in 0..height - 1 {
+            // create the next layer up of nodes from the current layer of nodes
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
