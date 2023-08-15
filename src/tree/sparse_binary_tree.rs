@@ -31,12 +31,6 @@ pub enum SparseBinaryTreeError {
     DuplicateLeaves,
 }
 
-impl<C: Mergeable + Clone> SparseBinaryTree<C> {
-    fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
-        self.store.get(coord)
-    }
-}
-
 // STENT TODO maybe rename this to TreeIndex
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
@@ -49,6 +43,17 @@ pub struct Coordinate {
 pub struct Node<C: Clone> {
     coord: Coordinate,
     content: C,
+}
+
+pub struct InputLeafNode<C> {
+    content: C,
+    x_coord: u64,
+}
+
+impl<C: Mergeable + Clone> SparseBinaryTree<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
+        self.store.get(coord)
+    }
 }
 
 impl<C: Mergeable + Clone> Node<C> {
@@ -113,11 +118,6 @@ impl<C: Clone> Node<C> {
             x: self.coord.x / 2,
         }
     }
-}
-
-pub struct InputLeafNode<C> {
-    content: C,
-    x_coord: u64,
 }
 
 impl<C: Clone> InputLeafNode<C> {
@@ -186,14 +186,6 @@ struct MatchedPair<C: Mergeable + Clone> {
     right: RightSibling<C>,
 }
 
-struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
-struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
-
-struct MatchedPairRef<'a, C: Mergeable + Clone> {
-    left: LeftSiblingRef<'a, C>,
-    right: RightSiblingRef<'a, C>,
-}
-
 impl<C: Mergeable + Clone> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
@@ -205,6 +197,13 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
             content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
+}
+
+struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
+struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
+struct MatchedPairRef<'a, C: Mergeable + Clone> {
+    left: LeftSiblingRef<'a, C>,
+    right: RightSiblingRef<'a, C>,
 }
 
 impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
@@ -280,6 +279,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 
         let mut store = HashMap::new();
 
+        // repeat for each layer of the tree
         for _i in 0..height - 1 {
             // create the next layer up of nodes from the current layer of nodes
             nodes = nodes
