@@ -30,7 +30,7 @@ pub struct Coordinate {
     x: u64, // from 0 to 2^y
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Node<C: Clone> {
     coord: Coordinate,
     content: C,
@@ -197,7 +197,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         // STENT TODO check this sorts in the correct direction
         nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
-        while nodes.len() > 1 {
+        for _i in 0..height - 1 {
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
@@ -260,6 +260,11 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         let root = nodes
             .pop()
             .expect("[Bug in tree constructor] Unable to find root node");
+
+        assert!(
+            nodes.len() == 0,
+            "[Bug in tree constructor] Should be no nodes left to process"
+        );
 
         store.insert(root.coord.clone(), root.clone());
 
@@ -444,8 +449,21 @@ mod tests {
         }
     }
 
+    fn check_tree(tree: &SparseBinaryTree<TestContent>, height: u32) {
+        assert_eq!(tree.height, height);
+    }
+
+    fn check_inclusion_proof(
+        tree: &SparseBinaryTree<TestContent>,
+        proof: &InclusionProof<TestContent>,
+    ) {
+        assert_eq!(tree.root, proof.root);
+        assert_eq!(proof.siblings.len() as u32, tree.height - 1);
+    }
+
+    // STENT TODO get rid of the prints in this test
     #[test]
-    fn tree_works_for_full_tree() {
+    fn tree_works_for_full_base_layer() {
         let height = 4;
 
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
@@ -462,6 +480,7 @@ mod tests {
         println!("leaves size {}", leaves.len());
 
         let tree = SparseBinaryTree::new(leaves, height, &get_padding_function());
+        check_tree(&tree, height);
         for item in &tree.store {
             println!(
                 "coord {:?} value {:?} hash {:?}",
@@ -471,7 +490,11 @@ mod tests {
 
         println!("\n");
 
-        let proof = tree.create_inclusion_proof(0).expect("Inclusion proof generation should have been successful");
+        let proof = tree
+            .create_inclusion_proof(0)
+            .expect("Inclusion proof generation should have been successful");
+        check_inclusion_proof(&tree, &proof);
+
         println!("num siblings in proof {:?}", proof.siblings.len());
         for item in &proof.siblings {
             println!(
@@ -481,18 +504,36 @@ mod tests {
         }
 
         println!("\n");
-        proof.verify().expect("Inclusion proof verification should have been successful");
+        proof
+            .verify()
+            .expect("Inclusion proof verification should have been successful");
     }
 
     #[test]
-    fn tree_works_for_leaf_0() {
-        let leaf = InputLeafNode::<TestContent> {
-            x_coord: 0,
-            content: TestContent {
-                hash: H256::default(),
-                value: 1,
-            },
-        };
+    fn tree_works_for_single_leaf() {
+        let height = 4;
+
+        for i in 0..2usize.pow(height - 1) {
+            let leaf = InputLeafNode::<TestContent> {
+                x_coord: i as u64,
+                content: TestContent {
+                    hash: H256::default(),
+                    value: 1,
+                },
+            };
+
+            let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function());
+            check_tree(&tree, height);
+
+            let proof = tree
+                .create_inclusion_proof(i as u64)
+                .expect("Inclusion proof generation should have been successful");
+            check_inclusion_proof(&tree, &proof);
+
+            proof
+                .verify()
+                .expect("Inclusion proof verification should have been successful");
+        }
     }
 
     // STENT TODO test to see if too many nodes gives error
