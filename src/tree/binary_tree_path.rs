@@ -1,6 +1,5 @@
-/// All the siblings for a leaf node's path from bottom layer to root node.
-// STENT TODO change name to path
-pub struct InclusionProof<C: Clone> {
+/// All the sibling nodes for a leaf node's path from bottom layer to root node.
+pub struct PathSiblings<C: Clone> {
     leaf: Node<C>,
     siblings: Vec<Node<C>>,
     root: Node<C>,
@@ -8,11 +7,11 @@ pub struct InclusionProof<C: Clone> {
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     // STENT TODO maybe we can compress by using something smaller than u64 for coords
-    /// Construct the sibling path for the leaf nod living at the given x-coord on the bottom layer.
-    fn create_inclusion_proof(
+    /// Construct the path for the leaf node living at the given x-coord on the bottom layer, and collect all the siblings to the path.
+    fn get_siblings_for_path(
         &self,
         leaf_x_coord: u64,
-    ) -> Result<InclusionProof<C>, InclusionProofError> {
+    ) -> Result<PathSiblings<C>, PathSiblingsError> {
         let coord = Coordinate {
             x: leaf_x_coord,
             y: 0,
@@ -20,7 +19,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 
         let leaf = self
             .get_node(&coord)
-            .ok_or(InclusionProofError::LeafNotFound)?;
+            .ok_or(PathSiblingsError::LeafNotFound)?;
 
         let mut current_node = leaf;
         let mut siblings = Vec::<Node<C>>::new();
@@ -34,7 +33,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             let sibling_coord = Coordinate { y, x: x_coord };
             siblings.push(
                 self.get_node(&sibling_coord)
-                    .ok_or(InclusionProofError::NodeNotFound {
+                    .ok_or(PathSiblingsError::NodeNotFound {
                         coord: sibling_coord,
                     })?
                     .clone(),
@@ -43,12 +42,12 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             let parent_coord = current_node.get_parent_coord();
             current_node =
                 self.get_node(&parent_coord)
-                    .ok_or(InclusionProofError::NodeNotFound {
+                    .ok_or(PathSiblingsError::NodeNotFound {
                         coord: parent_coord,
                     })?;
         }
 
-        Ok(InclusionProof {
+        Ok(PathSiblings {
             leaf: leaf.clone(),
             siblings,
             root: self.root.clone(),
@@ -57,7 +56,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 }
 
 #[derive(Error, Debug)]
-pub enum InclusionProofError {
+pub enum PathSiblingsError {
     #[error("Provided leaf node not found in the tree")]
     LeafNotFound,
     #[error("Node not found in tree ({coord:?})")]
@@ -80,12 +79,13 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     }
 }
 
-impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
-    fn verify(&self) -> Result<(), InclusionProofError> {
+impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
+    /// Verify that a path reconstruction using the leaf node and the path siblings results in the same root node content.
+    fn verify(&self) -> Result<(), PathSiblingsError> {
         let mut parent = self.leaf.clone();
 
         if self.siblings.len() < MIN_HEIGHT as usize {
-            return Err(InclusionProofError::TooFewSiblings);
+            return Err(PathSiblingsError::TooFewSiblings);
         }
 
         for node in &self.siblings {
@@ -100,7 +100,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
                     right: RightSiblingRef(node),
                 })
             } else {
-                Err(InclusionProofError::InvalidSibling {
+                Err(PathSiblingsError::InvalidSibling {
                     given: node.coord.clone(),
                     calculated: parent.coord,
                 })
@@ -111,7 +111,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
         if parent.content == self.root.content {
             Ok(())
         } else {
-            Err(InclusionProofError::RootMismatch)
+            Err(PathSiblingsError::RootMismatch)
         }
     }
 }
@@ -126,9 +126,9 @@ mod tests {
     };
     use super::*;
 
-    fn check_inclusion_proof(
+    fn check_path_siblings(
         tree: &SparseBinaryTree<TestContent>,
-        proof: &InclusionProof<TestContent>,
+        proof: &PathSiblings<TestContent>,
     ) {
         assert_eq!(tree.root, proof.root);
         assert_eq!(proof.siblings.len() as u32, tree.height - 1);
@@ -139,26 +139,26 @@ mod tests {
         let (tree, height) = full_tree();
 
         let proof = tree
-            .create_inclusion_proof(0)
-            .expect("Inclusion proof generation should have been successful");
-        check_inclusion_proof(&tree, &proof);
+            .get_siblings_for_path(0)
+            .expect("Path generation should have been successful");
+        check_path_siblings(&tree, &proof);
 
         proof
             .verify()
-            .expect("Inclusion proof verification should have been successful");
+            .expect("Path verification should have been successful");
     }
 
     #[test]
     fn proofs_work_for_sparse_leaves() {
         let tree = tree_with_sparse_leaves();
         let proof = tree
-            .create_inclusion_proof(6)
-            .expect("Inclusion proof generation should have been successful");
-        check_inclusion_proof(&tree, &proof);
+            .get_siblings_for_path(6)
+            .expect("Path generation should have been successful");
+        check_path_siblings(&tree, &proof);
 
         proof
             .verify()
-            .expect("Inclusion proof verification should have been successful");
+            .expect("Path verification should have been successful");
     }
 
     #[test]
@@ -168,13 +168,13 @@ mod tests {
         for i in 0..2usize.pow(height - 1) {
             let tree = tree_with_single_leaf(i as u64, height);
             let proof = tree
-                .create_inclusion_proof(i as u64)
-                .expect("Inclusion proof generation should have been successful");
-            check_inclusion_proof(&tree, &proof);
+                .get_siblings_for_path(i as u64)
+                .expect("Path generation should have been successful");
+            check_path_siblings(&tree, &proof);
 
             proof
                 .verify()
-                .expect("Inclusion proof verification should have been successful");
+                .expect("Path verification should have been successful");
         }
     }
 }
