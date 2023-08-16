@@ -29,12 +29,15 @@ pub trait Mergeable {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     // STENT TODO make these bounded, which depends on tree height
+    // STENT TODO change y to u8
     y: u32, // from 0 to height
+    // STENT TODO change to 2^256
     x: u64, // from 0 to 2^y
 }
 
 /// Main data structure.
 /// All nodes are stored in a hash map, their index in the tree being the key.
+// STENT TODO change height to u8
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct SparseBinaryTree<C: Clone> {
@@ -400,143 +403,16 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 // STENT TODO maybe put all this inclusion stuff in a different module/file
 //   what is the best practice here?
 
-#[allow(dead_code)]
-pub struct InclusionProof<C: Clone> {
-    leaf: Node<C>,
-    siblings: Vec<Node<C>>,
-    root: Node<C>,
-}
-
-#[derive(Error, Debug)]
-#[allow(dead_code)]
-pub enum InclusionProofError {
-    #[error("Provided leaf node not found in the tree")]
-    LeafNotFound,
-    #[error("Node not found in tree ({coord:?})")]
-    NodeNotFound { coord: Coordinate },
-    #[error("Calculated root content does not match provided root content")]
-    RootMismatch,
-    #[error("Provided node ({given:?}) is not a sibling of the calculated node ({calculated:?})")]
-    InvalidSibling {
-        given: Coordinate,
-        calculated: Coordinate,
-    },
-    #[error("Too few siblings")]
-    TooFewSiblings,
-}
-
-impl<C: Mergeable + Clone> SparseBinaryTree<C> {
-    /// Attempt to find a Node via it's coordinate in the underlying store.
-    #[allow(dead_code)]
-    fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
-        self.store.get(coord)
-    }
-}
-
-impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
-    // STENT TODO maybe we can compress by using something smaller than u64 for coords
-    #[allow(dead_code)]
-    fn create_inclusion_proof(
-        &self,
-        leaf_x_coord: u64,
-    ) -> Result<InclusionProof<C>, InclusionProofError> {
-        let coord = Coordinate {
-            x: leaf_x_coord,
-            y: 0,
-        };
-
-        let leaf = self
-            .get_node(&coord)
-            .ok_or(InclusionProofError::LeafNotFound)?;
-
-        let mut current_node = leaf;
-        let mut siblings = Vec::<Node<C>>::new();
-
-        for y in 0..self.height - 1 {
-            // STENT TODO maybe change sibling check to return enum of either left/right to show that there are only 2 options
-            let x_coord = match current_node.node_orientation() {
-                NodeOrientation::Left => current_node.coord.x + 1,
-                NodeOrientation::Right => current_node.coord.x - 1,
-            };
-
-            let sibling_coord = Coordinate { y, x: x_coord };
-            siblings.push(
-                self.get_node(&sibling_coord)
-                    .ok_or(InclusionProofError::NodeNotFound {
-                        coord: sibling_coord,
-                    })?
-                    .clone(),
-            );
-
-            let parent_coord = current_node.get_parent_coord();
-            current_node =
-                self.get_node(&parent_coord)
-                    .ok_or(InclusionProofError::NodeNotFound {
-                        coord: parent_coord,
-                    })?;
-        }
-
-        Ok(InclusionProof {
-            leaf: leaf.clone(),
-            siblings,
-            root: self.root.clone(),
-        })
-    }
-}
-
-impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
-    #[allow(dead_code)]
-    fn verify(&self) -> Result<(), InclusionProofError> {
-        let mut parent = self.leaf.clone();
-
-        if self.siblings.len() < MIN_HEIGHT as usize {
-            return Err(InclusionProofError::TooFewSiblings);
-        }
-
-        for node in &self.siblings {
-            let pair = if parent.is_right_sibling_of(node) {
-                Ok(MatchedPairRef {
-                    left: LeftSiblingRef(node),
-                    right: RightSiblingRef(&parent),
-                })
-            } else if parent.is_left_sibling_of(node) {
-                Ok(MatchedPairRef {
-                    left: LeftSiblingRef(&parent),
-                    right: RightSiblingRef(node),
-                })
-            } else {
-                Err(InclusionProofError::InvalidSibling {
-                    given: node.coord.clone(),
-                    calculated: parent.coord,
-                })
-            }?;
-            parent = pair.merge();
-        }
-
-        if parent.content == self.root.content {
-            Ok(())
-        } else {
-            Err(InclusionProofError::RootMismatch)
-        }
-    }
-}
-
 // ===========================================
 // Unit tests.
 
 #[cfg(test)]
 mod tests {
+    // STENT TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
 
     use super::*;
 
-    macro_rules! assert_err {
-        ($expression:expr, $($pattern:tt)+) => {
-            match $expression {
-                $($pattern)+ => (),
-                ref e => panic!("expected `{}` but got `{:?}`", stringify!($($pattern)+), e),
-            }
-        }
-    }
+    use crate::testing_utils::assert_err;
 
     #[derive(Default, Clone, Debug, PartialEq)]
     pub struct TestContent {
@@ -598,16 +474,8 @@ mod tests {
         assert_eq!(tree.height, height);
     }
 
-    fn check_inclusion_proof(
-        tree: &SparseBinaryTree<TestContent>,
-        proof: &InclusionProof<TestContent>,
-    ) {
-        assert_eq!(tree.root, proof.root);
-        assert_eq!(proof.siblings.len() as u32, tree.height - 1);
-    }
-
-    #[test]
-    fn tree_works_for_full_base_layer() {
+    // tree has a full bottom layer, and, subsequently, all other layers
+    fn full_tree() -> (SparseBinaryTree<TestContent>, u32) {
         let height = 4;
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
@@ -623,16 +491,30 @@ mod tests {
 
         let tree = SparseBinaryTree::new(leaves, height, &get_padding_function())
             .expect("Tree construction should not have produced an error");
+
+        (tree, height)
+    }
+
+    #[test]
+    fn tree_works_for_full_base_layer() {
+        let (tree, height) = full_tree();
         check_tree(&tree, height);
+    }
 
-        let proof = tree
-            .create_inclusion_proof(0)
-            .expect("Inclusion proof generation should have been successful");
-        check_inclusion_proof(&tree, &proof);
+    // only 1 bottom-layer leaf node is present in the whole tree
+    fn tree_with_single_leaf(x_coord_of_leaf: u64, height: u32) -> SparseBinaryTree<TestContent> {
+        let leaf = InputLeafNode::<TestContent> {
+            x_coord: x_coord_of_leaf,
+            content: TestContent {
+                hash: H256::default(),
+                value: 1,
+            },
+        };
 
-        proof
-            .verify()
-            .expect("Inclusion proof verification should have been successful");
+        let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function())
+            .expect("Tree construction should not have produced an error");
+
+        tree
     }
 
     #[test]
@@ -640,33 +522,16 @@ mod tests {
         let height = 4;
 
         for i in 0..2usize.pow(height - 1) {
-            let leaf = InputLeafNode::<TestContent> {
-                x_coord: i as u64,
-                content: TestContent {
-                    hash: H256::default(),
-                    value: 1,
-                },
-            };
-
-            let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function())
-                .expect("Tree construction should not have produced an error");
+            let tree = tree_with_single_leaf(i as u64, height);
             check_tree(&tree, height);
-
-            let proof = tree
-                .create_inclusion_proof(i as u64)
-                .expect("Inclusion proof generation should have been successful");
-            check_inclusion_proof(&tree, &proof);
-
-            proof
-                .verify()
-                .expect("Inclusion proof verification should have been successful");
         }
     }
 
-    #[test]
-    fn tree_works_for_sparse_leaves() {
+    // a selection of leaves dispersed sparsely along the bottom layer
+    fn tree_with_sparse_leaves() -> (SparseBinaryTree<TestContent>, u32) {
         let height = 5;
 
+        // note the nodes are not in order here (wrt x-coord) so this test also somewhat covers the sorting code in the constructor
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 6,
             content: TestContent {
@@ -702,16 +567,14 @@ mod tests {
             &get_padding_function(),
         )
         .expect("Tree construction should not have produced an error");
+
+        (tree, height)
+    }
+
+    #[test]
+    fn tree_works_for_sparse_leaves() {
+        let (tree, height) = tree_with_sparse_leaves();
         check_tree(&tree, height);
-
-        let proof = tree
-            .create_inclusion_proof(6)
-            .expect("Inclusion proof generation should have been successful");
-        check_inclusion_proof(&tree, &proof);
-
-        proof
-            .verify()
-            .expect("Inclusion proof verification should have been successful");
     }
 
     #[test]
@@ -785,7 +648,4 @@ mod tests {
 
         assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
     }
-
-    // STENT TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
-    // STENT TODO have a test with the nodes shuffled
 }
