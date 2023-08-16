@@ -2,10 +2,12 @@ use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
+use super::*;
+
 // STENT TODO possibly use concurrency for tree construction
 
 /// Minimum tree height supported.
-static MIN_HEIGHT: u32 = 2;
+pub static MIN_HEIGHT: u8 = 2;
 
 // ===========================================
 // Main structs and constructor.
@@ -14,8 +16,10 @@ static MIN_HEIGHT: u32 = 2;
 /// The data contained in the node is completely generic, requiring only to have an associated merge function.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node<C: Clone> {
-    coord: Coordinate,
-    content: C,
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub coord: Coordinate,
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub content: C,
 }
 
 /// The generic content type must implement this trait to allow 2 sibling nodes to be combined to make a new parent node.
@@ -29,10 +33,11 @@ pub trait Mergeable {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     // STENT TODO make these bounded, which depends on tree height
-    // STENT TODO change y to u8
-    y: u32, // from 0 to height
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub y: u8, // from 0 to height
     // STENT TODO change to 2^256
-    x: u64, // from 0 to 2^y
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub x: u64, // from 0 to 2^y
 }
 
 /// Main data structure.
@@ -41,16 +46,17 @@ pub struct Coordinate {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct SparseBinaryTree<C: Clone> {
-    root: Node<C>,
-    store: HashMap<Coordinate, Node<C>>,
-    height: u32,
+    pub root: Node<C>,
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub store: HashMap<Coordinate, Node<C>>,
+    pub height: u8,
 }
 
 /// A simpler version of the Node struct that is used by the calling code to pass leaves to the tree constructor.
 #[allow(dead_code)]
 pub struct InputLeafNode<C> {
-    content: C,
-    x_coord: u64,
+    pub content: C,
+    pub x_coord: u64,
 }
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
@@ -59,7 +65,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     #[allow(dead_code)]
     pub fn new<F>(
         leaves: Vec<InputLeafNode<C>>,
-        height: u32,
+        height: u8,
         new_padding_node_content: &F,
     ) -> Result<SparseBinaryTree<C>, SparseBinaryTreeError>
     where
@@ -67,7 +73,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     {
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
-            let max_leaves = 2u64.pow(height - 1);
+            let max_leaves = 2u64.pow(height as u32 - 1);
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
             }
@@ -215,17 +221,12 @@ pub enum SparseBinaryTreeError {
 // ===========================================
 // Supporting structs, types and functions.
 
-/// Used to organise nodes into left/right siblings.
-enum NodeOrientation {
-    Left,
-    Right,
-}
-
 impl<C: Clone> Node<C> {
     /// Returns left if this node is a left sibling and vice versa for right.
     /// Since we are working with a binary tree we can tell if the node is a left sibling of the above layer by checking the x_coord modulus 2.
     /// Since x_coord starts from 0 we check if the modulus is equal to 0.
-    fn node_orientation(&self) -> NodeOrientation {
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub fn node_orientation(&self) -> NodeOrientation {
         if self.coord.x % 2 == 0 {
             NodeOrientation::Left
         } else {
@@ -234,8 +235,9 @@ impl<C: Clone> Node<C> {
     }
 
     /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
+    // STENT TODO this should not be public but is needed to be used in paths file
     #[allow(dead_code)]
-    fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
+    pub fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => {
                 self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
@@ -245,7 +247,8 @@ impl<C: Clone> Node<C> {
     }
 
     /// Return true if self is a) a right sibling and b) lives just to the right of the other node.
-    fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
+    // STENT TODO this should not be public but is needed to be used in paths file
+    pub fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => false,
             NodeOrientation::Right => {
@@ -273,8 +276,9 @@ impl<C: Clone> Node<C> {
     /// Return the coordinates of this node's parent.
     /// The x-coord divide-by-2 works for both left _and_ right siblings because of truncation.
     /// Note that this function can be misused if tree height is not used to bound the y-coord from above.
+    // STENT TODO this should not be public but is needed to be used in paths file
     #[allow(dead_code)]
-    fn get_parent_coord(&self) -> Coordinate {
+    pub fn get_parent_coord(&self) -> Coordinate {
         Coordinate {
             y: self.coord.y + 1,
             x: self.coord.x / 2,
@@ -293,30 +297,6 @@ impl<C: Clone> InputLeafNode<C> {
             },
         }
     }
-}
-
-/// Used to orient nodes inside a sibling pair so that the compiler can guarantee a left node is actually a left node.
-enum Sibling<C: Clone> {
-    Left(LeftSibling<C>),
-    Right(RightSibling<C>),
-}
-
-/// Simply holds a Node under the designated 'LeftSibling' name.
-struct LeftSibling<C: Clone>(Node<C>);
-
-/// Simply holds a Node under the designated 'RightSibling' name.
-struct RightSibling<C: Clone>(Node<C>);
-
-/// A pair of sibling nodes, but one might be absent.
-struct MaybeUnmatchedPair<C: Mergeable + Clone> {
-    left: Option<LeftSibling<C>>,
-    right: Option<RightSibling<C>>,
-}
-
-/// A pair of sibling nodes where both are present.
-struct MatchedPair<C: Mergeable + Clone> {
-    left: LeftSibling<C>,
-    right: RightSibling<C>,
 }
 
 impl<C: Clone> LeftSibling<C> {
@@ -368,35 +348,6 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     }
 }
 
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
-#[allow(dead_code)]
-struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
-
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
-#[allow(dead_code)]
-struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
-
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
-#[allow(dead_code)]
-struct MatchedPairRef<'a, C: Mergeable + Clone> {
-    left: LeftSiblingRef<'a, C>,
-    right: RightSiblingRef<'a, C>,
-}
-
-impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
-    /// Create a parent node by merging the 2 nodes in the pair.
-    #[allow(dead_code)]
-    fn merge(&self) -> Node<C> {
-        Node {
-            coord: Coordinate {
-                y: self.left.0.coord.y + 1,
-                x: self.left.0.coord.x / 2,
-            },
-            content: C::merge(&self.left.0.content, &self.right.0.content),
-        }
-    }
-}
-
 // ===========================================
 // Inclusion proof generation and verification.
 
@@ -412,87 +363,14 @@ mod tests {
 
     use super::*;
 
+    use super::super::test_utils::{
+        tree_with_single_leaf, tree_with_sparse_leaves, TestContent, full_tree, H256, get_padding_function
+    };
+
     use crate::testing_utils::assert_err;
 
-    #[derive(Default, Clone, Debug, PartialEq)]
-    pub struct TestContent {
-        value: u32,
-        hash: H256,
-    }
-
-    #[derive(Default, Clone, Debug, PartialEq, Eq)]
-    pub struct H256([u8; 32]);
-
-    impl H256 {
-        fn as_bytes(&self) -> &[u8; 32] {
-            &self.0
-        }
-    }
-
-    pub trait H256Convertable {
-        fn finalize_as_h256(&self) -> H256;
-    }
-
-    impl H256Convertable for blake3::Hasher {
-        fn finalize_as_h256(&self) -> H256 {
-            H256(self.finalize().as_bytes().clone())
-        }
-    }
-
-    impl Mergeable for TestContent {
-        fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
-            // C(parent) = C(L) + C(R)
-            let parent_value = left_sibling.value + right_sibling.value;
-
-            // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
-            let parent_hash = {
-                let mut hasher = blake3::Hasher::new();
-                hasher.update(&left_sibling.value.to_le_bytes());
-                hasher.update(&right_sibling.value.to_le_bytes());
-                hasher.update(left_sibling.hash.as_bytes());
-                hasher.update(right_sibling.hash.as_bytes());
-                hasher.finalize_as_h256() // STENT TODO double check the output of this thing
-            };
-
-            TestContent {
-                value: parent_value,
-                hash: parent_hash,
-            }
-        }
-    }
-
-    fn get_padding_function() -> impl Fn(&Coordinate) -> TestContent {
-        |_coord: &Coordinate| -> TestContent {
-            TestContent {
-                value: 0,
-                hash: H256::default(),
-            }
-        }
-    }
-
-    fn check_tree(tree: &SparseBinaryTree<TestContent>, height: u32) {
+    fn check_tree(tree: &SparseBinaryTree<TestContent>, height: u8) {
         assert_eq!(tree.height, height);
-    }
-
-    // tree has a full bottom layer, and, subsequently, all other layers
-    fn full_tree() -> (SparseBinaryTree<TestContent>, u32) {
-        let height = 4;
-        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
-
-        for i in 0..2usize.pow(height - 1) {
-            leaves.push(InputLeafNode::<TestContent> {
-                x_coord: i as u64,
-                content: TestContent {
-                    hash: H256::default(),
-                    value: i as u32,
-                },
-            });
-        }
-
-        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function())
-            .expect("Tree construction should not have produced an error");
-
-        (tree, height)
     }
 
     #[test]
@@ -501,74 +379,14 @@ mod tests {
         check_tree(&tree, height);
     }
 
-    // only 1 bottom-layer leaf node is present in the whole tree
-    fn tree_with_single_leaf(x_coord_of_leaf: u64, height: u32) -> SparseBinaryTree<TestContent> {
-        let leaf = InputLeafNode::<TestContent> {
-            x_coord: x_coord_of_leaf,
-            content: TestContent {
-                hash: H256::default(),
-                value: 1,
-            },
-        };
-
-        let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function())
-            .expect("Tree construction should not have produced an error");
-
-        tree
-    }
-
     #[test]
     fn tree_works_for_single_leaf() {
-        let height = 4;
+        let height = 4u8;
 
-        for i in 0..2usize.pow(height - 1) {
+        for i in 0..2usize.pow(height as u32 - 1) {
             let tree = tree_with_single_leaf(i as u64, height);
             check_tree(&tree, height);
         }
-    }
-
-    // a selection of leaves dispersed sparsely along the bottom layer
-    fn tree_with_sparse_leaves() -> (SparseBinaryTree<TestContent>, u32) {
-        let height = 5;
-
-        // note the nodes are not in order here (wrt x-coord) so this test also somewhat covers the sorting code in the constructor
-        let leaf_0 = InputLeafNode::<TestContent> {
-            x_coord: 6,
-            content: TestContent {
-                hash: H256::default(),
-                value: 1,
-            },
-        };
-        let leaf_1 = InputLeafNode::<TestContent> {
-            x_coord: 1,
-            content: TestContent {
-                hash: H256::default(),
-                value: 2,
-            },
-        };
-        let leaf_2 = InputLeafNode::<TestContent> {
-            x_coord: 0,
-            content: TestContent {
-                hash: H256::default(),
-                value: 3,
-            },
-        };
-        let leaf_3 = InputLeafNode::<TestContent> {
-            x_coord: 5,
-            content: TestContent {
-                hash: H256::default(),
-                value: 4,
-            },
-        };
-
-        let tree = SparseBinaryTree::new(
-            vec![leaf_0, leaf_1, leaf_2, leaf_3],
-            height,
-            &get_padding_function(),
-        )
-        .expect("Tree construction should not have produced an error");
-
-        (tree, height)
     }
 
     #[test]
@@ -579,11 +397,11 @@ mod tests {
 
     #[test]
     fn too_many_leaf_nodes_gives_err() {
-        let height = 4;
+        let height = 4u8;
 
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
-        for i in 0..(2usize.pow(height - 1) + 1) {
+        for i in 0..(2usize.pow(height as u32 - 1) + 1) {
             leaves.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {
@@ -599,7 +417,7 @@ mod tests {
 
     #[test]
     fn duplicate_leaves_gives_err() {
-        let height = 4;
+        let height = 4u8;
 
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 7,
@@ -634,7 +452,7 @@ mod tests {
 
     #[test]
     fn small_height_gives_err() {
-        let height = 1;
+        let height = 1u8;
 
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 0,

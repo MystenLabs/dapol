@@ -1,4 +1,11 @@
+use ::std::fmt::Debug;
+use thiserror::Error;
+use super::sparse_binary_tree::{Node, SparseBinaryTree, Mergeable, Coordinate, MIN_HEIGHT};
+
+use super::*;
+
 /// All the sibling nodes for a leaf node's path from bottom layer to root node.
+#[allow(dead_code)]
 pub struct PathSiblings<C: Clone> {
     leaf: Node<C>,
     siblings: Vec<Node<C>>,
@@ -6,8 +13,9 @@ pub struct PathSiblings<C: Clone> {
 }
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
-    // STENT TODO maybe we can compress by using something smaller than u64 for coords
+    // TODO maybe we can compress the final result here to help keep the proof size as low as possible
     /// Construct the path for the leaf node living at the given x-coord on the bottom layer, and collect all the siblings to the path.
+    #[allow(dead_code)]
     fn get_siblings_for_path(
         &self,
         leaf_x_coord: u64,
@@ -56,6 +64,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 }
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum PathSiblingsError {
     #[error("Provided leaf node not found in the tree")]
     LeafNotFound,
@@ -81,6 +90,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
 
 impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
     /// Verify that a path reconstruction using the leaf node and the path siblings results in the same root node content.
+    #[allow(dead_code)]
     fn verify(&self) -> Result<(), PathSiblingsError> {
         let mut parent = self.leaf.clone();
 
@@ -116,13 +126,42 @@ impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
     }
 }
 
+/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+#[allow(dead_code)]
+struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
+
+/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+#[allow(dead_code)]
+struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
+
+/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+#[allow(dead_code)]
+struct MatchedPairRef<'a, C: Mergeable + Clone> {
+    left: LeftSiblingRef<'a, C>,
+    right: RightSiblingRef<'a, C>,
+}
+
+impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
+    /// Create a parent node by merging the 2 nodes in the pair.
+    #[allow(dead_code)]
+    fn merge(&self) -> Node<C> {
+        Node {
+            coord: Coordinate {
+                y: self.left.0.coord.y + 1,
+                x: self.left.0.coord.x / 2,
+            },
+            content: C::merge(&self.left.0.content, &self.right.0.content),
+        }
+    }
+}
+
 // ===========================================
 // Unit tests.
 
 #[cfg(test)]
 mod tests {
-    use super::super::sparse_binary_tree::tests::{
-        tree_with_single_leaf, tree_with_sparse_leaves, TestContent,
+    use super::super::test_utils::{
+        tree_with_single_leaf, tree_with_sparse_leaves, TestContent, full_tree, get_padding_function
     };
     use super::*;
 
@@ -131,7 +170,7 @@ mod tests {
         proof: &PathSiblings<TestContent>,
     ) {
         assert_eq!(tree.root, proof.root);
-        assert_eq!(proof.siblings.len() as u32, tree.height - 1);
+        assert_eq!(proof.siblings.len() as u8, tree.height - 1);
     }
 
     #[test]
@@ -150,7 +189,8 @@ mod tests {
 
     #[test]
     fn proofs_work_for_sparse_leaves() {
-        let tree = tree_with_sparse_leaves();
+        let (tree, _height) = tree_with_sparse_leaves();
+
         let proof = tree
             .get_siblings_for_path(6)
             .expect("Path generation should have been successful");
@@ -163,9 +203,9 @@ mod tests {
 
     #[test]
     fn proofs_work_for_single_leaf() {
-        let height = 4;
+        let height = 4u8;
 
-        for i in 0..2usize.pow(height - 1) {
+        for i in 0..2usize.pow(height as u32 - 1) {
             let tree = tree_with_single_leaf(i as u64, height);
             let proof = tree
                 .get_siblings_for_path(i as u64)
