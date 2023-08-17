@@ -2,8 +2,8 @@
 //! TODO add more detailed documentation for all public functions/structs
 
 mod sparse_binary_tree;
-pub use sparse_binary_tree::{Node, Mergeable, SparseBinaryTree, Coordinate, InputLeafNode};
-use sparse_binary_tree::{NodeOrientation};
+use sparse_binary_tree::NodeOrientation;
+pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree};
 
 mod binary_tree_path;
 mod dapol_node;
@@ -22,7 +22,6 @@ impl<C: Clone> Node<C> {
             NodeOrientation::Right
         }
     }
-
 }
 
 // ===========================================
@@ -30,7 +29,7 @@ impl<C: Clone> Node<C> {
 
 #[cfg(test)]
 mod test_utils {
-    use super::sparse_binary_tree::{SparseBinaryTree, InputLeafNode, Coordinate, Mergeable};
+    use super::sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, SparseBinaryTree};
 
     #[derive(Default, Clone, Debug, PartialEq)]
     pub struct TestContent {
@@ -110,7 +109,10 @@ mod test_utils {
     }
 
     // only 1 bottom-layer leaf node is present in the whole tree
-    pub fn tree_with_single_leaf(x_coord_of_leaf: u64, height: u8) -> SparseBinaryTree<TestContent> {
+    pub fn tree_with_single_leaf(
+        x_coord_of_leaf: u64,
+        height: u8,
+    ) -> SparseBinaryTree<TestContent> {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {

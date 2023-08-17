@@ -148,8 +148,7 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 #[cfg(test)]
 mod tests {
     use super::super::test_utils::{
-        full_tree, tree_with_single_leaf, tree_with_sparse_leaves,
-        TestContent,
+        full_tree, tree_with_single_leaf, tree_with_sparse_leaves, TestContent,
     };
     use super::*;
 
