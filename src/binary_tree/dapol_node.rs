@@ -1,3 +1,5 @@
+//! This file is not used, it will be adjusted in future
+
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use digest::Digest;
 use std::marker::PhantomData;
