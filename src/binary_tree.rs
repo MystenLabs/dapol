@@ -1,12 +1,12 @@
+//! TODO add module-level documentation
+//! TODO add more detailed documentation for all public functions/structs
+
 mod sparse_binary_tree;
 pub use sparse_binary_tree::{Node, Mergeable, SparseBinaryTree, Coordinate, InputLeafNode};
 use sparse_binary_tree::{NodeOrientation};
 
 mod binary_tree_path;
 mod dapol_node;
-
-// STENT TODO need to have the master secret as input somewhere
-// STENT TODO what are the commonalities between all the different accumulator types in the paper?
 
 // ===========================================
 // Helper functions that need to be made available to all submodules but kept private from calling code.

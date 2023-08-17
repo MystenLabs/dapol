@@ -2,8 +2,6 @@ use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
-use super::*;
-
 // TODO maybe use concurrency for tree construction if it is too slow on the larger trees
 
 /// Minimum tree height supported.

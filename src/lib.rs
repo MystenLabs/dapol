@@ -7,7 +7,7 @@ pub use proof::{DapolProof, DapolProofNode};
 mod range;
 pub use range::{RangeProofPadding, RangeProofSplitting, RangeProvable, RangeVerifiable};
 
-mod tree;
+mod binary_tree;
 
 pub mod errors;
 pub mod utils;
