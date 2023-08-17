@@ -1,6 +1,6 @@
+use super::sparse_binary_tree::{Coordinate, Mergeable, Node, SparseBinaryTree, MIN_HEIGHT};
 use ::std::fmt::Debug;
 use thiserror::Error;
-use super::sparse_binary_tree::{Node, SparseBinaryTree, Mergeable, Coordinate, MIN_HEIGHT};
 
 use super::*;
 
@@ -20,10 +20,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         &self,
         leaf_x_coord: u64,
     ) -> Result<PathSiblings<C>, PathSiblingsError> {
-        let coord = Coordinate {
-            x: leaf_x_coord,
-            y: 0,
-        };
+        let coord = Coordinate::new(leaf_x_coord, 0);
 
         let leaf = self
             .get_node(&coord)
@@ -32,13 +29,13 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         let mut current_node = leaf;
         let mut siblings = Vec::<Node<C>>::new();
 
-        for y in 0..self.height - 1 {
+        for y in 0..self.get_height() - 1 {
             let x_coord = match current_node.node_orientation() {
-                NodeOrientation::Left => current_node.coord.x + 1,
-                NodeOrientation::Right => current_node.coord.x - 1,
+                NodeOrientation::Left => current_node.get_x_coord() + 1,
+                NodeOrientation::Right => current_node.get_x_coord() - 1,
             };
 
-            let sibling_coord = Coordinate { y, x: x_coord };
+            let sibling_coord = Coordinate::new(x_coord, y);
             siblings.push(
                 self.get_node(&sibling_coord)
                     .ok_or(PathSiblingsError::NodeNotFound {
@@ -48,17 +45,17 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             );
 
             let parent_coord = current_node.get_parent_coord();
-            current_node =
-                self.get_node(&parent_coord)
-                    .ok_or(PathSiblingsError::NodeNotFound {
-                        coord: parent_coord,
-                    })?;
+            current_node = self
+                .get_node(&parent_coord)
+                .ok_or(PathSiblingsError::NodeNotFound {
+                    coord: parent_coord,
+                })?;
         }
 
         Ok(PathSiblings {
             leaf: leaf.clone(),
             siblings,
-            root: self.root.clone(),
+            root: self.get_root().clone(),
         })
     }
 }
@@ -81,15 +78,8 @@ pub enum PathSiblingsError {
     TooFewSiblings,
 }
 
-impl<C: Mergeable + Clone> SparseBinaryTree<C> {
-    /// Attempt to find a Node via it's coordinate in the underlying store.
-    fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
-        self.store.get(coord)
-    }
-}
-
 impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
-    /// Verify that a path reconstruction using the leaf node and the path siblings results in the same root node content.
+    /// Verify that a path reconstruction using the leaf node and the path siblings results in the same root node.
     #[allow(dead_code)]
     fn verify(&self) -> Result<(), PathSiblingsError> {
         let mut parent = self.leaf.clone();
@@ -111,14 +101,14 @@ impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
                 })
             } else {
                 Err(PathSiblingsError::InvalidSibling {
-                    given: node.coord.clone(),
-                    calculated: parent.coord,
+                    given: node.get_coord().clone(),
+                    calculated: parent.get_coord().clone(),
                 })
             }?;
             parent = pair.merge();
         }
 
-        if parent.content == self.root.content {
+        if parent == self.root {
             Ok(())
         } else {
             Err(PathSiblingsError::RootMismatch)
@@ -145,13 +135,10 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     #[allow(dead_code)]
     fn merge(&self) -> Node<C> {
-        Node {
-            coord: Coordinate {
-                y: self.left.0.coord.y + 1,
-                x: self.left.0.coord.x / 2,
-            },
-            content: C::merge(&self.left.0.content, &self.right.0.content),
-        }
+        Node::new(
+            Coordinate::new(self.left.0.get_x_coord() / 2, self.left.0.get_y_coord() + 1),
+            C::merge(self.left.0.get_content(), self.right.0.get_content()),
+        )
     }
 }
 
@@ -161,7 +148,8 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 #[cfg(test)]
 mod tests {
     use super::super::test_utils::{
-        tree_with_single_leaf, tree_with_sparse_leaves, TestContent, full_tree, get_padding_function
+        full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
+        TestContent,
     };
     use super::*;
 
@@ -169,13 +157,13 @@ mod tests {
         tree: &SparseBinaryTree<TestContent>,
         proof: &PathSiblings<TestContent>,
     ) {
-        assert_eq!(tree.root, proof.root);
-        assert_eq!(proof.siblings.len() as u8, tree.height - 1);
+        assert_eq!(tree.get_root(), &proof.root);
+        assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
     }
 
     #[test]
     fn tree_works_for_full_base_layer() {
-        let (tree, height) = full_tree();
+        let (tree, _height) = full_tree();
 
         let proof = tree
             .get_siblings_for_path(0)

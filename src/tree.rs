@@ -1,5 +1,6 @@
 mod sparse_binary_tree;
-use sparse_binary_tree::{Node, Mergeable};
+pub use sparse_binary_tree::{Node, Mergeable, SparseBinaryTree, Coordinate, InputLeafNode};
+use sparse_binary_tree::{NodeOrientation};
 
 mod binary_tree_path;
 mod dapol_node;
@@ -8,39 +9,20 @@ mod dapol_node;
 // STENT TODO what are the commonalities between all the different accumulator types in the paper?
 
 // ===========================================
-// Supporting structs, types and functions.
-// All objects are used in multiple sub-modules.
-// Not available outside the scope of this module.
+// Helper functions that need to be made available to all submodules but kept private from calling code.
 
-/// Used to organise nodes into left/right siblings.
-// STENT TODO this should not be public but is needed to be used in paths file
-pub enum NodeOrientation {
-    Left,
-    Right,
-}
+impl<C: Clone> Node<C> {
+    /// Returns left if this node is a left sibling and vice versa for right.
+    /// Since we are working with a binary tree we can tell if the node is a left sibling of the above layer by checking the x_coord modulus 2.
+    /// Since x_coord starts from 0 we check if the modulus is equal to 0.
+    fn node_orientation(&self) -> NodeOrientation {
+        if self.get_x_coord() % 2 == 0 {
+            NodeOrientation::Left
+        } else {
+            NodeOrientation::Right
+        }
+    }
 
-/// Used to orient nodes inside a sibling pair so that the compiler can guarantee a left node is actually a left node.
-enum Sibling<C: Clone> {
-    Left(LeftSibling<C>),
-    Right(RightSibling<C>),
-}
-
-/// Simply holds a Node under the designated 'LeftSibling' name.
-struct LeftSibling<C: Clone>(Node<C>);
-
-/// Simply holds a Node under the designated 'RightSibling' name.
-struct RightSibling<C: Clone>(Node<C>);
-
-/// A pair of sibling nodes, but one might be absent.
-struct MaybeUnmatchedPair<C: Mergeable + Clone> {
-    left: Option<LeftSibling<C>>,
-    right: Option<RightSibling<C>>,
-}
-
-/// A pair of sibling nodes where both are present.
-struct MatchedPair<C: Mergeable + Clone> {
-    left: LeftSibling<C>,
-    right: RightSibling<C>,
 }
 
 // ===========================================
