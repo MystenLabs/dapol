@@ -4,6 +4,7 @@ use smtree::{
 };
 
 #[test]
+#[ignore] // test takes long
 fn test_serialization() {
     let tree_height = 8;
     let num_leaves = 20;

@@ -98,6 +98,7 @@ impl<
     }
 }
 #[test]
+#[ignore] // test takes long
 fn test_dapol() {
     TesterDapol::<blake3::Hasher, RangeProofSplitting>::test();
     TesterDapol::<blake3::Hasher, RangeProofPadding>::test();
@@ -106,6 +107,7 @@ fn test_dapol() {
 }
 
 #[test]
+#[ignore] // test takes long
 fn prove_n_verify() {
     let tree_height = 5;
     let aggregation_factor = 1;

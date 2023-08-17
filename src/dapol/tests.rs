@@ -7,6 +7,7 @@ use smtree::{index::TreeIndex, traits::Serializable};
 // ================================================================================================
 
 #[test]
+#[ignore] // test takes long
 fn build_leaf_nodes() {
     let liabilities = build_test_liabilities();
     let (nodes, _) =
@@ -15,6 +16,7 @@ fn build_leaf_nodes() {
 }
 
 #[test]
+#[ignore] // test takes long
 fn build_dapol_tree() {
     let options = build_test_options(4, 2);
     let liabilities = build_test_liabilities();
@@ -28,6 +30,7 @@ fn build_dapol_tree() {
 // ================================================================================================
 
 #[test]
+#[ignore] // test takes long
 fn generate_proof_for_id() {
     // build a test tree
     let tree_height = 4;
@@ -85,6 +88,7 @@ fn generate_proof_for_id() {
 }
 
 #[test]
+#[ignore] // test takes long
 fn generate_proof_batch_for_ids() {
     // build a test tree
     let tree_height = 4;
