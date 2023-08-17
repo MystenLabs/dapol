@@ -1,5 +1,5 @@
 mod dapol;
-pub use dapol::{Dapol, DapolNode};
+pub use crate::dapol::{Dapol, DapolNode};
 
 mod proof;
 pub use proof::{DapolProof, DapolProofNode};
