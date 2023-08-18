@@ -1,3 +1,5 @@
+//! This is legacy and will be removed
+
 use rand::prelude::*;
 use smtree::{
     error::DecodingError,

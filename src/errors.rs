@@ -1,3 +1,5 @@
+//! This is legacy and will be removed
+
 use displaydoc::Display;
 use thiserror::Error;
 

@@ -1,3 +1,5 @@
+//! This is legacy and will be removed
+
 use digest::Digest;
 use std::fmt::Debug;
 use std::marker::PhantomData;
