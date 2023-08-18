@@ -6,7 +6,6 @@ use sparse_binary_tree::NodeOrientation;
 pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree};
 
 mod binary_tree_path;
-mod dapol_node;
 
 // ===========================================
 // Helper functions that need to be made available to all submodules but kept private from calling code.
