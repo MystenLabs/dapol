@@ -20,6 +20,7 @@ mod tests;
 mod binary_tree;
 mod node_types;
 mod accumulators;
+mod kdf;
 
 #[cfg(test)]
 mod testing_utils;
