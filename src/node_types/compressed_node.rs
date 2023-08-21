@@ -3,7 +3,7 @@
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use digest::Digest;
 use std::marker::PhantomData;
-use super::sparse_binary_tree::Mergeable;
+use crate::binary_tree::Mergeable;
 
 #[derive(Default, Clone, Debug)]
 pub struct DapolNodeContent<H> {
