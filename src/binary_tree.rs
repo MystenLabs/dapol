@@ -3,7 +3,7 @@
 
 mod sparse_binary_tree;
 use sparse_binary_tree::NodeOrientation;
-pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree};
+pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree, SparseBinaryTreeError};
 
 mod binary_tree_path;
 
