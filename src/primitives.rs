@@ -13,6 +13,7 @@ use crate::kdf::Key;
 ///
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types::U256 ] or [num256::Uint256] but those are options for later need be.
+#[derive(Clone)]
 pub struct D256([u8; 32]);
 
 impl From<Key> for D256 {

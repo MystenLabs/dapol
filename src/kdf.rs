@@ -1,6 +1,5 @@
 //! Specifics for the Key Derivation Function (KDF).
 
-use primitive_types::H256;
 use std::convert::From;
 
 // Currently the KDF is just the blake3 hash function.

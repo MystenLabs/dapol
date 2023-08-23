@@ -131,7 +131,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn constructor_works() {
+    fn new_leaf_works() {
         let liability = 11u64;
         let blinding_factor = 7u64.into();
         let user_id = UserId::from_str("some user").unwrap();

@@ -67,7 +67,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     {
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
-            let max_leaves = 2u64.pow(height as u32 - 1);
+            let max_leaves = max_leaves(height);
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
             }
@@ -88,6 +88,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 
             // make sure all x_coord < max
             if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+                println!("max {:?}", max_leaves);
                 return Err(SparseBinaryTreeError::InvalidXCoord);
             }
 
@@ -256,6 +257,12 @@ impl<C: Clone> SparseBinaryTree<C> {
 
 // ===========================================
 // Supporting structs, types and functions.
+
+/// The maximum number of leaf nodes on the bottom layer of the binary tree.
+/// TODO latex `max = 2^(height-1)`
+pub fn max_leaves(height: u8) -> u64 {
+    2u64.pow(height as u32 - 1)
+}
 
 /// Used to organise nodes into left/right siblings.
 pub enum NodeOrientation {
