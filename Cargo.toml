@@ -12,10 +12,10 @@ bench = false
 smtree = "0.1.2"
 rand = "0.8.5"
 digest = "0.9.0"
-blake2 = "0.9.0"
-sha2 = "0.9.0"
-sha3 = "0.9.0"
-primitive-types = "0.12.1"
+blake2 = "0.9.0" # can we get this from parity
+sha2 = "0.9.0" # is this needed?
+sha3 = "0.9.0" # is this needed?
+primitive-types = "0.12.1" # H256 & U256 (I think parity uses this so maybe we just use that crate instead)
 
 zeroize = "1.6.0"
 bulletproofs = "4.0.0"

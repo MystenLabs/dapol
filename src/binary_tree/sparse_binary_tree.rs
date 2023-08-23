@@ -29,7 +29,7 @@ pub trait Mergeable {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     y: u8, // from 0 to height
-    // TODO change to 2^256
+    // TODO change to 2^248 (256 - 8) to allow large tree height, but still being able to do byte conversion of length 256 bits
     x: u64, // from 0 to 2^y
 }
 
@@ -261,6 +261,18 @@ impl<C: Clone> SparseBinaryTree<C> {
 pub enum NodeOrientation {
     Left,
     Right,
+}
+
+impl Coordinate {
+    /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
+    pub fn as_bytes(&self) -> [u8; 32] {
+        let mut c = [0u8; 32];
+        let (left, mid) = c.split_at_mut(1);
+        left.copy_from_slice(&self.y.to_le_bytes());
+        let (mid, right) = mid.split_at_mut(8);
+        mid.copy_from_slice(&self.x.to_le_bytes());
+        c
+    }
 }
 
 impl<C: Clone> Node<C> {

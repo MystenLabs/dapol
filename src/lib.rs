@@ -18,9 +18,11 @@ mod tests;
 // new
 
 mod binary_tree;
-mod node_types;
+mod node_content;
 mod accumulators;
 mod kdf;
+mod user;
+mod primitives;
 
 #[cfg(test)]
 mod testing_utils;

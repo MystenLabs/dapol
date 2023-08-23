@@ -1,13 +1,16 @@
-//! Specifics for the Key Derivation function (KDF).
-//!
-//! Currently the KDF is just the blake3 hash function.
-//! TODO need to find a better suited KDF implementation.
+//! Specifics for the Key Derivation Function (KDF).
 
 use primitive_types::H256;
+use std::convert::From;
 
-struct KDF {
+// Currently the KDF is just the blake3 hash function.
+pub struct KDF {
+    // TODO need to find a better suited KDF implementation
     hasher: blake3::Hasher,
 }
+
+/// Output of the KDF.
+pub struct Key([u8; 32]);
 
 impl KDF {
     fn new() -> Self {
@@ -20,7 +23,20 @@ impl KDF {
         self.hasher.update(data);
     }
 
-    fn finalize_as_h256(&self) -> H256 {
-        H256(self.hasher.finalize().as_bytes().clone())
+    fn finalize(&self) -> Key {
+        Key(self.hasher.finalize().into())
     }
+}
+
+impl From<Key> for [u8; 32] {
+    fn from(key: Key) -> [u8; 32] {
+        key.0
+    }
+}
+
+pub fn generate_key(value1: &[u8], value2: &[u8]) -> Key {
+    let mut kdf = KDF::new();
+    kdf.update(value1);
+    kdf.update(value2);
+    kdf.finalize()
 }

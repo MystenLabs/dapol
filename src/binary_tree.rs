@@ -45,11 +45,11 @@ mod test_utils {
         }
     }
 
-    pub trait H256Convertable {
+    pub trait H256Finalizable {
         fn finalize_as_h256(&self) -> H256;
     }
 
-    impl H256Convertable for blake3::Hasher {
+    impl H256Finalizable for blake3::Hasher {
         fn finalize_as_h256(&self) -> H256 {
             H256(self.finalize().as_bytes().clone())
         }
