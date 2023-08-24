@@ -1,4 +1,4 @@
-//! This is legacy and will be removed
+//! Legacy
 
 use digest::Digest;
 use std::fmt::Debug;

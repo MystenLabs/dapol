@@ -1,4 +1,4 @@
-//! This is legacy and will be removed
+//! Legacy
 
 use displaydoc::Display;
 use thiserror::Error;

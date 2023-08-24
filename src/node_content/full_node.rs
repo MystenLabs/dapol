@@ -198,23 +198,7 @@ mod tests {
 }
 
 // =================================================
-// can probably remove all this
-
-// use smtree::{
-//     index::TreeIndex,
-//     pad_secret::Secret,
-//     traits::{Paddable, ProofExtractable, Rand, TypeName},
-// };
-// use rand::{thread_rng, Rng};
-
-// STENT TODO this is not needed anymore, the padding function definition should live somewhere else
-// impl<H: Digest> Paddable for FullNodeContent<H> {
-//     /// Returns a padding node with value 0 and a random blinding factor.
-//     /// TODO: check with Kostas if this padding is ok.
-//     fn padding(_idx: &TreeIndex, _secret: &Secret) -> FullNodeContent<H> {
-//         FullNodeContent::<H>::new(0, Scalar::random(&mut thread_rng()))
-//     }
-// }
+// May need in the future
 
 // STENT TODO this conversion does need to happen but not sure how I want to do it yet
 //   most likely the tree code will have a conversion function that takes a generic C' type
@@ -223,31 +207,5 @@ mod tests {
 //     type ProofNode = DapolProofNode<H>;
 //     fn get_proof_node(&self) -> Self::ProofNode {
 //         DapolProofNode::new(self.commitment, self.hash.clone())
-//     }
-// }
-
-// STENT TODO not sure we need this anymore, seems to only be used for testing
-// impl<H: Digest> Rand for FullNodeContent<H> {
-//     /// Randomly generates a DAPOL node with random value and random blinding factor.
-//     fn randomize(&mut self) {
-//         // The value shouldn't be generated as u64 to prevent overflow of sums.
-//         let tmp: u32 = thread_rng().gen();
-//         *self = FullNodeContent::<H>::new(tmp as u64, Scalar::random(&mut thread_rng()));
-//     }
-// }
-
-// // STENT TODO why do we need this?
-// impl<H: TypeName> TypeName for FullNodeContent<H> {
-//     /// Returns the type name of DAPOL nodes with corresponding hash function (for logging purpose).
-//     fn get_name() -> String {
-//         format!("DAPOL Node ({})", D::get_name())
-//     }
-// }
-
-// // STENT TODO why partial eq defined like this? what is partial eq actually supposed to do?
-// impl<H> PartialEq for FullNodeContent<H> {
-//     /// Two DAPOL nodes are considered equal iff the values are equal.
-//     fn eq(&self, other: &Self) -> bool {
-//         self.liability == other.liability
 //     }
 // }

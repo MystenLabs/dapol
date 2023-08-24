@@ -1,3 +1,5 @@
+//! Legacy
+
 use crate::{errors::DapolError, DapolProof, DapolProofNode, RangeProvable, RangeVerifiable};
 use curve25519_dalek_ng::scalar::Scalar;
 use digest::Digest;

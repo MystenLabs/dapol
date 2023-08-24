@@ -429,6 +429,7 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 #[cfg(test)]
 mod tests {
     // TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
+    // TODO write a test that checks the total number of nodes in the tree is correct
 
     use super::*;
 
