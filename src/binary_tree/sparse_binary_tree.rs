@@ -277,11 +277,12 @@ pub enum NodeOrientation {
 
 impl Coordinate {
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
+    #[allow(dead_code)]
     pub fn as_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
         let (left, mid) = c.split_at_mut(1);
         left.copy_from_slice(&self.y.to_le_bytes());
-        let (mid, right) = mid.split_at_mut(8);
+        let (mid, _right) = mid.split_at_mut(8);
         mid.copy_from_slice(&self.x.to_le_bytes());
         c
     }

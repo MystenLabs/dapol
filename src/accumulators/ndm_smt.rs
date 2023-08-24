@@ -14,6 +14,7 @@ use crate::user::{User, UserId};
 type Content = FullNodeContent<blake3::Hasher>;
 
 /// Main struct containing tree object, master secret and the salts.
+#[allow(dead_code)]
 pub struct NdmSmt {
     master_secret: D256,
     salt_b: D256,
@@ -25,6 +26,7 @@ pub struct NdmSmt {
 impl NdmSmt {
     /// Constructor.
     // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
+    #[allow(dead_code)]
     fn new(
         master_secret: D256,
         salt_b: D256,

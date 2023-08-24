@@ -49,6 +49,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
+    #[allow(dead_code)]
     pub fn new_leaf(
         liability: u64,
         blinding_factor: D256,
@@ -85,6 +86,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     ///
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
+    #[allow(dead_code)]
     pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> FullNodeContent<H> {
         let liability = 0u64;
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
@@ -137,7 +139,7 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
         FullNodeContent {
             liability: parent_liability,
             blinding_factor: parent_blinding_factor,
-            commitment: left_sibling.commitment + right_sibling.commitment,
+            commitment: parent_commitment,
             hash: parent_hash,
             _phantom_hash_function: PhantomData,
         }

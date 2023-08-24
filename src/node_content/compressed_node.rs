@@ -35,14 +35,13 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
     /// The `blinding_factor` needs to have a larger sized storage space (256 bits) ensure promised
     /// n-bit security of the commitments; it can be enlarged to 512 bits if need be as this size
     /// is supported by the underlying `Scalar` constructors.
+    #[allow(dead_code)]
     pub fn new_leaf(
         liability: u64,
         blinding_factor: D256,
         user_id: UserId,
         user_salt: D256,
     ) -> CompressedNodeContent<H> {
-        use bulletproofs::PedersenGens;
-
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
             Scalar::from(liability),
@@ -70,6 +69,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
     ///
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
+    #[allow(dead_code)]
     pub fn new_pad(
         blinding_factor: D256,
         coord: &Coordinate,
