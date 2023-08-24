@@ -65,9 +65,10 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
+        let max_leaves = num_bottom_layer_nodes(height);
+
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
-            let max_leaves = max_leaves(height);
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
             }
@@ -260,7 +261,7 @@ impl<C: Clone> SparseBinaryTree<C> {
 
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
 /// TODO latex `max = 2^(height-1)`
-pub fn max_leaves(height: u8) -> u64 {
+pub fn num_bottom_layer_nodes(height: u8) -> u64 {
     2u64.pow(height as u32 - 1)
 }
 
@@ -448,7 +449,7 @@ mod tests {
     fn tree_works_for_single_leaf() {
         let height = 4u8;
 
-        for i in 0..2usize.pow(height as u32 - 1) {
+        for i in 0..num_bottom_layer_nodes(height) {
             let tree = tree_with_single_leaf(i as u64, height);
             check_tree(&tree, height);
         }
@@ -466,7 +467,7 @@ mod tests {
 
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
-        for i in 0..(2usize.pow(height as u32 - 1) + 1) {
+        for i in 0..(num_bottom_layer_nodes(height) + 1) {
             leaves.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {

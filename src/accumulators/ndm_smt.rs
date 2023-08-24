@@ -113,11 +113,11 @@ impl RandomXCoordGenerator {
     /// The max value is the max number of bottom-layer leaves for the given height because we are trying to
     /// generate x-coords on the bottom layer of the tree.
     fn new(height: u8) -> Self {
-        use crate::binary_tree::max_leaves;
+        use crate::binary_tree::num_bottom_layer_nodes;
 
         RandomXCoordGenerator {
             map: HashMap::<u64, u64>::new(),
-            max_value: max_leaves(height),
+            max_value: num_bottom_layer_nodes(height),
             rng: thread_rng(),
         }
     }
@@ -167,6 +167,7 @@ pub struct OutOfBoundsError {
     max_value: u64,
 }
 
+// TODO test that the tree error propagates correctly (how do we mock in rust?)
 // TODO we should fuzz on these tests because the code utilizes a random number generator
 #[cfg(test)]
 mod tests {
@@ -194,7 +195,7 @@ mod tests {
         use std::collections::{HashMap, HashSet};
 
         use super::super::{OutOfBoundsError, RandomXCoordGenerator};
-        use crate::binary_tree::max_leaves;
+        use crate::binary_tree::num_bottom_layer_nodes;
 
         #[test]
         fn constructor_works() {
@@ -206,7 +207,7 @@ mod tests {
         fn new_unique_value_works() {
             let height = 4u8;
             let mut rxcg = RandomXCoordGenerator::new(height);
-            for i in 0..max_leaves(height) {
+            for i in 0..num_bottom_layer_nodes(height) {
                 rxcg.new_unique_x_coord(i).unwrap();
             }
         }
@@ -216,7 +217,7 @@ mod tests {
             let height = 4u8;
             let mut rxcg = RandomXCoordGenerator::new(height);
             let mut set = HashSet::<u64>::new();
-            for i in 0..max_leaves(height) {
+            for i in 0..num_bottom_layer_nodes(height) {
                 let x = rxcg.new_unique_x_coord(i).unwrap();
                 if set.contains(&x) {
                     panic!("{:?} was generated twice!", x);
@@ -230,7 +231,7 @@ mod tests {
             use crate::testing_utils::assert_err;
 
             let height = 4u8;
-            let max = max_leaves(height);
+            let max = num_bottom_layer_nodes(height);
             let mut rxcg = RandomXCoordGenerator::new(height);
             let res = rxcg.new_unique_x_coord(max + 1);
 
