@@ -24,6 +24,7 @@ pub struct NdmSmt {
 
 impl NdmSmt {
     /// Constructor.
+    // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
     fn new(
         master_secret: D256,
         salt_b: D256,
@@ -35,19 +36,21 @@ impl NdmSmt {
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
 
+        // closure that is used to create new padding nodes
+        // TODO check how much copying is going on in this closure, maybe we can optimize
         let new_padding_node_content = |coord: &Coordinate| {
-            // TODO check how much copying is going on here, maybe we can optimize
             let coord_bytes = coord.as_bytes();
-            let w = generate_key(master_secret_bytes, &coord_bytes);
-            let w_bytes: [u8; 32] = w.into();
-            let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-            let salt = generate_key(&w_bytes, salt_s_bytes);
+            // pad_secret_bytes is given as 'w' in the DAPOL+ paper
+            let pad_secret = generate_key(master_secret_bytes, &coord_bytes);
+            let pad_secret_bytes: [u8; 32] = pad_secret.into();
+            let blinding_factor = generate_key(&pad_secret_bytes, salt_b_bytes);
+            let salt = generate_key(&pad_secret_bytes, salt_s_bytes);
             Content::new_pad(blinding_factor.into(), coord, salt.into())
         };
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
-        let mut leaves = Vec::<InputLeafNode<Content>>::new();
-        let mut user_mapping = HashMap::<UserId, u64>::new();
+        let mut leaves = Vec::with_capacity(users.len());
+        let mut user_mapping = HashMap::with_capacity(users.len());
 
         for i in 0..users.len() {
             let user = users

@@ -56,6 +56,7 @@ pub struct InputLeafNode<C> {
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in prev code)
     #[allow(dead_code)]
     pub fn new<F>(
         leaves: Vec<InputLeafNode<C>>,
@@ -114,15 +115,18 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             nodes
         };
 
-        let mut store = HashMap::new();
+        // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
+        let mut store = HashMap::with_capacity(max_leaves as usize);
 
         // repeat for each layer of the tree
         for _i in 0..height - 1 {
+            // TODO (same concern as above) flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
+            let num_nodes_next_layer = nodes.len() / 2 as usize;
             // create the next layer up of nodes from the current layer of nodes
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
-                .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
+                .fold(Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer), |mut pairs, node| {
                     let sibling = Sibling::from_node(node);
                     match sibling {
                         Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {

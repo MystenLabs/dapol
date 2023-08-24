@@ -27,7 +27,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             .ok_or(PathSiblingsError::LeafNotFound)?;
 
         let mut current_node = leaf;
-        let mut siblings = Vec::<Node<C>>::new();
+        let mut siblings = Vec::with_capacity(self.get_height() as usize);
 
         for y in 0..self.get_height() - 1 {
             let x_coord = match current_node.node_orientation() {
