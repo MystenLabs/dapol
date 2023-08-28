@@ -9,7 +9,6 @@ use super::*;
 pub struct PathSiblings<C: Clone> {
     leaf: Node<C>,
     siblings: Vec<Node<C>>,
-    root: Node<C>, // TODO this should not be part of this struct but rather an input to the verify method
 }
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
@@ -55,7 +54,6 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
         Ok(PathSiblings {
             leaf: leaf.clone(),
             siblings,
-            root: self.get_root().clone(),
         })
     }
 }
@@ -81,7 +79,7 @@ pub enum PathSiblingsError {
 impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
     /// Verify that a path reconstruction using the leaf node and the path siblings results in the same root node.
     #[allow(dead_code)]
-    fn verify(&self) -> Result<(), PathSiblingsError> {
+    fn verify(&self, root: &Node<C>) -> Result<(), PathSiblingsError> {
         let mut parent = self.leaf.clone();
 
         if self.siblings.len() < MIN_HEIGHT as usize {
@@ -108,7 +106,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
             parent = pair.merge();
         }
 
-        if parent == self.root {
+        if parent == *root {
             Ok(())
         } else {
             Err(PathSiblingsError::RootMismatch)
@@ -168,7 +166,6 @@ mod tests {
         tree: &SparseBinaryTree<TestContent>,
         proof: &PathSiblings<TestContent>,
     ) {
-        assert_eq!(tree.get_root(), &proof.root);
         assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
     }
 
@@ -182,7 +179,7 @@ mod tests {
         check_path_siblings(&tree, &proof);
 
         proof
-            .verify()
+            .verify(tree.get_root())
             .expect("Path verification should have been successful");
     }
 
@@ -196,7 +193,7 @@ mod tests {
         check_path_siblings(&tree, &proof);
 
         proof
-            .verify()
+            .verify(tree.get_root())
             .expect("Path verification should have been successful");
     }
 
@@ -212,7 +209,7 @@ mod tests {
             check_path_siblings(&tree, &proof);
 
             proof
-                .verify()
+                .verify(tree.get_root())
                 .expect("Path verification should have been successful");
         }
     }

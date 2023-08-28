@@ -187,7 +187,7 @@ mod tests {
             let salt_b: D256 = 2u64.into();
             let salt_s: D256 = 3u64.into();
             let height = 4u8;
-            let mut users = vec![User {
+            let users = vec![User {
                 liability: 5u64,
                 id: UserId::from_str("some user").unwrap(),
             }];
@@ -197,7 +197,7 @@ mod tests {
     }
 
     mod random_x_coord_generator {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashSet;
 
         use super::super::{OutOfBoundsError, RandomXCoordGenerator};
         use crate::binary_tree::num_bottom_layer_nodes;
