@@ -17,6 +17,7 @@ use crate::user::{User, UserId};
 type Content = FullNodeContent<blake3::Hasher>;
 
 /// Main struct containing tree object, master secret and the salts.
+/// The user mapping structure is required because it is non-deterministic.
 #[allow(dead_code)]
 pub struct NdmSmt {
     master_secret: D256,
@@ -35,7 +36,7 @@ impl NdmSmt {
         salt_b: D256,
         salt_s: D256,
         height: u8,
-        mut users: Vec<User>,
+        users: Vec<User>,
     ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
         let salt_b_bytes = salt_b.as_bytes();
@@ -56,14 +57,11 @@ impl NdmSmt {
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
         let mut leaves = Vec::with_capacity(users.len());
         let mut user_mapping = HashMap::with_capacity(users.len());
+        let mut i = 0;
 
-        for i in 0..users.len() {
-            let user = users
-                .pop()
-                // this should never happen because the loop runs for the length of the vector
-                .expect("[Bug in ndm smt] unexpected empty user vector");
-
+        for user in users.into_iter() {
             let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
+            i = i + 1;
 
             let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
             let w_bytes: [u8; 32] = w.into();
