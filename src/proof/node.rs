@@ -1,3 +1,5 @@
+//! Legacy
+
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, ristretto::RistrettoPoint};
 use digest::Digest;
 use smtree::{
