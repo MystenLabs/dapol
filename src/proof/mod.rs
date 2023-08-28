@@ -1,3 +1,5 @@
+//! Legacy
+
 use crate::{DapolNode, RangeVerifiable};
 use digest::Digest;
 use smtree::{error::DecodingError, proof::MerkleProof, traits::Serializable};

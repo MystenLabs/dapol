@@ -1,3 +1,5 @@
+//! Legacy
+
 use crate::DapolProofNode;
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};

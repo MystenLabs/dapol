@@ -1,3 +1,5 @@
+//! Legacy
+
 use bulletproofs::{PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use smtree::{

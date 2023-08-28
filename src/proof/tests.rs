@@ -1,3 +1,5 @@
+//! Legacy
+
 use crate::{utils::get_secret, Dapol, DapolNode, DapolProof, RangeProofSplitting};
 use smtree::{
     index::TreeIndex, traits::ProofExtractable, utils::generate_sorted_index_value_pairs,

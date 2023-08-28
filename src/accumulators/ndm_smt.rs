@@ -11,9 +11,14 @@ use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
 use crate::user::{User, UserId};
 
+// -------------------------------------------------------------------------------------------------
+// NDM-SMT struct and methods
+
 type Content = FullNodeContent<blake3::Hasher>;
 
 /// Main struct containing tree object, master secret and the salts.
+/// The user mapping structure is required because it is non-deterministic.
+#[allow(dead_code)]
 pub struct NdmSmt {
     master_secret: D256,
     salt_b: D256,
@@ -24,38 +29,39 @@ pub struct NdmSmt {
 
 impl NdmSmt {
     /// Constructor.
+    // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
+    #[allow(dead_code)]
     fn new(
         master_secret: D256,
         salt_b: D256,
         salt_s: D256,
         height: u8,
-        mut users: Vec<User>,
+        users: Vec<User>,
     ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
 
+        // closure that is used to create new padding nodes
+        // TODO check how much copying is going on in this closure, maybe we can optimize
         let new_padding_node_content = |coord: &Coordinate| {
-            // TODO check how much copying is going on here, maybe we can optimize
             let coord_bytes = coord.as_bytes();
-            let w = generate_key(master_secret_bytes, &coord_bytes);
-            let w_bytes: [u8; 32] = w.into();
-            let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-            let salt = generate_key(&w_bytes, salt_s_bytes);
+            // pad_secret_bytes is given as 'w' in the DAPOL+ paper
+            let pad_secret = generate_key(master_secret_bytes, &coord_bytes);
+            let pad_secret_bytes: [u8; 32] = pad_secret.into();
+            let blinding_factor = generate_key(&pad_secret_bytes, salt_b_bytes);
+            let salt = generate_key(&pad_secret_bytes, salt_s_bytes);
             Content::new_pad(blinding_factor.into(), coord, salt.into())
         };
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
-        let mut leaves = Vec::<InputLeafNode<Content>>::new();
-        let mut user_mapping = HashMap::<UserId, u64>::new();
+        let mut leaves = Vec::with_capacity(users.len());
+        let mut user_mapping = HashMap::with_capacity(users.len());
+        let mut i = 0;
 
-        for i in 0..users.len() {
-            let user = users
-                .pop()
-                // this should never happen because the loop runs for the length of the vector
-                .expect("[Bug in ndm smt] unexpected empty user vector");
-
+        for user in users.into_iter() {
             let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
+            i = i + 1;
 
             let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
             let w_bytes: [u8; 32] = w.into();
@@ -95,6 +101,10 @@ pub enum NdmSmtError {
     HeightTooSmall(#[from] OutOfBoundsError),
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// Random shuffle algorithm
+
 /// Used for generating x-coordinate values on the bottom layer of the tree.
 ///
 /// A struct is needed is because the algorithm used to generate new values keeps a memory of
@@ -113,11 +123,11 @@ impl RandomXCoordGenerator {
     /// The max value is the max number of bottom-layer leaves for the given height because we are trying to
     /// generate x-coords on the bottom layer of the tree.
     fn new(height: u8) -> Self {
-        use crate::binary_tree::max_leaves;
+        use crate::binary_tree::num_bottom_layer_nodes;
 
         RandomXCoordGenerator {
             map: HashMap::<u64, u64>::new(),
-            max_value: max_leaves(height),
+            max_value: num_bottom_layer_nodes(height),
             rng: thread_rng(),
         }
     }
@@ -167,6 +177,10 @@ pub struct OutOfBoundsError {
     max_value: u64,
 }
 
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
+// TODO test that the tree error propagates correctly (how do we mock in rust?)
 // TODO we should fuzz on these tests because the code utilizes a random number generator
 #[cfg(test)]
 mod tests {
@@ -181,7 +195,7 @@ mod tests {
             let salt_b: D256 = 2u64.into();
             let salt_s: D256 = 3u64.into();
             let height = 4u8;
-            let mut users = vec![User {
+            let users = vec![User {
                 liability: 5u64,
                 id: UserId::from_str("some user").unwrap(),
             }];
@@ -191,10 +205,10 @@ mod tests {
     }
 
     mod random_x_coord_generator {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashSet;
 
         use super::super::{OutOfBoundsError, RandomXCoordGenerator};
-        use crate::binary_tree::max_leaves;
+        use crate::binary_tree::num_bottom_layer_nodes;
 
         #[test]
         fn constructor_works() {
@@ -206,7 +220,7 @@ mod tests {
         fn new_unique_value_works() {
             let height = 4u8;
             let mut rxcg = RandomXCoordGenerator::new(height);
-            for i in 0..max_leaves(height) {
+            for i in 0..num_bottom_layer_nodes(height) {
                 rxcg.new_unique_x_coord(i).unwrap();
             }
         }
@@ -216,7 +230,7 @@ mod tests {
             let height = 4u8;
             let mut rxcg = RandomXCoordGenerator::new(height);
             let mut set = HashSet::<u64>::new();
-            for i in 0..max_leaves(height) {
+            for i in 0..num_bottom_layer_nodes(height) {
                 let x = rxcg.new_unique_x_coord(i).unwrap();
                 if set.contains(&x) {
                     panic!("{:?} was generated twice!", x);
@@ -230,7 +244,7 @@ mod tests {
             use crate::testing_utils::assert_err;
 
             let height = 4u8;
-            let max = max_leaves(height);
+            let max = num_bottom_layer_nodes(height);
             let mut rxcg = RandomXCoordGenerator::new(height);
             let res = rxcg.new_unique_x_coord(max + 1);
 

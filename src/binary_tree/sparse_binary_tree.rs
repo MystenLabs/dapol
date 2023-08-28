@@ -56,6 +56,7 @@ pub struct InputLeafNode<C> {
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in prev code)
     #[allow(dead_code)]
     pub fn new<F>(
         leaves: Vec<InputLeafNode<C>>,
@@ -65,9 +66,10 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
+        let max_leaves = num_bottom_layer_nodes(height);
+
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
-            let max_leaves = max_leaves(height);
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
             }
@@ -113,15 +115,18 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             nodes
         };
 
-        let mut store = HashMap::new();
+        // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
+        let mut store = HashMap::with_capacity(max_leaves as usize);
 
         // repeat for each layer of the tree
         for _i in 0..height - 1 {
+            // TODO (same concern as above) flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
+            let num_nodes_next_layer = nodes.len() / 2 as usize;
             // create the next layer up of nodes from the current layer of nodes
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
-                .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
+                .fold(Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer), |mut pairs, node| {
                     let sibling = Sibling::from_node(node);
                     match sibling {
                         Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
@@ -260,7 +265,7 @@ impl<C: Clone> SparseBinaryTree<C> {
 
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
 /// TODO latex `max = 2^(height-1)`
-pub fn max_leaves(height: u8) -> u64 {
+pub fn num_bottom_layer_nodes(height: u8) -> u64 {
     2u64.pow(height as u32 - 1)
 }
 
@@ -272,11 +277,12 @@ pub enum NodeOrientation {
 
 impl Coordinate {
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
+    #[allow(dead_code)]
     pub fn as_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
         let (left, mid) = c.split_at_mut(1);
         left.copy_from_slice(&self.y.to_le_bytes());
-        let (mid, right) = mid.split_at_mut(8);
+        let (mid, _right) = mid.split_at_mut(8);
         mid.copy_from_slice(&self.x.to_le_bytes());
         c
     }
@@ -424,6 +430,7 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 #[cfg(test)]
 mod tests {
     // TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
+    // TODO write a test that checks the total number of nodes in the tree is correct
 
     use super::*;
 
@@ -448,7 +455,7 @@ mod tests {
     fn tree_works_for_single_leaf() {
         let height = 4u8;
 
-        for i in 0..2usize.pow(height as u32 - 1) {
+        for i in 0..num_bottom_layer_nodes(height) {
             let tree = tree_with_single_leaf(i as u64, height);
             check_tree(&tree, height);
         }
@@ -466,7 +473,7 @@ mod tests {
 
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
-        for i in 0..(2usize.pow(height as u32 - 1) + 1) {
+        for i in 0..(num_bottom_layer_nodes(height) + 1) {
             leaves.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {
