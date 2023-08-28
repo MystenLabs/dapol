@@ -9,7 +9,7 @@ use super::*;
 pub struct PathSiblings<C: Clone> {
     leaf: Node<C>,
     siblings: Vec<Node<C>>,
-    root: Node<C>,
+    root: Node<C>, // TODO this should not be part of this struct but rather an input to the verify method
 }
 
 impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
@@ -116,15 +116,27 @@ impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
     }
 }
 
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+/// A reference to a left sibling node.
+///
+/// It is like [super][sparse_binary_tree][LeftSibling] but does not own the underlying node.
+/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][LeftSibling]
+/// when ownership of the Node type is not needed.
 #[allow(dead_code)]
 struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
 
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+/// A reference to a right sibling node.
+///
+/// It is like [super][sparse_binary_tree][RightSibling] but does not own the underlying node.
+/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][RightSibling]
+/// when ownership of the Node type is not needed.
 #[allow(dead_code)]
 struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
 
-/// Ease of use types for efficiency gains when ownership of the Node type is not needed.
+/// A reference to a pair of left and right sibling nodes.
+///
+/// It is like [super][sparse_binary_tree][MatchedPair] but does not own the underlying node.
+/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][MatchedPair]
+/// when ownership of the Node type is not needed.
 #[allow(dead_code)]
 struct MatchedPairRef<'a, C: Mergeable + Clone> {
     left: LeftSiblingRef<'a, C>,
