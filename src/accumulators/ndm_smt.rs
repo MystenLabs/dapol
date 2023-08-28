@@ -11,6 +11,9 @@ use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
 use crate::user::{User, UserId};
 
+// -------------------------------------------------------------------------------------------------
+// NDM-SMT struct and methods
+
 type Content = FullNodeContent<blake3::Hasher>;
 
 /// Main struct containing tree object, master secret and the salts.
@@ -100,6 +103,10 @@ pub enum NdmSmtError {
     HeightTooSmall(#[from] OutOfBoundsError),
 }
 
+
+// -------------------------------------------------------------------------------------------------
+// Random shuffle algorithm
+
 /// Used for generating x-coordinate values on the bottom layer of the tree.
 ///
 /// A struct is needed is because the algorithm used to generate new values keeps a memory of
@@ -171,6 +178,9 @@ impl RandomXCoordGenerator {
 pub struct OutOfBoundsError {
     max_value: u64,
 }
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests
 
 // TODO test that the tree error propagates correctly (how do we mock in rust?)
 // TODO we should fuzz on these tests because the code utilizes a random number generator
