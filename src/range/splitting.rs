@@ -1,3 +1,5 @@
+//! Legacy
+
 use crate::utils::bytes_to_usize_with_error;
 use bulletproofs::RangeProof;
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
