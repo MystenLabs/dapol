@@ -14,6 +14,9 @@ use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use digest::Digest;
 use thiserror::Error;
 
+mod individual_range_proof;
+use individual_range_proof::IndividualRangeProof;
+
 /// Inclusion proof struct.
 ///
 /// There are 2 parts to an inclusion proof:
@@ -25,7 +28,7 @@ use thiserror::Error;
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
     path: Path<CompressedNodeContent<H>>,
-    range_proof: RangeProofPadding, // TODO make generic
+    range_proof: Vec<IndividualRangeProof>,
 }
 
 impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
@@ -34,14 +37,16 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
         let aggregation_factor = 2usize;
 
-        let nodes = path.nodes_from_bottom_to_top()?;
-        let secrets: Vec<u64> = nodes.iter().map(|node| node.content.liability).collect();
-        let blindings: Vec<Scalar> = nodes
-            .iter()
-            .map(|node| node.content.blinding_factor)
+        let range_proof = path
+            .nodes_from_bottom_to_top()?
+            .into_iter()
+            .map(|node| {
+                IndividualRangeProof::generate(
+                    node.content.liability,
+                    &node.content.blinding_factor,
+                )
+            })
             .collect();
-        let range_proof =
-            RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
 
         Ok(InclusionProof {
             path: path.convert(),
@@ -55,19 +60,18 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
         self.path.verify(root)?;
 
-        // TODO need to only use compressed ristretto when we serialize
-        let commitments: Vec<CompressedRistretto> = self
+        if self
             .path
             .nodes_from_bottom_to_top()?
             .iter()
             .map(|node| node.content.commitment.compress())
-            .collect();
-
-        if !self.range_proof.verify(&commitments) {
-            return Err(InclusionProofError::RangeProofError);
+            .zip(self.range_proof.iter())
+            .any(|(com, proof)| !proof.verify(&com))
+        {
+            Err(InclusionProofError::RangeProofError)
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
