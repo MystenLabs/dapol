@@ -1,11 +1,16 @@
 //! Non-deterministic mapping sparse Merkle tree (NDM_SMT).
+//!
+//! TODO more docs
 
 use rand::rngs::ThreadRng;
 use rand::{distributions::Uniform, thread_rng, Rng}; // TODO double check this is cryptographically safe randomness
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::binary_tree::{Coordinate, InputLeafNode, SparseBinaryTree, SparseBinaryTreeError};
+use crate::binary_tree::{
+    Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
+};
+use crate::inclusion_proof::{InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
@@ -14,7 +19,8 @@ use crate::user::{User, UserId};
 // -------------------------------------------------------------------------------------------------
 // NDM-SMT struct and methods
 
-type Content = FullNodeContent<blake3::Hasher>;
+type Hash = blake3::Hasher;
+type Content = FullNodeContent<Hash>;
 
 /// Main struct containing tree object, master secret and the salts.
 /// The user mapping structure is required because it is non-deterministic.
@@ -29,9 +35,10 @@ pub struct NdmSmt {
 
 impl NdmSmt {
     /// Constructor.
+    /// TODO more docs
     // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
     #[allow(dead_code)]
-    fn new(
+    pub fn new(
         master_secret: D256,
         salt_b: D256,
         salt_s: D256,
@@ -91,6 +98,25 @@ impl NdmSmt {
             user_mapping,
         })
     }
+
+    /// Generate an inclusion proof for the given user_id.
+    ///
+    /// The NdmSmt struct defines the content type that is used, and so must define how to extract
+    /// the secret value (liability) and blinding factor for the range proof, which are both
+    /// required for the range proof that is done in the [InclusionProof] constructor.
+    pub fn generate_inclusion_proof(
+        &self,
+        user_id: &UserId,
+    ) -> Result<InclusionProof<Hash>, NdmSmtError> {
+        let leaf_x_coord = self
+            .user_mapping
+            .get(user_id)
+            .ok_or(NdmSmtError::UserIdNotFound)?;
+
+        let path = self.tree.build_path_for(*leaf_x_coord)?;
+
+        Ok(InclusionProof::generate(path)?)
+    }
 }
 
 #[derive(Error, Debug)]
@@ -99,8 +125,13 @@ pub enum NdmSmtError {
     TreeError(#[from] SparseBinaryTreeError),
     #[error("Number of users cannot be bigger than 2^height")]
     HeightTooSmall(#[from] OutOfBoundsError),
+    #[error("Inclusion proof generation failed when trying to build the path in the tree")]
+    InclusionProofPathGenerationError(#[from] PathError),
+    #[error("Inclusion proof generation failed")]
+    InclusionProofGenerationError(#[from] InclusionProofError),
+    #[error("User ID not found in the user mapping")]
+    UserIdNotFound,
 }
-
 
 // -------------------------------------------------------------------------------------------------
 // Random shuffle algorithm

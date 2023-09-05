@@ -1,0 +1,279 @@
+//! Inclusion proof struct and methods.
+//!
+//! The inclusion proof is very closely related to the node content type, and so the struct was not
+//! made generic in the type of node content. If other node contents are to be supported then new
+//! inclusion proof structs and methods will need to be written.
+
+use crate::binary_tree::{Node, Path, PathError};
+use crate::node_content::{CompressedNodeContent, FullNodeContent};
+use crate::primitives::H256Finalizable;
+use crate::{RangeProofPadding, RangeProvable, RangeVerifiable};
+
+use ::std::fmt::Debug;
+use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
+use digest::Digest;
+use thiserror::Error;
+
+/// Inclusion proof struct.
+///
+/// There are 2 parts to an inclusion proof:
+/// - the path in the tree
+/// - the range proof for the Pedersen commitments
+/// The tree path is taken to be of a compressed node content type because sharing a full node
+/// content type with users would leak secret information such as other user's liabilities and the
+/// total sum of liabilities.
+#[derive(Debug)]
+pub struct InclusionProof<H: Clone> {
+    path: Path<CompressedNodeContent<H>>,
+    range_proof: RangeProofPadding, // TODO make generic
+}
+
+impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
+    /// Generate an inclusion proof from a tree path.
+    pub fn generate(path: Path<FullNodeContent<H>>) -> Result<Self, InclusionProofError> {
+        // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
+        let aggregation_factor = 2usize;
+
+        let nodes = path.nodes_from_bottom_to_top()?;
+        let secrets: Vec<u64> = nodes.iter().map(|node| node.content.liability).collect();
+        let blindings: Vec<Scalar> = nodes
+            .iter()
+            .map(|node| node.content.blinding_factor)
+            .collect();
+        let range_proof =
+            RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
+
+        Ok(InclusionProof {
+            path: path.convert(),
+            range_proof,
+        })
+    }
+
+    /// Verify that an inclusion proof matches a given root hash.
+    // TODO have the upper bound as an input here to make it clear what is needed to verify
+    // TODO only require the hash, not the whole node
+    pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
+        self.path.verify(root)?;
+
+        // TODO need to only use compressed ristretto when we serialize
+        let commitments: Vec<CompressedRistretto> = self
+            .path
+            .nodes_from_bottom_to_top()?
+            .iter()
+            .map(|node| node.content.commitment.compress())
+            .collect();
+
+        if !self.range_proof.verify(&commitments) {
+            return Err(InclusionProofError::RangeProofError);
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum InclusionProofError {
+    #[error("Siblings path verification failed")]
+    TreePathError(#[from] PathError),
+    #[error("Range proof verification failed")]
+    RangeProofError,
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::binary_tree::Coordinate;
+
+    use bulletproofs::PedersenGens;
+    use curve25519_dalek_ng::ristretto::RistrettoPoint;
+    use primitive_types::H256;
+
+    type Hash = blake3::Hasher;
+
+    // tree that is built, with path highlighted
+    ///////////////////////////////////////////////////////
+    //    |                   [root]                     //
+    //  3 |                     224                      //
+    //    |                    //\                       //
+    //    |                   //  \                      //
+    //    |                  //    \                     //
+    //    |                 //      \                    //
+    //    |                //        \                   //
+    //    |               //          \                  //
+    //    |              //            \                 //
+    //    |             //              \                //
+    //    |            //                \               //
+    //    |           //                  \              //
+    //    |          //                    \             //
+    //  2 |         80                      144          //
+    //    |         /\\                     /\           //
+    //    |        /  \\                   /  \          //
+    //    |       /    \\                 /    \         //
+    //    |      /      \\               /      \        //
+    //    |     /        \\             /        \       //
+    //  1 |   30          50          84          60     //
+    //    |   /\         //\          /\          /\     //
+    //    |  /  \       //  \        /  \        /  \    //
+    //  0 |13    17    27    23    41    43    07    53  //
+    //  _            [leaf]                              //
+    //  y  --------------------------------------------  //
+    //  x| 0     1     2     3     4     5     6     7   //
+    //                                                   //
+    ///////////////////////////////////////////////////////
+    fn build_test_path() -> (Path<FullNodeContent<Hash>>, RistrettoPoint, H256) {
+        // leaf at (2,0)
+        let liability = 27u64;
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let mut hasher = Hash::new();
+        hasher.update("leaf".as_bytes());
+        let hash = hasher.finalize_as_h256();
+        let leaf = Node {
+            coord: Coordinate { x: 2u64, y: 0u8 },
+            content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+        };
+
+        // sibling at (3,0)
+        let liability = 23u64;
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"22223333444455556666777788881111");
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let mut hasher = Hash::new();
+        hasher.update("sibling1".as_bytes());
+        let hash = hasher.finalize_as_h256();
+        let sibling1 = Node {
+            coord: Coordinate { x: 3u64, y: 0u8 },
+            content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+        };
+
+        // we need to construct the root hash & commitment for verification testing
+        let (parent_hash, parent_commitment) = build_parent(
+            leaf.content.commitment,
+            sibling1.content.commitment,
+            leaf.content.hash,
+            sibling1.content.hash,
+        );
+
+        // sibling at (0,1)
+        let liability = 30u64;
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let mut hasher = Hash::new();
+        hasher.update("sibling2".as_bytes());
+        let hash = hasher.finalize_as_h256();
+        let sibling2 = Node {
+            coord: Coordinate { x: 0u64, y: 1u8 },
+            content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+        };
+
+        // we need to construct the root hash & commitment for verification testing
+        let (parent_hash, parent_commitment) = build_parent(
+            sibling2.content.commitment,
+            parent_commitment,
+            sibling2.content.hash,
+            parent_hash,
+        );
+
+        // sibling at (1,2)
+        let liability = 144u64;
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let mut hasher = Hash::new();
+        hasher.update("sibling3".as_bytes());
+        let hash = hasher.finalize_as_h256();
+        let sibling3 = Node {
+            coord: Coordinate { x: 1u64, y: 2u8 },
+            content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+        };
+
+        // we need to construct the root hash & commitment for verification testing
+        let (root_hash, root_commitment) = build_parent(
+            parent_commitment,
+            sibling3.content.commitment,
+            parent_hash,
+            sibling3.content.hash,
+        );
+
+        (
+            Path {
+                siblings: vec![sibling1, sibling2, sibling3],
+                leaf,
+            },
+            root_commitment,
+            root_hash,
+        )
+    }
+
+    fn build_parent(
+        left_commitment: RistrettoPoint,
+        right_commitment: RistrettoPoint,
+        left_hash: H256,
+        right_hash: H256,
+    ) -> (H256, RistrettoPoint) {
+        let parent_commitment = left_commitment + right_commitment;
+
+        // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
+        let parent_hash = {
+            let mut hasher = Hash::new();
+            hasher.update(left_commitment.compress().as_bytes());
+            hasher.update(right_commitment.compress().as_bytes());
+            hasher.update(left_hash.as_bytes());
+            hasher.update(right_hash.as_bytes());
+            hasher.finalize_as_h256()
+        };
+
+        (parent_hash, parent_commitment)
+    }
+
+    #[test]
+    fn generate_works() {
+        let (path, _, _) = build_test_path();
+        InclusionProof::generate(path).unwrap();
+    }
+
+    #[test]
+    fn verify_works() {
+        let (path, root_commitment, root_hash) = build_test_path();
+        let root = Node {
+            coord: Coordinate { x: 0u64, y: 3u8 },
+            content: CompressedNodeContent::new(root_commitment, root_hash),
+        };
+
+        let proof = InclusionProof::generate(path).unwrap();
+        proof.verify(&root).unwrap();
+    }
+
+    // TODO test correct error translation from lower layers (probably should mock the error responses rather than triggering them from the code in the lower layers)
+}
+
+// -------------------------------------------------------------------------------------------------
+// This was an attempt at making this struct more generic but it's actually just over-complicating the code for no reason
+
+// impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
+//     pub fn generate<B, F, G>(
+//         path: Path<B>,
+//         secret_extractor: F,
+//         blinding_extractor: G,
+//     ) -> Result<Self, InclusionProofError>
+//     where
+//         C: From<B>,
+//         B: Mergeable + Clone + PartialEq + Debug,
+//         F: FnMut(&Node<B>) -> u64,
+//         G: FnMut(&Node<B>) -> Scalar,
+//     {
+//         let aggregation_factor = 2usize;
+
+//         let nodes = path.get_nodes()?;
+//         let secrets: Vec<u64> = nodes.iter().map(secret_extractor).collect();
+//         let blindings: Vec<Scalar> = nodes.iter().map(blinding_extractor).collect();
+//         let range_proof =
+//             RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
+
+//         Ok(InclusionProof {
+//             path: path.convert::<C>(),
+//             range_proof,
+//         })
+//     }
+// }
