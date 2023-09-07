@@ -3,16 +3,24 @@
 //! The inclusion proof is very closely related to the node content type, and so the struct was not
 //! made generic in the type of node content. If other node contents are to be supported then new
 //! inclusion proof structs and methods will need to be written.
+//!
+//! TODO more docs, need to say that the aggregated nodes are assumed to be the front ones (i.e. bottom layer nodes) and the tail are the individual proofs
 
 use crate::binary_tree::{Node, Path, PathError};
 use crate::node_content::{CompressedNodeContent, FullNodeContent};
 use crate::primitives::H256Finalizable;
-use crate::{RangeProofPadding, RangeProvable, RangeVerifiable};
 
 use ::std::fmt::Debug;
-use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
+use bulletproofs::ProofError;
 use digest::Digest;
+use percentage::PercentageInteger;
 use thiserror::Error;
+
+mod individual_range_proof;
+use individual_range_proof::IndividualRangeProof;
+
+mod aggregated_range_proof;
+use aggregated_range_proof::AggregatedRangeProof;
 
 /// Inclusion proof struct.
 ///
@@ -25,27 +33,72 @@ use thiserror::Error;
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
     path: Path<CompressedNodeContent<H>>,
-    range_proof: RangeProofPadding, // TODO make generic
+    individual_range_proofs: Vec<IndividualRangeProof>,
+    aggregated_range_proof: AggregatedRangeProof,
+}
+
+/// Method used to determine how many of the range proofs are aggregated. Those that do not
+/// form part of the aggregated proof are just proved individually.
+///
+/// Divisor: divide the number of nodes by this number to get the ratio of the nodes to be used in
+/// the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height / divisor` (any
+/// decimals are truncated, not rounded). Note:
+/// - if this number is 0 it means that none of the proofs should be aggregated
+/// - if this number is 1 it means that all of the proofs should be aggregated
+/// - if this number is `tree_height` it means that only the leaf node should be aggregated
+/// - if this number is `> tree_height` it means that none of the proofs should be aggregated
+///
+/// Percent: multiply the `tree_height` by this percentage to get the number of nodes to be used
+/// in the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height * percentage`.
+///
+/// Number: the exact number of nodes to be used in the aggregated proof. Note that if this number
+/// is `> tree_height` it is treated as if it was equal to `tree_height`.
+pub enum AggregationFactor {
+    Divisor(u8),
+    Percent(PercentageInteger),
+    Number(u8),
 }
 
 impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
     pub fn generate(path: Path<FullNodeContent<H>>) -> Result<Self, InclusionProofError> {
         // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
-        let aggregation_factor = 2usize;
+        // TODO we need to check that this number is bounded, so that we cannot get 0 for the aggregation number, or is that fine?
+        //   it definitely can't be 0, or maybe we just assume that 0 implies 1, which means all aggregation? Or maybe 0 can imply all individual? So that the caller does not need to know exactly what the input size is.
+        // TODO it might be useful for the caller to provide either the aggregation factor, or the aggregation index, or some percentage
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
+        // TODO make argument as to why the cast is safe here
+        let tree_height = path.siblings.len() as u8 + 1;
+        let aggregation_index = aggregation_factor.apply_to(tree_height);
 
-        let nodes = path.nodes_from_bottom_to_top()?;
-        let secrets: Vec<u64> = nodes.iter().map(|node| node.content.liability).collect();
-        let blindings: Vec<Scalar> = nodes
-            .iter()
-            .map(|node| node.content.blinding_factor)
+        let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
+        let mut nodes_for_individual_proofs =
+            nodes_for_aggregation.split_off(aggregation_index as usize);
+
+        let upper_bound_bit_length = 64; // TODO parameter
+
+        let aggregation_tuples = nodes_for_aggregation
+            .into_iter()
+            .map(|node| (node.content.liability, node.content.blinding_factor))
             .collect();
-        let range_proof =
-            RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
+        let aggregated_range_proof =
+            AggregatedRangeProof::generate(&aggregation_tuples, upper_bound_bit_length)?;
+
+        let individual_range_proofs = nodes_for_individual_proofs
+            .into_iter()
+            .map(|node| {
+                IndividualRangeProof::generate(
+                    node.content.liability,
+                    &node.content.blinding_factor,
+                    upper_bound_bit_length,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         Ok(InclusionProof {
             path: path.convert(),
-            range_proof,
+            individual_range_proofs,
+            aggregated_range_proof,
         })
     }
 
@@ -53,21 +106,51 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     // TODO have the upper bound as an input here to make it clear what is needed to verify
     // TODO only require the hash, not the whole node
     pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
+        use curve25519_dalek_ng::ristretto::CompressedRistretto;
+
         self.path.verify(root)?;
 
-        // TODO need to only use compressed ristretto when we serialize
-        let commitments: Vec<CompressedRistretto> = self
+        let upper_bound_bit_length = 64; // TODO parameter
+        let tree_height = self.path.siblings.len() + 1;
+        let aggregation_index = tree_height - self.individual_range_proofs.len();
+
+        let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
             .path
             .nodes_from_bottom_to_top()?
             .iter()
             .map(|node| node.content.commitment.compress())
             .collect();
 
-        if !self.range_proof.verify(&commitments) {
-            return Err(InclusionProofError::RangeProofError);
-        }
+        let commitments_for_individual_proofs =
+            commitments_for_aggregated_proofs.split_off(aggregation_index);
+
+        commitments_for_individual_proofs
+            .iter()
+            .zip(self.individual_range_proofs.iter())
+            .map(|(com, proof)| proof.verify(&com, upper_bound_bit_length))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        // STENT TODO do not perform the verification if there were no aggregated proof, same for individual
+        self.aggregated_range_proof
+            .verify(&commitments_for_aggregated_proofs, upper_bound_bit_length);
 
         Ok(())
+    }
+}
+
+impl AggregationFactor {
+    fn apply_to(self, tree_height: u8) -> u8 {
+        match self {
+            Self::Divisor(div) => {
+                if div == 0 || div > tree_height {
+                    0
+                } else {
+                    tree_height / div
+                }
+            }
+            Self::Percent(per) => per.apply_to(tree_height),
+            Self::Number(num) => num.min(tree_height),
+        }
     }
 }
 
@@ -75,12 +158,24 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
     TreePathError(#[from] PathError),
-    #[error("Range proof verification failed")]
-    RangeProofError,
+    #[error("Issues with range proof")]
+    RangeProofError(#[from] RangeProofError),
+}
+
+#[derive(Error, Debug)]
+pub enum RangeProofError {
+    #[error("Bulletproofs generation failed")]
+    BulletproofGenerationError(ProofError),
+    #[error("Bulletproofs verification failed")]
+    BulletproofVerificationError(ProofError),
+    #[error("The length of the Pedersen commitments vector did not match the length of the input used to generate the proof")]
+    InputVectorLengthMismatch,
 }
 
 // -------------------------------------------------------------------------------------------------
 // Unit tests
+
+// TODO tests for different aggregation factors
 
 #[cfg(test)]
 mod tests {
@@ -88,7 +183,7 @@ mod tests {
     use crate::binary_tree::Coordinate;
 
     use bulletproofs::PedersenGens;
-    use curve25519_dalek_ng::ristretto::RistrettoPoint;
+    use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
     type Hash = blake3::Hasher;

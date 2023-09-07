@@ -22,6 +22,11 @@ use super::FullNodeContent;
 /// and the merge function in this case needs to use a generic hash function. One way to
 /// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug)]
+// STENT TODO the naming "compressed" here is weird
+//   because with ristrettopoint the compressed version is only for wire transfer
+//   and with node content the compressed version is for less struct fields
+//   Maybe we should change the name from compressed to safe or private
+//   and save compressed for if we want to have a node content struct with compressed ristretto point
 pub struct CompressedNodeContent<H> {
     pub commitment: RistrettoPoint,
     pub hash: H256,

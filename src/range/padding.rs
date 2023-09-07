@@ -119,6 +119,8 @@ impl RangeProvable for RangeProofPadding {
         }
     }
 
+    // STENT TODO what is this? and why create just 1 individual proof if len > aggretation_factor?
+    //   'new com' refers to the fact that the proof struct already exists, and we are simply adding more items to it
     fn generate_proof_by_new_com(
         &mut self,
         secrets: &[u64],
