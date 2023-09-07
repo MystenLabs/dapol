@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::binary_tree::{
     Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
 };
-use crate::inclusion_proof::{InclusionProof, InclusionProofError};
+use crate::inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
@@ -114,8 +114,9 @@ impl NdmSmt {
             .ok_or(NdmSmtError::UserIdNotFound)?;
 
         let path = self.tree.build_path_for(*leaf_x_coord)?;
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
 
-        Ok(InclusionProof::generate(path)?)
+        Ok(InclusionProof::generate(path, aggregation_factor)?)
     }
 }
 

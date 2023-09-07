@@ -3,8 +3,6 @@
 //! The inclusion proof is very closely related to the node content type, and so the struct was not
 //! made generic in the type of node content. If other node contents are to be supported then new
 //! inclusion proof structs and methods will need to be written.
-//!
-//! TODO more docs, need to say that the aggregated nodes are assumed to be the front ones (i.e. bottom layer nodes) and the tail are the individual proofs
 
 use crate::binary_tree::{Node, Path, PathError};
 use crate::node_content::{CompressedNodeContent, FullNodeContent};
@@ -37,37 +35,20 @@ pub struct InclusionProof<H: Clone> {
     aggregated_range_proof: AggregatedRangeProof,
 }
 
-/// Method used to determine how many of the range proofs are aggregated. Those that do not
-/// form part of the aggregated proof are just proved individually.
-///
-/// Divisor: divide the number of nodes by this number to get the ratio of the nodes to be used in
-/// the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height / divisor` (any
-/// decimals are truncated, not rounded). Note:
-/// - if this number is 0 it means that none of the proofs should be aggregated
-/// - if this number is 1 it means that all of the proofs should be aggregated
-/// - if this number is `tree_height` it means that only the leaf node should be aggregated
-/// - if this number is `> tree_height` it means that none of the proofs should be aggregated
-///
-/// Percent: multiply the `tree_height` by this percentage to get the number of nodes to be used
-/// in the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height * percentage`.
-///
-/// Number: the exact number of nodes to be used in the aggregated proof. Note that if this number
-/// is `> tree_height` it is treated as if it was equal to `tree_height`.
-pub enum AggregationFactor {
-    Divisor(u8),
-    Percent(PercentageInteger),
-    Number(u8),
-}
-
 impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
-    pub fn generate(path: Path<FullNodeContent<H>>) -> Result<Self, InclusionProofError> {
-        // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
-        // TODO we need to check that this number is bounded, so that we cannot get 0 for the aggregation number, or is that fine?
-        //   it definitely can't be 0, or maybe we just assume that 0 implies 1, which means all aggregation? Or maybe 0 can imply all individual? So that the caller does not need to know exactly what the input size is.
-        // TODO it might be useful for the caller to provide either the aggregation factor, or the aggregation index, or some percentage
-        let aggregation_factor = AggregationFactor::Divisor(2u8);
-        // TODO make argument as to why the cast is safe here
+    ///
+    /// The aggregation factor is used to determine how many of the range proofs are aggregated.
+    /// Those that do not form part of the aggregated proof are just proved individually. The
+    /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    pub fn generate(
+        path: Path<FullNodeContent<H>>,
+        aggregation_factor: AggregationFactor,
+    ) -> Result<Self, InclusionProofError> {
+        // Is this cast safe? Yes because the tree height (which is the same as the length of the
+        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
+        // TODO might be worth using a bounded vector for siblings. If the tree height changes
+        //   type for some reason then this code would fail silently.
         let tree_height = path.siblings.len() as u8 + 1;
         let aggregation_index = aggregation_factor.apply_to(tree_height);
 
@@ -138,6 +119,31 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Aggregation factor
+
+/// Method used to determine how many of the range proofs are aggregated. Those that do not
+/// form part of the aggregated proof are just proved individually.
+///
+/// Divisor: divide the number of nodes by this number to get the ratio of the nodes to be used in
+/// the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height / divisor` (any
+/// decimals are truncated, not rounded). Note:
+/// - if this number is 0 it means that none of the proofs should be aggregated
+/// - if this number is 1 it means that all of the proofs should be aggregated
+/// - if this number is `tree_height` it means that only the leaf node should be aggregated
+/// - if this number is `> tree_height` it means that none of the proofs should be aggregated
+///
+/// Percent: multiply the `tree_height` by this percentage to get the number of nodes to be used
+/// in the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height * percentage`.
+///
+/// Number: the exact number of nodes to be used in the aggregated proof. Note that if this number
+/// is `> tree_height` it is treated as if it was equal to `tree_height`.
+pub enum AggregationFactor {
+    Divisor(u8),
+    Percent(PercentageInteger),
+    Number(u8),
+}
+
 impl AggregationFactor {
     fn apply_to(self, tree_height: u8) -> u8 {
         match self {
@@ -153,6 +159,9 @@ impl AggregationFactor {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Errors
 
 #[derive(Error, Debug)]
 pub enum InclusionProofError {
@@ -175,7 +184,7 @@ pub enum RangeProofError {
 // -------------------------------------------------------------------------------------------------
 // Unit tests
 
-// TODO tests for different aggregation factors
+// TODO should we mock out the inclusion proof layer for these tests?
 
 #[cfg(test)]
 mod tests {
@@ -322,21 +331,24 @@ mod tests {
         (parent_hash, parent_commitment)
     }
 
+    // TODO fuzz on the aggregation factor
     #[test]
     fn generate_works() {
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
         let (path, _, _) = build_test_path();
-        InclusionProof::generate(path).unwrap();
+        InclusionProof::generate(path, aggregation_factor).unwrap();
     }
 
     #[test]
     fn verify_works() {
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
         let (path, root_commitment, root_hash) = build_test_path();
         let root = Node {
             coord: Coordinate { x: 0u64, y: 3u8 },
             content: CompressedNodeContent::new(root_commitment, root_hash),
         };
 
-        let proof = InclusionProof::generate(path).unwrap();
+        let proof = InclusionProof::generate(path, aggregation_factor).unwrap();
         proof.verify(&root).unwrap();
     }
 
