@@ -115,8 +115,9 @@ impl NdmSmt {
 
         let path = self.tree.build_path_for(*leaf_x_coord)?;
         let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
 
-        Ok(InclusionProof::generate(path, aggregation_factor)?)
+        Ok(InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length)?)
     }
 }
 

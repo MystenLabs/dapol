@@ -25,25 +25,37 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// There are 2 parts to an inclusion proof:
 /// - the path in the tree
 /// - the range proof for the Pedersen commitments
+///
 /// The tree path is taken to be of a compressed node content type because sharing a full node
 /// content type with users would leak secret information such as other user's liabilities and the
 /// total sum of liabilities.
+///
+/// The Bulletproofs protocol allows aggregating multiple range proofs into 1 proof, which is more
+/// efficient to produce & verify than doing them individually. Both aggregated and individual range
+/// proofs are supported.
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
     path: Path<CompressedNodeContent<H>>,
     individual_range_proofs: Vec<IndividualRangeProof>,
     aggregated_range_proof: AggregatedRangeProof,
+    upper_bound_bit_length: u8,
 }
 
 impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
     ///
-    /// The aggregation factor is used to determine how many of the range proofs are aggregated.
+    /// `aggregation_factor` is used to determine how many of the range proofs are aggregated.
     /// Those that do not form part of the aggregated proof are just proved individually. The
     /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    ///
+    /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
+    /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
+    /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
+    /// because we are not expected to require bounds higher than $2^256$.
     pub fn generate(
         path: Path<FullNodeContent<H>>,
         aggregation_factor: AggregationFactor,
+        upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
         // Is this cast safe? Yes because the tree height (which is the same as the length of the
         // input) is also stored as a u8, and so there would never be more siblings than max(u8).
@@ -55,8 +67,6 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
         let mut nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
-
-        let upper_bound_bit_length = 64; // TODO parameter
 
         let aggregation_tuples = nodes_for_aggregation
             .into_iter()
@@ -80,6 +90,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             path: path.convert(),
             individual_range_proofs,
             aggregated_range_proof,
+            upper_bound_bit_length,
         })
     }
 
@@ -91,7 +102,6 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 
         self.path.verify(root)?;
 
-        let upper_bound_bit_length = 64; // TODO parameter
         let tree_height = self.path.siblings.len() + 1;
         let aggregation_index = tree_height - self.individual_range_proofs.len();
 
@@ -108,12 +118,12 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         commitments_for_individual_proofs
             .iter()
             .zip(self.individual_range_proofs.iter())
-            .map(|(com, proof)| proof.verify(&com, upper_bound_bit_length))
+            .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
             .collect::<Result<Vec<_>, _>>()?;
 
         // STENT TODO do not perform the verification if there were no aggregated proof, same for individual
         self.aggregated_range_proof
-            .verify(&commitments_for_aggregated_proofs, upper_bound_bit_length);
+            .verify(&commitments_for_aggregated_proofs, self.upper_bound_bit_length);
 
         Ok(())
     }
@@ -335,20 +345,24 @@ mod tests {
     #[test]
     fn generate_works() {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
+
         let (path, _, _) = build_test_path();
-        InclusionProof::generate(path, aggregation_factor).unwrap();
+        InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
     }
 
     #[test]
     fn verify_works() {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
+
         let (path, root_commitment, root_hash) = build_test_path();
         let root = Node {
             coord: Coordinate { x: 0u64, y: 3u8 },
             content: CompressedNodeContent::new(root_commitment, root_hash),
         };
 
-        let proof = InclusionProof::generate(path, aggregation_factor).unwrap();
+        let proof = InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
         proof.verify(&root).unwrap();
     }
 
