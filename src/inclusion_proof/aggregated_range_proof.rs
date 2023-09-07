@@ -63,16 +63,25 @@ fn new_transcript() -> Transcript {
 }
 
 impl AggregatedRangeProof {
-    fn get_input_length(&self) -> u8 {
-        match self {
-            AggregatedRangeProof::Padding {
-                proof,
-                input_size: input_length,
-            } => *input_length,
-            AggregatedRangeProof::Splitting {
-                proofs,
-                input_size: input_length,
-            } => *input_length,
+    /// Generate an aggregated proof.
+    ///
+    /// Whether the padding method or splitting method is used will be determined by the input size,
+    /// so that the most efficient method is used. The code currently just naively checks whether
+    /// the size lies in the first or second half of the gap between the 2 powers of 2 on either
+    /// side if the size value.
+    pub fn generate(
+        secrets_blindings_tuples: &Vec<(u64, Scalar)>,
+        upper_bound_bit_length: u8,
+    ) -> Result<AggregatedRangeProof, RangeProofError> {
+        let size = secrets_blindings_tuples.len();
+        let next_pow_2 = size.next_power_of_two();
+        let prev_pow_2 = next_pow_2 / 2;
+
+        // TODO this choice of split is fairly arbitrary, one should run the numbers and figure out where the best split is
+        if size < (next_pow_2 - prev_pow_2) / 2 {
+            Self::generate_with_splitting(secrets_blindings_tuples, upper_bound_bit_length)
+        } else {
+            Self::generate_with_padding(secrets_blindings_tuples, upper_bound_bit_length)
         }
     }
 
@@ -185,7 +194,7 @@ impl AggregatedRangeProof {
         commitments: &Vec<CompressedRistretto>,
         upper_bound_bit_length: u8,
     ) -> Result<(), RangeProofError> {
-        if commitments.len() != self.get_input_length() as usize {
+        if commitments.len() != self.get_input_size() as usize {
             return Err(RangeProofError::InputVectorLengthMismatch);
         }
 
@@ -201,16 +210,16 @@ impl AggregatedRangeProof {
         match self {
             AggregatedRangeProof::Padding {
                 proof,
-                input_size: input_length,
+                input_size,
             } => {
-                let next_pow_2 = input_length.next_power_of_two();
+                let next_pow_2 = input_size.next_power_of_two();
                 let bp_gens =
                     BulletproofGens::new(upper_bound_bit_length as usize, next_pow_2 as usize);
                 let commitment_pad = pc_gens
                     .commit(Scalar::from(padding_tuple().0), padding_tuple().1)
                     .compress();
 
-                for _i in *input_length..next_pow_2 {
+                for _i in *input_size..next_pow_2 {
                     commitments_clone.push(commitment_pad);
                 }
 
@@ -224,7 +233,7 @@ impl AggregatedRangeProof {
             }
             AggregatedRangeProof::Splitting {
                 proofs,
-                input_size: input_length,
+                input_size: _,
             } => proofs.iter().try_for_each(|(proof, length)| {
                 let length_usize = *length as usize;
                 let bp_gens = BulletproofGens::new(upper_bound_bit_length as usize, length_usize);
@@ -242,8 +251,22 @@ impl AggregatedRangeProof {
         }
         .map_err(|err| RangeProofError::BulletproofVerificationError(err))
     }
+
+    fn get_input_size(&self) -> u8 {
+        match self {
+            AggregatedRangeProof::Padding {
+                proof: _,
+                input_size: input_length,
+            } => *input_length,
+            AggregatedRangeProof::Splitting {
+                proofs: _,
+                input_size: input_length,
+            } => *input_length,
+        }
+    }
 }
 
+// TODO need to test the generate function once we have decided on the best split point
 #[cfg(test)]
 mod tests {
     use bulletproofs::ProofError;
