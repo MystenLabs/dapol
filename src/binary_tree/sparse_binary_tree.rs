@@ -1,3 +1,7 @@
+//! Sparse binary tree implementation.
+//!
+//! TODO more docs
+
 use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
@@ -14,8 +18,8 @@ pub static MIN_HEIGHT: u8 = 2;
 /// The data contained in the node is completely generic, requiring only to have an associated merge function.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node<C: Clone> {
-    coord: Coordinate,
-    content: C,
+    pub coord: Coordinate,
+    pub content: C,
 }
 
 /// The generic content type must implement this trait to allow 2 sibling nodes to be combined to make a new parent node.
@@ -28,9 +32,9 @@ pub trait Mergeable {
 /// x is the horizontal index of the Node (0 being the leftmost index).
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
-    y: u8, // from 0 to height
+    pub y: u8, // from 0 to height
     // TODO change to 2^248 (256 - 8) to allow large tree height, but still being able to do byte conversion of length 256 bits
-    x: u64, // from 0 to 2^y
+    pub x: u64, // from 0 to 2^y
 }
 
 /// Main data structure.
@@ -53,7 +57,7 @@ pub struct InputLeafNode<C> {
 // ===========================================
 // Constructors.
 
-impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
+impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in prev code)
@@ -126,35 +130,40 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
-                .fold(Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer), |mut pairs, node| {
-                    let sibling = Sibling::from_node(node);
-                    match sibling {
-                        Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                            left: Some(left_sibling),
-                            right: Option::None,
-                        }),
-                        Sibling::Right(right_sibling) => {
-                            let is_right_sibling_of_prev_node = pairs
-                                .last_mut()
-                                .map(|pair| (&pair.left).as_ref())
-                                .flatten()
-                                .is_some_and(|left| right_sibling.0.is_right_sibling_of(&left.0));
-                            if is_right_sibling_of_prev_node {
-                                pairs
+                .fold(
+                    Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer),
+                    |mut pairs, node| {
+                        let sibling = Sibling::from_node(node);
+                        match sibling {
+                            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                                left: Some(left_sibling),
+                                right: Option::None,
+                            }),
+                            Sibling::Right(right_sibling) => {
+                                let is_right_sibling_of_prev_node = pairs
                                     .last_mut()
-                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                                    .expect("[Bug in tree constructor] Previous node not found")
-                                    .right = Option::Some(right_sibling);
-                            } else {
-                                pairs.push(MaybeUnmatchedPair {
-                                    left: Option::None,
-                                    right: Some(right_sibling),
-                                });
+                                    .map(|pair| (&pair.left).as_ref())
+                                    .flatten()
+                                    .is_some_and(|left| {
+                                        right_sibling.0.is_right_sibling_of(&left.0)
+                                    });
+                                if is_right_sibling_of_prev_node {
+                                    pairs
+                                        .last_mut()
+                                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                        .expect("[Bug in tree constructor] Previous node not found")
+                                        .right = Option::Some(right_sibling);
+                                } else {
+                                    pairs.push(MaybeUnmatchedPair {
+                                        left: Option::None,
+                                        right: Some(right_sibling),
+                                    });
+                                }
                             }
                         }
-                    }
-                    pairs
-                })
+                        pairs
+                    },
+                )
                 .into_iter()
                 // add padding nodes to unmatched pairs
                 .map(|pair| match (pair.left, pair.right) {
@@ -203,12 +212,14 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
 }
 
 impl<C: Clone> Node<C> {
+    // TODO we won't need this anymore if the fields of Node are going to be public
     pub fn new(coord: Coordinate, content: C) -> Self {
         Node { coord, content }
     }
 }
 
 impl Coordinate {
+    // TODO we won't need this anymore if the fields of Coordinate are going to be public
     pub fn new(x: u64, y: u8) -> Self {
         Coordinate { x, y }
     }
@@ -231,6 +242,8 @@ pub enum SparseBinaryTreeError {
 
 // ===========================================
 // Accessor methods
+// TODO do we really need these getters? If Node is not going to be publicly an
+//  available API for this crate then we can just make the struct keys public
 
 impl<C: Clone> Node<C> {
     pub fn get_coord(&self) -> &Coordinate {
@@ -257,6 +270,11 @@ impl<C: Clone> SparseBinaryTree<C> {
     /// Attempt to find a Node via it's coordinate in the underlying store.
     pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
         self.store.get(coord)
+    }
+    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the underlying store.
+    pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
+        let coord = Coordinate { x: x_coord, y: 0 };
+        self.get_node(&coord)
     }
 }
 
@@ -290,7 +308,6 @@ impl Coordinate {
 
 impl<C: Clone> Node<C> {
     /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
-    #[allow(dead_code)]
     pub fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => {
@@ -334,6 +351,15 @@ impl<C: Clone> Node<C> {
         Coordinate {
             y: self.coord.y + 1,
             x: self.coord.x / 2,
+        }
+    }
+}
+
+impl<C: Clone> Node<C> {
+    pub fn convert<B: Clone + From<C>>(self) -> Node<B> {
+        Node {
+            content: self.content.into(),
+            coord: self.coord,
         }
     }
 }

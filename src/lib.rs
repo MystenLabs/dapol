@@ -19,10 +19,19 @@ mod tests;
 
 mod binary_tree;
 mod node_content;
-mod accumulators;
 mod kdf;
-mod user;
+
+mod inclusion_proof;
+pub use inclusion_proof::{InclusionProof, InclusionProofError};
+
 mod primitives;
+pub use primitives::D256;
+
+mod user;
+pub use user::{User, UserId};
+
+mod accumulators;
+pub use accumulators::NdmSmt;
 
 #[cfg(test)]
 mod testing_utils;

@@ -1,39 +1,39 @@
 //! Data structures and methods related to paths in a binary tree.
 //!
 //! A path in a binary tree goes from a leaf node to the root node. For each node (starting from
-//! the leaf node) one follows the path by moving to the node's parent; since the root node has
-//! no parent this is the end of the path. A path is uniquely determined by the leaf node.
+//! the leaf node) one follows the path by moving to the parent node; since the root node has
+//! no parent this is the end of the path.
+//!
+//! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
+//! to as the leaf node's path.
 
 use super::sparse_binary_tree::{Coordinate, Mergeable, Node, SparseBinaryTree, MIN_HEIGHT};
+use super::NodeOrientation;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
-use super::*;
-
-// -------------------------------------------------------------------------------------------------
-// Structs and methods for path from leaf node to root node
-
-/// All the sibling nodes for a leaf node's path from bottom layer to root node.
-#[allow(dead_code)]
-pub struct PathSiblings<C: Clone> {
-    leaf: Node<C>,
-    siblings: Vec<Node<C>>,
+/// All the sibling nodes for the nodes in a leaf node's path.
+/// The nodes are ordered from bottom layer (first) to root node (last, not included).
+/// The leaf node + the siblings can be used to reconstruct the actual nodes in the path as well
+/// as the root node.
+#[derive(Debug)]
+pub struct Path<C: Clone> {
+    pub leaf: Node<C>,
+    pub siblings: Vec<Node<C>>,
 }
 
-impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
-    // TODO maybe we can compress the final result here to help keep the proof size as low as possible
+// -------------------------------------------------------------------------------------------------
+// Constructor
+
+impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     /// Construct the path up the tree from the leaf node at the given x-coord on the bottom layer
-    /// to the root node. Put all the sibling nodes for the path into a vector and return it.
-    #[allow(dead_code)]
-    fn get_siblings_for_path(
-        &self,
-        leaf_x_coord: u64,
-    ) -> Result<PathSiblings<C>, PathSiblingsError> {
+    /// to the root node. Put all the sibling nodes for the path into a vector and use this vector
+    /// to create a [Path] struct and return it. The vector is ordered from bottom layer (first)
+    /// to root node (last, not included).
+    pub fn build_path_for(&self, leaf_x_coord: u64) -> Result<Path<C>, PathError> {
         let coord = Coordinate::new(leaf_x_coord, 0);
 
-        let leaf = self
-            .get_node(&coord)
-            .ok_or(PathSiblingsError::LeafNotFound)?;
+        let leaf = self.get_node(&coord).ok_or(PathError::LeafNotFound)?;
 
         let mut current_node = leaf;
         let mut siblings = Vec::with_capacity(self.get_height() as usize);
@@ -47,7 +47,7 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             let sibling_coord = Coordinate::new(x_coord, y);
             siblings.push(
                 self.get_node(&sibling_coord)
-                    .ok_or(PathSiblingsError::NodeNotFound {
+                    .ok_or(PathError::NodeNotFound {
                         coord: sibling_coord,
                     })?
                     .clone(),
@@ -56,73 +56,135 @@ impl<C: Mergeable + Default + Clone> SparseBinaryTree<C> {
             let parent_coord = current_node.get_parent_coord();
             current_node = self
                 .get_node(&parent_coord)
-                .ok_or(PathSiblingsError::NodeNotFound {
+                .ok_or(PathError::NodeNotFound {
                     coord: parent_coord,
                 })?;
         }
 
-        Ok(PathSiblings {
+        Ok(Path {
             leaf: leaf.clone(),
             siblings,
         })
     }
 }
 
-impl<C: Mergeable + Clone + PartialEq + Debug> PathSiblings<C> {
+// -------------------------------------------------------------------------------------------------
+// Methods for Path
+
+/// Construct a [MatchedPairRef] using the 2 given nodes.
+/// Only build the pair if the 2 nodes are siblings, otherwise return an error.
+fn build_pair<'a, C: Mergeable + Clone>(
+    node: &'a Node<C>,
+    parent: &'a Node<C>,
+) -> Result<MatchedPairRef<'a, C>, PathError> {
+    if parent.is_right_sibling_of(node) {
+        Ok(MatchedPairRef {
+            left: LeftSiblingRef(node),
+            right: RightSiblingRef(parent),
+        })
+    } else if parent.is_left_sibling_of(node) {
+        Ok(MatchedPairRef {
+            left: LeftSiblingRef(parent),
+            right: RightSiblingRef(node),
+        })
+    } else {
+        Err(PathError::InvalidSibling {
+            node_that_needs_sibling: parent.get_coord().clone(),
+            sibling_given: node.get_coord().clone(),
+        })
+    }
+}
+
+impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
     /// Verify that the given list of sibling nodes + the base leaf node matches the given root node.
     ///
     /// This is done by reconstructing each node in the path, from bottom layer to the root, using
     /// the given leaf and sibling nodes, and then comparing the resulting root node to the given
     /// root node.
-    #[allow(dead_code)]
-    fn verify(&self, root: &Node<C>) -> Result<(), PathSiblingsError> {
+    ///
+    /// An error is returned if the number of siblings is less than the min amount, or the
+    /// constructed root node does not match the given one.
+    pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
         let mut parent = self.leaf.clone();
 
         if self.siblings.len() < MIN_HEIGHT as usize {
-            return Err(PathSiblingsError::TooFewSiblings);
+            return Err(PathError::TooFewSiblings);
         }
 
         for node in &self.siblings {
-            let pair = if parent.is_right_sibling_of(node) {
-                Ok(MatchedPairRef {
-                    left: LeftSiblingRef(node),
-                    right: RightSiblingRef(&parent),
-                })
-            } else if parent.is_left_sibling_of(node) {
-                Ok(MatchedPairRef {
-                    left: LeftSiblingRef(&parent),
-                    right: RightSiblingRef(node),
-                })
-            } else {
-                Err(PathSiblingsError::InvalidSibling {
-                    given: node.get_coord().clone(),
-                    calculated: parent.get_coord().clone(),
-                })
-            }?;
+            let pair = build_pair(node, &parent)?;
             parent = pair.merge();
         }
 
         if parent == *root {
             Ok(())
         } else {
-            Err(PathSiblingsError::RootMismatch)
+            Err(PathError::RootMismatch)
+        }
+    }
+
+    /// Return a vector containing only the nodes the tree path.
+    ///
+    /// The path nodes have to be constructed using the leaf & sibling nodes in [Path] because
+    /// they are not stored explicitly. The order of the returned path nodes is bottom first (leaf)
+    /// and top last (root).
+    ///
+    /// An error is returned if the [Path] data is invalid.
+    pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathError> {
+        // +1 because the root node is included in the returned vector
+        let mut nodes = Vec::<Node<C>>::with_capacity(self.siblings.len() + 1);
+
+        nodes.push(self.leaf.clone());
+
+        for node in &self.siblings {
+            // this should never panic because we pushed the leaf node before the loop
+            let parent = nodes
+                .last()
+                .expect("[Bug in path generation] Empty node vector");
+            let pair = build_pair(node, parent)?;
+            nodes.push(pair.merge());
+        }
+
+        Ok(nodes)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Conversion
+
+impl<C: Clone> Path<C> {
+    /// Convert `Path<C>` to `Path<D>`:
+    ///
+    /// Apply the function `f` to each of the nodes in the [Path] struct, converting them to a new
+    /// type of node. Consume self and return a new Path.
+    pub fn convert<B: Clone + From<C>>(self) -> Path<B> {
+        Path {
+            siblings: self
+                .siblings
+                .into_iter()
+                .map(|node| node.convert())
+                .collect(),
+            leaf: self.leaf.convert(),
         }
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Errors
+
 #[derive(Error, Debug)]
 #[allow(dead_code)]
-pub enum PathSiblingsError {
+pub enum PathError {
     #[error("Provided leaf node not found in the tree")]
     LeafNotFound,
     #[error("Node not found in tree ({coord:?})")]
     NodeNotFound { coord: Coordinate },
     #[error("Calculated root content does not match provided root content")]
     RootMismatch,
-    #[error("Provided node ({given:?}) is not a sibling of the calculated node ({calculated:?})")]
+    #[error("Provided node ({sibling_given:?}) is not a sibling of the calculated node ({node_that_needs_sibling:?})")]
     InvalidSibling {
-        given: Coordinate,
-        calculated: Coordinate,
+        node_that_needs_sibling: Coordinate,
+        sibling_given: Coordinate,
     },
     #[error("Too few siblings")]
     TooFewSiblings,
@@ -179,10 +241,7 @@ mod tests {
     };
     use super::*;
 
-    fn check_path_siblings(
-        tree: &SparseBinaryTree<TestContent>,
-        proof: &PathSiblings<TestContent>,
-    ) {
+    fn check_path_siblings(tree: &SparseBinaryTree<TestContent>, proof: &Path<TestContent>) {
         assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
     }
 
@@ -191,7 +250,7 @@ mod tests {
         let (tree, _height) = full_tree();
 
         let proof = tree
-            .get_siblings_for_path(0)
+            .build_path_for(0)
             .expect("Path generation should have been successful");
         check_path_siblings(&tree, &proof);
 
@@ -205,7 +264,7 @@ mod tests {
         let (tree, _height) = tree_with_sparse_leaves();
 
         let proof = tree
-            .get_siblings_for_path(6)
+            .build_path_for(6)
             .expect("Path generation should have been successful");
         check_path_siblings(&tree, &proof);
 
@@ -221,7 +280,7 @@ mod tests {
         for i in 0..2usize.pow(height as u32 - 1) {
             let tree = tree_with_single_leaf(i as u64, height);
             let proof = tree
-                .get_siblings_for_path(i as u64)
+                .build_path_for(i as u64)
                 .expect("Path generation should have been successful");
             check_path_siblings(&tree, &proof);
 

@@ -9,9 +9,11 @@ use primitive_types::H256;
 use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
+use crate::primitives::H256Finalizable;
 use crate::primitives::D256;
 use crate::user::UserId;
-use crate::primitives::H256Finalizable;
+
+use super::FullNodeContent;
 
 /// Main struct containing the Pedersen commitment & hash.
 ///
@@ -19,15 +21,33 @@ use crate::primitives::H256Finalizable;
 /// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
 /// and the merge function in this case needs to use a generic hash function. One way to
 /// solve this is to have a generic parameter on this struct and a phantom field.
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct CompressedNodeContent<H> {
-    commitment: RistrettoPoint,
-    hash: H256,
+    pub commitment: RistrettoPoint,
+    pub hash: H256,
     _phantom_hash_function: PhantomData<H>,
 }
 
+impl<H> PartialEq for CompressedNodeContent<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.commitment == other.commitment && self.hash == other.hash
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Constructors
+
 impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
-    /// Constructor.
+    /// Simple constructor
+    pub fn new(commitment: RistrettoPoint, hash: H256) -> Self {
+        CompressedNodeContent {
+            commitment,
+            hash,
+            _phantom_hash_function: PhantomData,
+        }
+    }
+
+    /// Create the content for a leaf node.
     ///
     /// The secret `value` realistically does not need more space than 64 bits because it is
     /// generally used for monetary value or head count, also the Bulletproofs library requires
@@ -43,6 +63,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
         user_salt: D256,
     ) -> CompressedNodeContent<H> {
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
+        // TODO we should document the default group elements used here, and put them in the spec
         let commitment = PedersenGens::default().commit(
             Scalar::from(liability),
             Scalar::from_bytes_mod_order(blinding_factor.into()),
@@ -98,6 +119,18 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Conversion
+
+impl<H: Digest + H256Finalizable> From<FullNodeContent<H>> for CompressedNodeContent<H> {
+    fn from(full_node: FullNodeContent<H>) -> Self {
+        full_node.compress()
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Implement merge trait
+
 impl<H: Digest + H256Finalizable> Mergeable for CompressedNodeContent<H> {
     /// Returns the parent node content by merging two child node contents.
     ///
@@ -124,7 +157,11 @@ impl<H: Digest + H256Finalizable> Mergeable for CompressedNodeContent<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
 // TODO should fuzz the values instead of hard-coding
+// TODO we need to unit test the new "new" constructor method
 #[cfg(test)]
 mod tests {
     use super::*;

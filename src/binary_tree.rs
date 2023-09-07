@@ -6,6 +6,7 @@ use sparse_binary_tree::NodeOrientation;
 pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree, SparseBinaryTreeError, num_bottom_layer_nodes};
 
 mod binary_tree_path;
+pub use binary_tree_path::{Path, PathError};
 
 // ===========================================
 // Helper functions that need to be made available to all submodules but kept private from calling code.
@@ -67,7 +68,7 @@ mod test_utils {
                 hasher.update(&right_sibling.value.to_le_bytes());
                 hasher.update(left_sibling.hash.as_bytes());
                 hasher.update(right_sibling.hash.as_bytes());
-                hasher.finalize_as_h256() // STENT TODO double check the output of this thing
+                hasher.finalize_as_h256() // TODO double check the output of this thing
             };
 
             TestContent {

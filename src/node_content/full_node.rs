@@ -21,6 +21,8 @@ use std::marker::PhantomData;
 
 use crate::primitives::H256Finalizable;
 
+use super::CompressedNodeContent;
+
 /// Main struct containing:
 /// - Raw liability value
 /// - Blinding factor
@@ -28,19 +30,47 @@ use crate::primitives::H256Finalizable;
 /// - Hash
 ///
 /// The hash function needs to be a generic parameter because when implementing
-/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
-/// and the merge function in this case needs to use a generic hash function. One way to
-/// solve this is to have a generic parameter on this struct and a phantom field.
-#[derive(Default, Clone, Debug)]
+/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, which is not generic,
+/// and the merge function in the case of FullNodeContent needs to use a generic hash function.
+/// One way to solve this problem is to have a generic parameter on this struct and a phantom field.
+#[derive(Clone, Debug)]
 pub struct FullNodeContent<H> {
-    liability: u64,
-    blinding_factor: Scalar,
-    commitment: RistrettoPoint,
-    hash: H256,
+    pub liability: u64,
+    pub blinding_factor: Scalar,
+    pub commitment: RistrettoPoint,
+    pub hash: H256,
     _phantom_hash_function: PhantomData<H>,
 }
 
+impl<H> PartialEq for FullNodeContent<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.liability == other.liability
+            && self.blinding_factor == other.blinding_factor
+            && self.commitment == other.commitment
+            && self.hash == other.hash
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Constructors
+
 impl<H: Digest + H256Finalizable> FullNodeContent<H> {
+    /// Simple constructor
+    pub fn new(
+        liability: u64,
+        blinding_factor: Scalar,
+        commitment: RistrettoPoint,
+        hash: H256,
+    ) -> Self {
+        FullNodeContent {
+            liability,
+            blinding_factor,
+            commitment,
+            hash,
+            _phantom_hash_function: PhantomData,
+        }
+    }
+
     /// Constructor.
     ///
     /// The secret `liability` realistically does not need more space than 64 bits because it is
@@ -115,6 +145,18 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Conversions
+
+impl<H: Digest + H256Finalizable> FullNodeContent<H> {
+    pub fn compress(self) -> CompressedNodeContent<H> {
+        CompressedNodeContent::new(self.commitment, self.hash)
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Implement Mergeable trait
+
 impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
     /// Returns the parent node content by merging two child node contents.
     ///
@@ -146,7 +188,11 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
 // TODO should fuzz the values instead of hard-coding
+// TODO we need to unit test the new "new" constructor method
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,16 +244,3 @@ mod tests {
         FullNodeContent::merge(&node_1, &node_2);
     }
 }
-
-// =================================================
-// May need in the future
-
-// STENT TODO this conversion does need to happen but not sure how I want to do it yet
-//   most likely the tree code will have a conversion function that takes a generic C' type
-//   that implements the convert_node trait or something, then can define convert_node here
-// impl<H> ProofExtractable for FullNodeContent<H> {
-//     type ProofNode = DapolProofNode<H>;
-//     fn get_proof_node(&self) -> Self::ProofNode {
-//         DapolProofNode::new(self.commitment, self.hash.clone())
-//     }
-// }
