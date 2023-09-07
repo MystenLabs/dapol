@@ -71,6 +71,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
         F: Fn(&Coordinate) -> C,
     {
         let max_leaves = num_bottom_layer_nodes(height);
+        let num_leaves = leaves.len();
 
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
@@ -94,7 +95,6 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
 
             // make sure all x_coord < max
             if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
-                println!("max {:?}", max_leaves);
                 return Err(SparseBinaryTreeError::InvalidXCoord);
             }
 
@@ -120,7 +120,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
         };
 
         // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
-        let mut store = HashMap::with_capacity(max_leaves as usize);
+        let mut store = HashMap::with_capacity(num_leaves);
 
         // repeat for each layer of the tree
         for _i in 0..height - 1 {
