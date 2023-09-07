@@ -35,7 +35,7 @@ pub struct CompressedNodeContent<H> {
 
 impl<H> PartialEq for CompressedNodeContent<H> {
     fn eq(&self, other: &Self) -> bool {
-        self.commitment == other.commitment && self.hash == other.hash
+        self.hash == other.hash
     }
 }
 

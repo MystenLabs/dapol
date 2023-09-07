@@ -4,7 +4,7 @@
 //! made generic in the type of node content. If other node contents are to be supported then new
 //! inclusion proof structs and methods will need to be written.
 
-use crate::binary_tree::{Node, Path, PathError};
+use crate::binary_tree::{Coordinate, Node, Path, PathError};
 use crate::node_content::{CompressedNodeContent, FullNodeContent};
 use crate::primitives::H256Finalizable;
 
@@ -12,6 +12,7 @@ use ::std::fmt::Debug;
 use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
+use primitive_types::H256;
 use thiserror::Error;
 
 mod individual_range_proof;
@@ -95,14 +96,22 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     }
 
     /// Verify that an inclusion proof matches a given root hash.
-    // TODO have the upper bound as an input here to make it clear what is needed to verify
-    // TODO only require the hash, not the whole node
-    pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
-        use curve25519_dalek_ng::ristretto::CompressedRistretto;
-
-        self.path.verify(root)?;
+    pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
+        use bulletproofs::PedersenGens;
+        use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 
         let tree_height = self.path.siblings.len() + 1;
+
+        // PartialEq for CompressedNodeContent does not depend on the commitment so we can
+        // make this whatever we like
+        let dummy_commitment = PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+        let root = Node {
+            content: CompressedNodeContent::new(dummy_commitment, root_hash),
+            coord: Coordinate::new(0, tree_height as u8 - 1),
+        };
+
+        self.path.verify(&root)?;
+
         let aggregation_index = tree_height - self.individual_range_proofs.len();
 
         let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
@@ -122,8 +131,10 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             .collect::<Result<Vec<_>, _>>()?;
 
         // STENT TODO do not perform the verification if there were no aggregated proof, same for individual
-        self.aggregated_range_proof
-            .verify(&commitments_for_aggregated_proofs, self.upper_bound_bit_length);
+        self.aggregated_range_proof.verify(
+            &commitments_for_aggregated_proofs,
+            self.upper_bound_bit_length,
+        );
 
         Ok(())
     }
@@ -356,14 +367,11 @@ mod tests {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
 
-        let (path, root_commitment, root_hash) = build_test_path();
-        let root = Node {
-            coord: Coordinate { x: 0u64, y: 3u8 },
-            content: CompressedNodeContent::new(root_commitment, root_hash),
-        };
+        let (path, _root_commitment, root_hash) = build_test_path();
 
-        let proof = InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
-        proof.verify(&root).unwrap();
+        let proof =
+            InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+        proof.verify(root_hash).unwrap();
     }
 
     // TODO test correct error translation from lower layers (probably should mock the error responses rather than triggering them from the code in the lower layers)
