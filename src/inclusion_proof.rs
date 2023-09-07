@@ -7,15 +7,18 @@
 use crate::binary_tree::{Node, Path, PathError};
 use crate::node_content::{CompressedNodeContent, FullNodeContent};
 use crate::primitives::H256Finalizable;
-use crate::{RangeProofPadding, RangeProvable, RangeVerifiable};
 
 use ::std::fmt::Debug;
+use bulletproofs::ProofError;
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use digest::Digest;
 use thiserror::Error;
 
 mod individual_range_proof;
 use individual_range_proof::IndividualRangeProof;
+
+mod aggregated_range_proof;
+use aggregated_range_proof::AggregatedRangeProof;
 
 /// Inclusion proof struct.
 ///
@@ -36,21 +39,23 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     pub fn generate(path: Path<FullNodeContent<H>>) -> Result<Self, InclusionProofError> {
         // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
         let aggregation_factor = 2usize;
+        let upper_bound_bit_length = 64; // TODO parameter
 
-        let range_proof = path
+        let range_proof_res: Result<Vec<_>, _> = path
             .nodes_from_bottom_to_top()?
             .into_iter()
             .map(|node| {
                 IndividualRangeProof::generate(
                     node.content.liability,
                     &node.content.blinding_factor,
+                    upper_bound_bit_length,
                 )
             })
             .collect();
 
         Ok(InclusionProof {
             path: path.convert(),
-            range_proof,
+            range_proof: range_proof_res?,
         })
     }
 
@@ -59,19 +64,17 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     // TODO only require the hash, not the whole node
     pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
         self.path.verify(root)?;
+        let upper_bound_bit_length = 64; // TODO parameter
 
-        if self
-            .path
+        self.path
             .nodes_from_bottom_to_top()?
             .iter()
             .map(|node| node.content.commitment.compress())
             .zip(self.range_proof.iter())
-            .any(|(com, proof)| !proof.verify(&com))
-        {
-            Err(InclusionProofError::RangeProofError)
-        } else {
-            Ok(())
-        }
+            .map(|(com, proof)| proof.verify(&com, upper_bound_bit_length))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
     }
 }
 
@@ -79,8 +82,18 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
     TreePathError(#[from] PathError),
-    #[error("Range proof verification failed")]
-    RangeProofError,
+    #[error("Issues with range proof")]
+    RangeProofError(#[from] RangeProofError),
+}
+
+#[derive(Error, Debug)]
+pub enum RangeProofError {
+    #[error("Bulletproofs generation failed")]
+    BulletproofGenerationError(ProofError),
+    #[error("Bulletproofs verification failed")]
+    BulletproofVerificationError(ProofError),
+    #[error("The length of the Pedersen commitments vector did not match the length of the input used to generate the proof")]
+    InputVectorLengthMismatch,
 }
 
 // -------------------------------------------------------------------------------------------------
