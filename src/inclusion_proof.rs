@@ -37,8 +37,9 @@ use aggregated_range_proof::AggregatedRangeProof;
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
     path: Path<CompressedNodeContent<H>>,
-    individual_range_proofs: Vec<IndividualRangeProof>,
-    aggregated_range_proof: AggregatedRangeProof,
+    individual_range_proofs: Option<Vec<IndividualRangeProof>>,
+    aggregated_range_proof: Option<AggregatedRangeProof>,
+    aggregation_factor: AggregationFactor,
     upper_bound_bit_length: u8,
 }
 
@@ -69,28 +70,41 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         let mut nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
-        let aggregation_tuples = nodes_for_aggregation
-            .into_iter()
-            .map(|node| (node.content.liability, node.content.blinding_factor))
-            .collect();
-        let aggregated_range_proof =
-            AggregatedRangeProof::generate(&aggregation_tuples, upper_bound_bit_length)?;
-
-        let individual_range_proofs = nodes_for_individual_proofs
-            .into_iter()
-            .map(|node| {
-                IndividualRangeProof::generate(
-                    node.content.liability,
-                    &node.content.blinding_factor,
+        let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {
+            False => {
+                let aggregation_tuples = nodes_for_aggregation
+                    .into_iter()
+                    .map(|node| (node.content.liability, node.content.blinding_factor))
+                    .collect();
+                Some(AggregatedRangeProof::generate(
+                    &aggregation_tuples,
                     upper_bound_bit_length,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+                )?)
+            }
+            True => None,
+        };
+
+        let individual_range_proofs = match aggregation_factor.is_max(tree_height) {
+            False => Some(
+                nodes_for_individual_proofs
+                    .into_iter()
+                    .map(|node| {
+                        IndividualRangeProof::generate(
+                            node.content.liability,
+                            &node.content.blinding_factor,
+                            upper_bound_bit_length,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            True => None,
+        };
 
         Ok(InclusionProof {
             path: path.convert(),
             individual_range_proofs,
             aggregated_range_proof,
+            aggregation_factor,
             upper_bound_bit_length,
         })
     }
@@ -100,19 +114,21 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         use bulletproofs::PedersenGens;
         use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 
-        let tree_height = self.path.siblings.len() + 1;
+        // Is this cast safe? Yes because the tree height (which is the same as the length of the
+        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
+        let tree_height = self.path.siblings.len() as u8 + 1;
 
         // PartialEq for CompressedNodeContent does not depend on the commitment so we can
         // make this whatever we like
         let dummy_commitment = PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
         let root = Node {
             content: CompressedNodeContent::new(dummy_commitment, root_hash),
-            coord: Coordinate::new(0, tree_height as u8 - 1),
+            coord: Coordinate::new(0, tree_height - 1),
         };
 
         self.path.verify(&root)?;
 
-        let aggregation_index = tree_height - self.individual_range_proofs.len();
+        let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
 
         let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
             .path
@@ -124,17 +140,20 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         let commitments_for_individual_proofs =
             commitments_for_aggregated_proofs.split_off(aggregation_index);
 
-        commitments_for_individual_proofs
-            .iter()
-            .zip(self.individual_range_proofs.iter())
-            .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
-            .collect::<Result<Vec<_>, _>>()?;
+        if let Some(proofs) = &self.individual_range_proofs {
+            commitments_for_individual_proofs
+                .iter()
+                .zip(proofs.iter())
+                .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
+                .collect::<Result<Vec<_>, _>>()?;
+        }
 
-        // STENT TODO do not perform the verification if there were no aggregated proof, same for individual
-        self.aggregated_range_proof.verify(
-            &commitments_for_aggregated_proofs,
-            self.upper_bound_bit_length,
-        );
+        if let Some(proof) = &self.aggregated_range_proof {
+            proof.verify(
+                &commitments_for_aggregated_proofs,
+                self.upper_bound_bit_length,
+            )?;
+        }
 
         Ok(())
     }
@@ -165,18 +184,51 @@ pub enum AggregationFactor {
     Number(u8),
 }
 
+use std::fmt;
+
+/// We cannot derive this because [percent][PercentageInteger] does not implement Debug.
+impl fmt::Debug for AggregationFactor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Divisor(div) => write!(f, "AggregationFactor::Divisor {}", div),
+            Self::Percent(per) => write!(f, "AggregationFactor::Percent {}", per.value()),
+            Self::Number(num) => write!(f, "AggregationFactor::Number {}", num),
+        }
+    }
+}
+
 impl AggregationFactor {
-    fn apply_to(self, tree_height: u8) -> u8 {
+    /// Transform the aggregation factor into a u8, representing the number of ranges that should
+    /// aggregated together into a single Bulletproof.
+    fn apply_to(&self, tree_height: u8) -> u8 {
         match self {
             Self::Divisor(div) => {
-                if div == 0 || div > tree_height {
+                if *div == 0 || *div > tree_height {
                     0
                 } else {
                     tree_height / div
                 }
             }
             Self::Percent(per) => per.apply_to(tree_height),
-            Self::Number(num) => num.min(tree_height),
+            Self::Number(num) => *num.min(&tree_height),
+        }
+    }
+
+    /// True if `apply_to` would result in 0 no matter the input `tree_height`.
+    fn is_zero(&self, tree_height: u8) -> bool {
+        match self {
+            Self::Divisor(div) => *div == 0 || *div > tree_height,
+            Self::Percent(per) => per.value() == 0,
+            Self::Number(num) => *num == 0,
+        }
+    }
+
+    /// True if `apply_to` would result in the same as the input `tree_height`.
+    fn is_max(&self, tree_height: u8) -> bool {
+        match self {
+            Self::Divisor(div) => *div == 1,
+            Self::Percent(per) => per.value() == 100,
+            Self::Number(num) => *num == tree_height,
         }
     }
 }
