@@ -53,7 +53,8 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
     /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
     /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
-    /// because we are not expected to require bounds higher than $2^256$.
+    /// because we are not expected to require bounds higher than $2^256$. Note that if the value
+    /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
     pub fn generate(
         path: Path<FullNodeContent<H>>,
         aggregation_factor: AggregationFactor,
