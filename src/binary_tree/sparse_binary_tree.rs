@@ -119,8 +119,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
             nodes
         };
 
-        // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
-        let mut store = HashMap::with_capacity(num_leaves);
+        let mut store = HashMap::new();
 
         // repeat for each layer of the tree
         for _i in 0..height - 1 {
