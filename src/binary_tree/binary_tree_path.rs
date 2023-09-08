@@ -31,7 +31,10 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     /// to create a [Path] struct and return it. The vector is ordered from bottom layer (first)
     /// to root node (last, not included).
     pub fn build_path_for(&self, leaf_x_coord: u64) -> Result<Path<C>, PathError> {
-        let coord = Coordinate::new(leaf_x_coord, 0);
+        let coord = Coordinate {
+            x: leaf_x_coord,
+            y: 0,
+        };
 
         let leaf = self.get_node(&coord).ok_or(PathError::LeafNotFound)?;
 
@@ -44,7 +47,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
                 NodeOrientation::Right => current_node.get_x_coord() - 1,
             };
 
-            let sibling_coord = Coordinate::new(x_coord, y);
+            let sibling_coord = Coordinate { x: x_coord, y };
             siblings.push(
                 self.get_node(&sibling_coord)
                     .ok_or(PathError::NodeNotFound {
@@ -223,10 +226,13 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     #[allow(dead_code)]
     fn merge(&self) -> Node<C> {
-        Node::new(
-            Coordinate::new(self.left.0.get_x_coord() / 2, self.left.0.get_y_coord() + 1),
-            C::merge(self.left.0.get_content(), self.right.0.get_content()),
-        )
+        Node {
+            coord: Coordinate {
+                x: self.left.0.get_x_coord() / 2,
+                y: self.left.0.get_y_coord() + 1,
+            },
+            content: C::merge(self.left.0.get_content(), self.right.0.get_content()),
+        }
     }
 }
 

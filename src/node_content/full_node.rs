@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn new_pad_works() {
         let blinding_factor = 7u64.into();
-        let coord = Coordinate::new(1u64, 2u8);
+        let coord = Coordinate { x: 1u64, y: 2u8 };
         let user_salt = 13u64.into();
 
         FullNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);

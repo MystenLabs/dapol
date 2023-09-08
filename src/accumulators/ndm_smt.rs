@@ -36,7 +36,6 @@ pub struct NdmSmt {
 impl NdmSmt {
     /// Constructor.
     /// TODO more docs
-    // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
     #[allow(dead_code)]
     pub fn new(
         master_secret: D256,
@@ -50,8 +49,8 @@ impl NdmSmt {
         let salt_s_bytes = salt_s.as_bytes();
 
         // closure that is used to create new padding nodes
-        // TODO check how much copying is going on in this closure, maybe we can optimize
         let new_padding_node_content = |coord: &Coordinate| {
+            // TODO unfortunately we copy data here, maybe there is a way to do without copying
             let coord_bytes = coord.as_bytes();
             // pad_secret_bytes is given as 'w' in the DAPOL+ paper
             let pad_secret = generate_key(master_secret_bytes, &coord_bytes);

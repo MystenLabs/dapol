@@ -91,11 +91,7 @@ impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     #[allow(dead_code)]
-    pub fn new_pad(
-        blinding_factor: D256,
-        coord: &Coordinate,
-        salt: D256,
-    ) -> HiddenNodeContent<H> {
+    pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to 0 `P = g_1^0 * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
             Scalar::from(0u64),
@@ -185,7 +181,7 @@ mod tests {
     #[test]
     fn new_pad_works() {
         let blinding_factor = 7u64.into();
-        let coord = Coordinate::new(1u64, 2u8);
+        let coord = Coordinate { x: 1u64, y: 2u8 };
         let user_salt = 13u64.into();
 
         HiddenNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);

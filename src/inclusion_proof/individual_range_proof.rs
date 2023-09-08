@@ -96,6 +96,7 @@ impl IndividualRangeProof {
 // rather use the unit tests here as integration tests.
 
 // TODO how to get the generation to emit an error from the underlying bulletproof library?
+// TODO need to test that bound bit lengths not equal to one of 8, 16, 32, 64 produce errors in generation/verification
 #[cfg(test)]
 mod tests {
     use bulletproofs::ProofError;

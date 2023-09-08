@@ -5,7 +5,7 @@
 //! inclusion proof structs and methods will need to be written.
 
 use crate::binary_tree::{Coordinate, Node, Path, PathError};
-use crate::node_content::{HiddenNodeContent, FullNodeContent};
+use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::primitives::H256Finalizable;
 
 use ::std::fmt::Debug;
@@ -130,7 +130,10 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
                 PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
             let root = Node {
                 content: HiddenNodeContent::new(dummy_commitment, root_hash),
-                coord: Coordinate::new(0, tree_height - 1),
+                coord: Coordinate {
+                    x: 0,
+                    y: tree_height - 1,
+                },
             };
 
             self.path.verify(&root)?;
