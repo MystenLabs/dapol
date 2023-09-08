@@ -153,10 +153,9 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 // Conversion
 
 impl<C: Clone> Path<C> {
-    /// Convert `Path<C>` to `Path<D>`:
+    /// Convert `Path<C>` to `Path<D>`.
     ///
-    /// Apply the function `f` to each of the nodes in the [Path] struct, converting them to a new
-    /// type of node. Consume self and return a new Path.
+    /// `convert` is called on each of the sibling nodes & leaf node.
     pub fn convert<B: Clone + From<C>>(self) -> Path<B> {
         Path {
             siblings: self

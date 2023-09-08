@@ -71,7 +71,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
         let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {
-            False => {
+            false => {
                 let aggregation_tuples = nodes_for_aggregation
                     .into_iter()
                     .map(|node| (node.content.liability, node.content.blinding_factor))
@@ -81,11 +81,11 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
                     upper_bound_bit_length,
                 )?)
             }
-            True => None,
+            true => None,
         };
 
         let individual_range_proofs = match aggregation_factor.is_max(tree_height) {
-            False => Some(
+            false => Some(
                 nodes_for_individual_proofs
                     .into_iter()
                     .map(|node| {
@@ -97,7 +97,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
                     })
                     .collect::<Result<Vec<_>, _>>()?,
             ),
-            True => None,
+            true => None,
         };
 
         Ok(InclusionProof {
@@ -111,48 +111,59 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 
     /// Verify that an inclusion proof matches a given root hash.
     pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
-        use bulletproofs::PedersenGens;
-        use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
+        use curve25519_dalek_ng::ristretto::CompressedRistretto;
 
         // Is this cast safe? Yes because the tree height (which is the same as the length of the
         // input) is also stored as a u8, and so there would never be more siblings than max(u8).
         let tree_height = self.path.siblings.len() as u8 + 1;
 
-        // PartialEq for CompressedNodeContent does not depend on the commitment so we can
-        // make this whatever we like
-        let dummy_commitment = PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
-        let root = Node {
-            content: CompressedNodeContent::new(dummy_commitment, root_hash),
-            coord: Coordinate::new(0, tree_height - 1),
-        };
+        {
+            // Merkle tree path verification
 
-        self.path.verify(&root)?;
+            use bulletproofs::PedersenGens;
+            use curve25519_dalek_ng::scalar::Scalar;
 
-        let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
+            // PartialEq for CompressedNodeContent does not depend on the commitment so we can
+            // make this whatever we like
+            let dummy_commitment =
+                PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+            let root = Node {
+                content: CompressedNodeContent::new(dummy_commitment, root_hash),
+                coord: Coordinate::new(0, tree_height - 1),
+            };
 
-        let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-            .path
-            .nodes_from_bottom_to_top()?
-            .iter()
-            .map(|node| node.content.commitment.compress())
-            .collect();
-
-        let commitments_for_individual_proofs =
-            commitments_for_aggregated_proofs.split_off(aggregation_index);
-
-        if let Some(proofs) = &self.individual_range_proofs {
-            commitments_for_individual_proofs
-                .iter()
-                .zip(proofs.iter())
-                .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
-                .collect::<Result<Vec<_>, _>>()?;
+            self.path.verify(&root)?;
         }
 
-        if let Some(proof) = &self.aggregated_range_proof {
-            proof.verify(
-                &commitments_for_aggregated_proofs,
-                self.upper_bound_bit_length,
-            )?;
+        {
+            // Range proof verification
+
+            let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
+
+            let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
+                .path
+                .nodes_from_bottom_to_top()?
+                .iter()
+                .map(|node| node.content.commitment.compress())
+                .collect();
+
+            let commitments_for_individual_proofs =
+                commitments_for_aggregated_proofs.split_off(aggregation_index);
+
+            if let Some(proofs) = &self.individual_range_proofs {
+                commitments_for_individual_proofs
+                    .iter()
+                    .zip(proofs.iter())
+                    .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+
+            if let Some(proof) = &self.aggregated_range_proof {
+                proof.verify(
+                    &commitments_for_aggregated_proofs,
+                    self.upper_bound_bit_length,
+                )?;
+            }
         }
 
         Ok(())
