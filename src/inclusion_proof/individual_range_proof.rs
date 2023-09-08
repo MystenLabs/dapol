@@ -1,6 +1,7 @@
 //! Single range proof generation and verification using the Bulletproofs protocol.
 //!
-//! See also [super][aggregated_range_proof] which is used for batching range proofs.
+//! See also [super][aggregated_range_proof] which is used for batching range proofs with an
+//! efficiency gain.
 //!
 //! Note `upper_bound_bit_length` parameter is in u8 because it is not expected to require bounds
 //! higher than $2^256$.
@@ -37,8 +38,6 @@ impl IndividualRangeProof {
     pub fn generate(
         secret: u64,
         blinding_factor: &Scalar,
-        // STENT TODO this can only be one of: 8 16 32 64
-        //   otherwise the bulletproof library will throw an error
         upper_bound_bit_length: u8,
     ) -> Result<IndividualRangeProof, RangeProofError> {
         let pc_gens = PedersenGens::default();
@@ -57,7 +56,7 @@ impl IndividualRangeProof {
         }
     }
 
-    /// Verify the Bulletproofs range proof.
+    /// Verify the Bulletproof.
     ///
     /// `commitment` - the Pedersen commitment, in compressed form.
     ///
