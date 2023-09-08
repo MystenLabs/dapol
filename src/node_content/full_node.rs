@@ -1,6 +1,6 @@
 //! An implementation of the generic content type required for [crate][binary_tree][`Node<C>`].
 //!
-//! This implementation contains the values in the [super][compressed_node] implementation
+//! This implementation contains the values in the [super][hidden_node] implementation
 //! (Pedersen commitment & hash) plus the additional private values (blinding factor and plain text
 //! liability). The private values are included so that the total blinding factor & liability sum
 //! can be accessed after tree construction. This node type should ideally not be used in
@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 
 use crate::primitives::H256Finalizable;
 
-use super::CompressedNodeContent;
+use super::HiddenNodeContent;
 
 /// Main struct containing:
 /// - Raw liability value
@@ -149,8 +149,8 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
 // Conversions
 
 impl<H: Digest + H256Finalizable> FullNodeContent<H> {
-    pub fn compress(self) -> CompressedNodeContent<H> {
-        CompressedNodeContent::new(self.commitment, self.hash)
+    pub fn compress(self) -> HiddenNodeContent<H> {
+        HiddenNodeContent::new(self.commitment, self.hash)
     }
 }
 

@@ -5,7 +5,7 @@
 //! inclusion proof structs and methods will need to be written.
 
 use crate::binary_tree::{Coordinate, Node, Path, PathError};
-use crate::node_content::{CompressedNodeContent, FullNodeContent};
+use crate::node_content::{HiddenNodeContent, FullNodeContent};
 use crate::primitives::H256Finalizable;
 
 use ::std::fmt::Debug;
@@ -36,7 +36,7 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// proofs are supported.
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
-    path: Path<CompressedNodeContent<H>>,
+    path: Path<HiddenNodeContent<H>>,
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
     aggregation_factor: AggregationFactor,
@@ -123,12 +123,12 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             use bulletproofs::PedersenGens;
             use curve25519_dalek_ng::scalar::Scalar;
 
-            // PartialEq for CompressedNodeContent does not depend on the commitment so we can
+            // PartialEq for HiddenNodeContent does not depend on the commitment so we can
             // make this whatever we like
             let dummy_commitment =
                 PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
             let root = Node {
-                content: CompressedNodeContent::new(dummy_commitment, root_hash),
+                content: HiddenNodeContent::new(dummy_commitment, root_hash),
                 coord: Coordinate::new(0, tree_height - 1),
             };
 
