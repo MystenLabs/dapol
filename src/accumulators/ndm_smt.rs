@@ -4,10 +4,11 @@
 
 use rand::{rngs::ThreadRng, distributions::Uniform, thread_rng, Rng};
 use std::collections::HashMap;
+use std::sync::Arc;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
+    Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError, dive,
 };
 use crate::inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
 use crate::kdf::generate_key;
@@ -44,18 +45,24 @@ impl NdmSmt {
         users: Vec<User>,
     ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
+        let master_secret_bytes_clone = master_secret_bytes.clone();
         let salt_b_bytes = salt_b.as_bytes();
+        let salt_b_bytes_clone = salt_b_bytes.clone();
         let salt_s_bytes = salt_s.as_bytes();
+        let salt_s_bytes_clone = salt_s_bytes.clone();
 
         // closure that is used to create new padding nodes
-        let new_padding_node_content = |coord: &Coordinate| {
+        let new_padding_node_content = move |coord: &Coordinate| {
             // TODO unfortunately we copy data here, maybe there is a way to do without copying
             let coord_bytes = coord.as_bytes();
             // pad_secret_bytes is given as 'w' in the DAPOL+ paper
-            let pad_secret = generate_key(master_secret_bytes, &coord_bytes);
+            let master_secret_bytes_clone_2 = master_secret_bytes_clone;
+            let salt_b_bytes_clone_2 = salt_b_bytes_clone;
+            let salt_s_bytes_clone_2 = salt_s_bytes_clone;
+            let pad_secret = generate_key(&master_secret_bytes_clone_2, &coord_bytes);
             let pad_secret_bytes: [u8; 32] = pad_secret.into();
-            let blinding_factor = generate_key(&pad_secret_bytes, salt_b_bytes);
-            let salt = generate_key(&pad_secret_bytes, salt_s_bytes);
+            let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes_clone_2);
+            let salt = generate_key(&pad_secret_bytes, &salt_s_bytes_clone_2);
             Content::new_pad(blinding_factor.into(), coord, salt.into())
         };
 
@@ -86,7 +93,11 @@ impl NdmSmt {
             user_mapping.insert(user.id, x_coord);
         }
 
-        let tree = SparseBinaryTree::new(leaves, height, &new_padding_node_content)?;
+        let leaves_test = vec![leaves.pop().unwrap()];
+        let tree = SparseBinaryTree::new(leaves_test, 2, &new_padding_node_content)?;
+        println!("done tree");
+        let node = dive(0, 2u64.pow(height as u32 - 1), leaves, Arc::new(new_padding_node_content));
+        println!("done dive");
 
         Ok(NdmSmt {
             tree,

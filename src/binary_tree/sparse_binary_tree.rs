@@ -74,7 +74,7 @@ use std::thread;
 // bit_map is going to be stored in u64 like so:
 // if bit map is 1001 then u64 value will be 2^3 + 2^0
 // and last index would be 3
-fn dive<C: Clone + Mergeable + Send + 'static, F>(
+pub fn dive<C: Clone + Mergeable + Send + 'static, F>(
     x_coord_min: u64,
     x_coord_max: u64,
     mut leaves: Vec<InputLeafNode<C>>,

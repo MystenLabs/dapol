@@ -5,7 +5,7 @@ mod sparse_binary_tree;
 use sparse_binary_tree::NodeOrientation;
 pub use sparse_binary_tree::{
     num_bottom_layer_nodes, Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree,
-    SparseBinaryTreeError,
+    SparseBinaryTreeError, dive,
 };
 
 mod binary_tree_path;
