@@ -55,6 +55,92 @@ pub struct InputLeafNode<C> {
 // ===========================================
 // Constructors.
 
+fn count(bit_map: u64, index: u8) -> u8 {
+    let mut total = 0;
+    for i in 0..index {
+        if bit_map & 1 << i != 0 {
+            total += 1;
+        }
+    }
+    total
+}
+
+use std::sync::mpsc;
+use std::thread;
+
+// bit_map is going to be stored in u64 like so:
+// if bit map is 1001 then u64 value will be 2^3 + 2^0
+// and last index would be 3
+fn dive<C: Clone + Mergeable, F>(
+    bit_map: u64,           // Can we make it smaller than u64?
+    bit_map_last_index: u8, // supposed to be the index in the map with the last useful bit, will be tree_height for first iteration
+    leaves: Vec<InputLeafNode<C>>,
+    new_padding_node_content: &F, // is this thread-safe?
+) -> Node<C>
+where
+    F: Fn(&Coordinate) -> C,
+{
+    // base case: reached layer above leaves
+    if bit_map_last_index == 1 {
+        let pair = if bit_map & 2 != 0 {
+            let left = LeftSibling::from_node(leaves.get(0).unwrap().to_node());
+
+            let right = if bit_map & 1 != 0 {
+                RightSibling::from_node(leaves.get(1).unwrap().to_node())
+            } else {
+                left.new_sibling_padding_node(new_padding_node_content)
+            };
+            MatchedPair { left, right }
+        } else {
+            // note we would not have gotten here if both leaves did not exist, so we can safely assume the following leaf node exists
+            let right = RightSibling::from_node(leaves.get(0).unwrap().to_node());
+            let left = right.new_sibling_padding_node(new_padding_node_content);
+            MatchedPair { left, right }
+        };
+
+        return pair.merge();
+    }
+
+    let new_bit_map_last_index = bit_map_last_index / 2; // should always be a power of 2
+    let left_bit_map = bit_map >> new_bit_map_last_index;
+    let right_bit_map = bit_map;
+
+    // count the number of 1s in the 1st & 2nd halves of the bitmap
+    let left_count = count(left_bit_map, new_bit_map_last_index);
+    let right_count = count(right_bit_map, new_bit_map_last_index);
+
+    // if count > 0 for 1st & 2nd half then spawn a new thread to go down the right node
+    let pair = if left_count > 0 && right_count > 0 {
+        let right_leaves = leaves.split_off(left_count as usize);
+        let left_leaves = leaves;
+
+        let (tx, rx) = mpsc::channel();
+
+        // for right child
+        thread::spawn(move || {
+            let node = dive(right_bit_map, new_bit_map_last_index, right_leaves, new_padding_node_content);
+            tx.send(RightSibling::from_node(node)).unwrap();
+        });
+
+        let left = LeftSibling::from_node(dive(left_bit_map, new_bit_map_last_index, left_leaves, new_padding_node_content));
+        let right = rx.recv().unwrap();
+
+        MatchedPair { left, right }
+    } else if left_count > 0 {
+        // go down left child
+        let left = LeftSibling::from_node(dive(left_bit_map, new_bit_map_last_index, leaves, new_padding_node_content));
+        let right = left.new_sibling_padding_node(new_padding_node_content);
+        MatchedPair { left, right }
+    } else {
+        // go down right child
+        let right = RightSibling::from_node(dive(right_bit_map, new_bit_map_last_index, leaves, new_padding_node_content));
+        let left = right.new_sibling_padding_node(new_padding_node_content);
+        MatchedPair { left, right }
+    };
+
+    return pair.merge();
+}
+
 impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
@@ -386,6 +472,10 @@ impl<C: Clone> LeftSibling<C> {
         let node = Node { coord, content };
         RightSibling(node)
     }
+    fn from_node(node: Node<C>) -> Self {
+        // TODO panic if node is not a left sibling
+        Self(node)
+    }
 }
 
 impl<C: Clone> RightSibling<C> {
@@ -399,6 +489,10 @@ impl<C: Clone> RightSibling<C> {
         let node = Node { coord, content };
         LeftSibling(node)
     }
+    fn from_node(node: Node<C>) -> Self {
+        // TODO panic if node is not a left sibling
+        Self(node)
+    }
 }
 
 impl<C: Clone> Sibling<C> {
@@ -407,6 +501,16 @@ impl<C: Clone> Sibling<C> {
         match node.node_orientation() {
             NodeOrientation::Left => Sibling::Left(LeftSibling(node)),
             NodeOrientation::Right => Sibling::Right(RightSibling(node)),
+        }
+    }
+
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        match self {
+            Sibling::Left(node) => node.new_sibling_padding_node(new_padding_node_content),
+            Sibling::Right(node) => node.new_sibling_padding_node(new_padding_node_content),
         }
     }
 }
@@ -432,11 +536,11 @@ mod tests {
     // TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
     // TODO write a test that checks the total number of nodes in the tree is correct
 
-    use super::*;
     use super::super::test_utils::{
         full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
         TestContent,
     };
+    use super::*;
     use crate::testing_utils::assert_err;
 
     use primitive_types::H256;
