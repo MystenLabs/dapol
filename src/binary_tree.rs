@@ -3,7 +3,10 @@
 
 mod sparse_binary_tree;
 use sparse_binary_tree::NodeOrientation;
-pub use sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree, SparseBinaryTreeError, num_bottom_layer_nodes};
+pub use sparse_binary_tree::{
+    num_bottom_layer_nodes, Coordinate, InputLeafNode, Mergeable, Node, SparseBinaryTree,
+    SparseBinaryTreeError,
+};
 
 mod binary_tree_path;
 pub use binary_tree_path::{Path, PathError};
@@ -30,20 +33,12 @@ impl<C: Clone> Node<C> {
 #[cfg(test)]
 mod test_utils {
     use super::sparse_binary_tree::{Coordinate, InputLeafNode, Mergeable, SparseBinaryTree};
+    use primitive_types::H256;
 
     #[derive(Default, Clone, Debug, PartialEq)]
     pub struct TestContent {
         pub value: u32,
         pub hash: H256,
-    }
-
-    #[derive(Default, Clone, Debug, PartialEq, Eq)]
-    pub struct H256([u8; 32]);
-
-    impl H256 {
-        fn as_bytes(&self) -> &[u8; 32] {
-            &self.0
-        }
     }
 
     pub trait H256Finalizable {

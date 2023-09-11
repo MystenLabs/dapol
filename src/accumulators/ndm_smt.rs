@@ -2,8 +2,7 @@
 //!
 //! TODO more docs
 
-use rand::rngs::ThreadRng;
-use rand::{distributions::Uniform, thread_rng, Rng}; // TODO double check this is cryptographically safe randomness
+use rand::{rngs::ThreadRng, distributions::Uniform, thread_rng, Rng};
 use std::collections::HashMap;
 use thiserror::Error;
 
