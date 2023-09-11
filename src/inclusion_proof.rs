@@ -3,17 +3,16 @@
 //! The inclusion proof is very closely related to the node content type, and so the struct was not
 //! made generic in the type of node content. If other node contents are to be supported then new
 //! inclusion proof structs and methods will need to be written.
-//!
-//! TODO more docs, need to say that the aggregated nodes are assumed to be the front ones (i.e. bottom layer nodes) and the tail are the individual proofs
 
-use crate::binary_tree::{Node, Path, PathError};
-use crate::node_content::{CompressedNodeContent, FullNodeContent};
+use crate::binary_tree::{Coordinate, Node, Path, PathError};
+use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::primitives::H256Finalizable;
 
 use ::std::fmt::Debug;
 use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
+use primitive_types::H256;
 use thiserror::Error;
 
 mod individual_range_proof;
@@ -27,15 +26,156 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// There are 2 parts to an inclusion proof:
 /// - the path in the tree
 /// - the range proof for the Pedersen commitments
+///
 /// The tree path is taken to be of a compressed node content type because sharing a full node
 /// content type with users would leak secret information such as other user's liabilities and the
 /// total sum of liabilities.
+///
+/// The Bulletproofs protocol allows aggregating multiple range proofs into 1 proof, which is more
+/// efficient to produce & verify than doing them individually. Both aggregated and individual range
+/// proofs are supported.
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
-    path: Path<CompressedNodeContent<H>>,
-    individual_range_proofs: Vec<IndividualRangeProof>,
-    aggregated_range_proof: AggregatedRangeProof,
+    path: Path<HiddenNodeContent<H>>,
+    individual_range_proofs: Option<Vec<IndividualRangeProof>>,
+    aggregated_range_proof: Option<AggregatedRangeProof>,
+    aggregation_factor: AggregationFactor,
+    upper_bound_bit_length: u8,
 }
+
+impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
+    /// Generate an inclusion proof from a tree path.
+    ///
+    /// `aggregation_factor` is used to determine how many of the range proofs are aggregated.
+    /// Those that do not form part of the aggregated proof are just proved individually. The
+    /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    ///
+    /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
+    /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
+    /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
+    /// because we are not expected to require bounds higher than $2^256$. Note that if the value
+    /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
+    pub fn generate(
+        path: Path<FullNodeContent<H>>,
+        aggregation_factor: AggregationFactor,
+        upper_bound_bit_length: u8,
+    ) -> Result<Self, InclusionProofError> {
+        // Is this cast safe? Yes because the tree height (which is the same as the length of the
+        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
+        // TODO might be worth using a bounded vector for siblings. If the tree height changes
+        //   type for some reason then this code would fail silently.
+        let tree_height = path.siblings.len() as u8 + 1;
+        let aggregation_index = aggregation_factor.apply_to(tree_height);
+
+        let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
+        let mut nodes_for_individual_proofs =
+            nodes_for_aggregation.split_off(aggregation_index as usize);
+
+        let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {
+            false => {
+                let aggregation_tuples = nodes_for_aggregation
+                    .into_iter()
+                    .map(|node| (node.content.liability, node.content.blinding_factor))
+                    .collect();
+                Some(AggregatedRangeProof::generate(
+                    &aggregation_tuples,
+                    upper_bound_bit_length,
+                )?)
+            }
+            true => None,
+        };
+
+        let individual_range_proofs = match aggregation_factor.is_max(tree_height) {
+            false => Some(
+                nodes_for_individual_proofs
+                    .into_iter()
+                    .map(|node| {
+                        IndividualRangeProof::generate(
+                            node.content.liability,
+                            &node.content.blinding_factor,
+                            upper_bound_bit_length,
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()?,
+            ),
+            true => None,
+        };
+
+        Ok(InclusionProof {
+            path: path.convert(),
+            individual_range_proofs,
+            aggregated_range_proof,
+            aggregation_factor,
+            upper_bound_bit_length,
+        })
+    }
+
+    /// Verify that an inclusion proof matches a given root hash.
+    pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
+        use curve25519_dalek_ng::ristretto::CompressedRistretto;
+
+        // Is this cast safe? Yes because the tree height (which is the same as the length of the
+        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
+        let tree_height = self.path.siblings.len() as u8 + 1;
+
+        {
+            // Merkle tree path verification
+
+            use bulletproofs::PedersenGens;
+            use curve25519_dalek_ng::scalar::Scalar;
+
+            // PartialEq for HiddenNodeContent does not depend on the commitment so we can
+            // make this whatever we like
+            let dummy_commitment =
+                PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+            let root = Node {
+                content: HiddenNodeContent::new(dummy_commitment, root_hash),
+                coord: Coordinate {
+                    x: 0,
+                    y: tree_height - 1,
+                },
+            };
+
+            self.path.verify(&root)?;
+        }
+
+        {
+            // Range proof verification
+
+            let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
+
+            let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
+                .path
+                .nodes_from_bottom_to_top()?
+                .iter()
+                .map(|node| node.content.commitment.compress())
+                .collect();
+
+            let commitments_for_individual_proofs =
+                commitments_for_aggregated_proofs.split_off(aggregation_index);
+
+            if let Some(proofs) = &self.individual_range_proofs {
+                commitments_for_individual_proofs
+                    .iter()
+                    .zip(proofs.iter())
+                    .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
+                    .collect::<Result<Vec<_>, _>>()?;
+            }
+
+            if let Some(proof) = &self.aggregated_range_proof {
+                proof.verify(
+                    &commitments_for_aggregated_proofs,
+                    self.upper_bound_bit_length,
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Aggregation factor
 
 /// Method used to determine how many of the range proofs are aggregated. Those that do not
 /// form part of the aggregated proof are just proved individually.
@@ -59,100 +199,57 @@ pub enum AggregationFactor {
     Number(u8),
 }
 
-impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
-    /// Generate an inclusion proof from a tree path.
-    pub fn generate(path: Path<FullNodeContent<H>>) -> Result<Self, InclusionProofError> {
-        // TODO how should we have this defined? Parameter? Keep it here? Figure it out when we do the range proof code
-        // TODO we need to check that this number is bounded, so that we cannot get 0 for the aggregation number, or is that fine?
-        //   it definitely can't be 0, or maybe we just assume that 0 implies 1, which means all aggregation? Or maybe 0 can imply all individual? So that the caller does not need to know exactly what the input size is.
-        // TODO it might be useful for the caller to provide either the aggregation factor, or the aggregation index, or some percentage
-        let aggregation_factor = AggregationFactor::Divisor(2u8);
-        // TODO make argument as to why the cast is safe here
-        let tree_height = path.siblings.len() as u8 + 1;
-        let aggregation_index = aggregation_factor.apply_to(tree_height);
+use std::fmt;
 
-        let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
-        let mut nodes_for_individual_proofs =
-            nodes_for_aggregation.split_off(aggregation_index as usize);
-
-        let upper_bound_bit_length = 64; // TODO parameter
-
-        let aggregation_tuples = nodes_for_aggregation
-            .into_iter()
-            .map(|node| (node.content.liability, node.content.blinding_factor))
-            .collect();
-        let aggregated_range_proof =
-            AggregatedRangeProof::generate(&aggregation_tuples, upper_bound_bit_length)?;
-
-        let individual_range_proofs = nodes_for_individual_proofs
-            .into_iter()
-            .map(|node| {
-                IndividualRangeProof::generate(
-                    node.content.liability,
-                    &node.content.blinding_factor,
-                    upper_bound_bit_length,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(InclusionProof {
-            path: path.convert(),
-            individual_range_proofs,
-            aggregated_range_proof,
-        })
-    }
-
-    /// Verify that an inclusion proof matches a given root hash.
-    // TODO have the upper bound as an input here to make it clear what is needed to verify
-    // TODO only require the hash, not the whole node
-    pub fn verify(&self, root: &Node<CompressedNodeContent<H>>) -> Result<(), InclusionProofError> {
-        use curve25519_dalek_ng::ristretto::CompressedRistretto;
-
-        self.path.verify(root)?;
-
-        let upper_bound_bit_length = 64; // TODO parameter
-        let tree_height = self.path.siblings.len() + 1;
-        let aggregation_index = tree_height - self.individual_range_proofs.len();
-
-        let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-            .path
-            .nodes_from_bottom_to_top()?
-            .iter()
-            .map(|node| node.content.commitment.compress())
-            .collect();
-
-        let commitments_for_individual_proofs =
-            commitments_for_aggregated_proofs.split_off(aggregation_index);
-
-        commitments_for_individual_proofs
-            .iter()
-            .zip(self.individual_range_proofs.iter())
-            .map(|(com, proof)| proof.verify(&com, upper_bound_bit_length))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        // STENT TODO do not perform the verification if there were no aggregated proof, same for individual
-        self.aggregated_range_proof
-            .verify(&commitments_for_aggregated_proofs, upper_bound_bit_length);
-
-        Ok(())
+/// We cannot derive this because [percent][PercentageInteger] does not implement Debug.
+impl fmt::Debug for AggregationFactor {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Divisor(div) => write!(f, "AggregationFactor::Divisor {}", div),
+            Self::Percent(per) => write!(f, "AggregationFactor::Percent {}", per.value()),
+            Self::Number(num) => write!(f, "AggregationFactor::Number {}", num),
+        }
     }
 }
 
 impl AggregationFactor {
-    fn apply_to(self, tree_height: u8) -> u8 {
+    /// Transform the aggregation factor into a u8, representing the number of ranges that should
+    /// aggregated together into a single Bulletproof.
+    fn apply_to(&self, tree_height: u8) -> u8 {
         match self {
             Self::Divisor(div) => {
-                if div == 0 || div > tree_height {
+                if *div == 0 || *div > tree_height {
                     0
                 } else {
                     tree_height / div
                 }
             }
             Self::Percent(per) => per.apply_to(tree_height),
-            Self::Number(num) => num.min(tree_height),
+            Self::Number(num) => *num.min(&tree_height),
+        }
+    }
+
+    /// True if `apply_to` would result in 0 no matter the input `tree_height`.
+    fn is_zero(&self, tree_height: u8) -> bool {
+        match self {
+            Self::Divisor(div) => *div == 0 || *div > tree_height,
+            Self::Percent(per) => per.value() == 0,
+            Self::Number(num) => *num == 0,
+        }
+    }
+
+    /// True if `apply_to` would result in the same as the input `tree_height`.
+    fn is_max(&self, tree_height: u8) -> bool {
+        match self {
+            Self::Divisor(div) => *div == 1,
+            Self::Percent(per) => per.value() == 100,
+            Self::Number(num) => *num == tree_height,
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Errors
 
 #[derive(Error, Debug)]
 pub enum InclusionProofError {
@@ -175,7 +272,7 @@ pub enum RangeProofError {
 // -------------------------------------------------------------------------------------------------
 // Unit tests
 
-// TODO tests for different aggregation factors
+// TODO should we mock out the inclusion proof layer for these tests?
 
 #[cfg(test)]
 mod tests {
@@ -322,22 +419,26 @@ mod tests {
         (parent_hash, parent_commitment)
     }
 
+    // TODO fuzz on the aggregation factor
     #[test]
     fn generate_works() {
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
+
         let (path, _, _) = build_test_path();
-        InclusionProof::generate(path).unwrap();
+        InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
     }
 
     #[test]
     fn verify_works() {
-        let (path, root_commitment, root_hash) = build_test_path();
-        let root = Node {
-            coord: Coordinate { x: 0u64, y: 3u8 },
-            content: CompressedNodeContent::new(root_commitment, root_hash),
-        };
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
 
-        let proof = InclusionProof::generate(path).unwrap();
-        proof.verify(&root).unwrap();
+        let (path, _root_commitment, root_hash) = build_test_path();
+
+        let proof =
+            InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+        proof.verify(root_hash).unwrap();
     }
 
     // TODO test correct error translation from lower layers (probably should mock the error responses rather than triggering them from the code in the lower layers)

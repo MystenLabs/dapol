@@ -22,30 +22,25 @@ use super::FullNodeContent;
 /// and the merge function in this case needs to use a generic hash function. One way to
 /// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug)]
-// STENT TODO the naming "compressed" here is weird
-//   because with ristrettopoint the compressed version is only for wire transfer
-//   and with node content the compressed version is for less struct fields
-//   Maybe we should change the name from compressed to safe or private
-//   and save compressed for if we want to have a node content struct with compressed ristretto point
-pub struct CompressedNodeContent<H> {
+pub struct HiddenNodeContent<H> {
     pub commitment: RistrettoPoint,
     pub hash: H256,
     _phantom_hash_function: PhantomData<H>,
 }
 
-impl<H> PartialEq for CompressedNodeContent<H> {
+impl<H> PartialEq for HiddenNodeContent<H> {
     fn eq(&self, other: &Self) -> bool {
-        self.commitment == other.commitment && self.hash == other.hash
+        self.hash == other.hash
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Constructors
 
-impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
+impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
     /// Simple constructor
     pub fn new(commitment: RistrettoPoint, hash: H256) -> Self {
-        CompressedNodeContent {
+        HiddenNodeContent {
             commitment,
             hash,
             _phantom_hash_function: PhantomData,
@@ -66,7 +61,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
         blinding_factor: D256,
         user_id: UserId,
         user_salt: D256,
-    ) -> CompressedNodeContent<H> {
+    ) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
         // TODO we should document the default group elements used here, and put them in the spec
         let commitment = PedersenGens::default().commit(
@@ -84,7 +79,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
         hasher.update(user_salt_bytes);
         let hash = hasher.finalize_as_h256();
 
-        CompressedNodeContent {
+        HiddenNodeContent {
             commitment,
             hash,
             _phantom_hash_function: PhantomData,
@@ -96,11 +91,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     #[allow(dead_code)]
-    pub fn new_pad(
-        blinding_factor: D256,
-        coord: &Coordinate,
-        salt: D256,
-    ) -> CompressedNodeContent<H> {
+    pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to 0 `P = g_1^0 * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
             Scalar::from(0u64),
@@ -116,7 +107,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
         hasher.update(salt_bytes);
         let hash = hasher.finalize_as_h256();
 
-        CompressedNodeContent {
+        HiddenNodeContent {
             commitment,
             hash,
             _phantom_hash_function: PhantomData,
@@ -127,7 +118,7 @@ impl<H: Digest + H256Finalizable> CompressedNodeContent<H> {
 // -------------------------------------------------------------------------------------------------
 // Conversion
 
-impl<H: Digest + H256Finalizable> From<FullNodeContent<H>> for CompressedNodeContent<H> {
+impl<H: Digest + H256Finalizable> From<FullNodeContent<H>> for HiddenNodeContent<H> {
     fn from(full_node: FullNodeContent<H>) -> Self {
         full_node.compress()
     }
@@ -136,7 +127,7 @@ impl<H: Digest + H256Finalizable> From<FullNodeContent<H>> for CompressedNodeCon
 // -------------------------------------------------------------------------------------------------
 // Implement merge trait
 
-impl<H: Digest + H256Finalizable> Mergeable for CompressedNodeContent<H> {
+impl<H: Digest + H256Finalizable> Mergeable for HiddenNodeContent<H> {
     /// Returns the parent node content by merging two child node contents.
     ///
     /// The commitment of the parent is the homomorphic sum of the two children.
@@ -154,7 +145,7 @@ impl<H: Digest + H256Finalizable> Mergeable for CompressedNodeContent<H> {
             hasher.finalize_as_h256() // TODO do a unit test that compares the output of this to a different piece of code
         };
 
-        CompressedNodeContent {
+        HiddenNodeContent {
             commitment: parent_commitment,
             hash: parent_hash,
             _phantom_hash_function: PhantomData,
@@ -179,7 +170,7 @@ mod tests {
         let user_id = UserId::from_str("some user").unwrap();
         let user_salt = 13u64.into();
 
-        CompressedNodeContent::<blake3::Hasher>::new_leaf(
+        HiddenNodeContent::<blake3::Hasher>::new_leaf(
             liability,
             blinding_factor,
             user_id,
@@ -190,10 +181,10 @@ mod tests {
     #[test]
     fn new_pad_works() {
         let blinding_factor = 7u64.into();
-        let coord = Coordinate::new(1u64, 2u8);
+        let coord = Coordinate { x: 1u64, y: 2u8 };
         let user_salt = 13u64.into();
 
-        CompressedNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);
+        HiddenNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);
     }
 
     #[test]
@@ -202,7 +193,7 @@ mod tests {
         let blinding_factor_1 = 7u64.into();
         let user_id_1 = UserId::from_str("some user 1").unwrap();
         let user_salt_1 = 13u64.into();
-        let node_1 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
+        let node_1 = HiddenNodeContent::<blake3::Hasher>::new_leaf(
             liability_1,
             blinding_factor_1,
             user_id_1,
@@ -213,13 +204,13 @@ mod tests {
         let blinding_factor_2 = 27u64.into();
         let user_id_2 = UserId::from_str("some user 2").unwrap();
         let user_salt_2 = 23u64.into();
-        let node_2 = CompressedNodeContent::<blake3::Hasher>::new_leaf(
+        let node_2 = HiddenNodeContent::<blake3::Hasher>::new_leaf(
             liability_2,
             blinding_factor_2,
             user_id_2,
             user_salt_2,
         );
 
-        CompressedNodeContent::merge(&node_1, &node_2);
+        HiddenNodeContent::merge(&node_1, &node_2);
     }
 }

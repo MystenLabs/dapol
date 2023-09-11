@@ -1,6 +1,7 @@
 //! Single range proof generation and verification using the Bulletproofs protocol.
 //!
-//! See also [super][aggregated_range_proof] which is used for batching range proofs.
+//! See also [super][aggregated_range_proof] which is used for batching range proofs with an
+//! efficiency gain.
 //!
 //! Note `upper_bound_bit_length` parameter is in u8 because it is not expected to require bounds
 //! higher than $2^256$.
@@ -55,7 +56,7 @@ impl IndividualRangeProof {
         }
     }
 
-    /// Verify the Bulletproofs range proof.
+    /// Verify the Bulletproof.
     ///
     /// `commitment` - the Pedersen commitment, in compressed form.
     ///
@@ -79,7 +80,9 @@ impl IndividualRangeProof {
             commitment,
             upper_bound_bit_length as usize,
         ) {
-            Err(underlying_err) => Err(RangeProofError::BulletproofVerificationError(underlying_err)),
+            Err(underlying_err) => Err(RangeProofError::BulletproofVerificationError(
+                underlying_err,
+            )),
             Ok(_) => Ok(()),
         }
     }
@@ -93,6 +96,7 @@ impl IndividualRangeProof {
 // rather use the unit tests here as integration tests.
 
 // TODO how to get the generation to emit an error from the underlying bulletproof library?
+// TODO need to test that bound bit lengths not equal to one of 8, 16, 32, 64 produce errors in generation/verification
 #[cfg(test)]
 mod tests {
     use bulletproofs::ProofError;
@@ -107,6 +111,19 @@ mod tests {
         let upper_bound_bit_length = 32u8;
 
         IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length).unwrap();
+    }
+
+    // this is unexpected but verification will definitely fail so it's not a problem
+    #[test]
+    fn generation_works_when_secret_out_of_bounds() {
+        // secret = 2^32 > 2^8 = upper_bound
+        let invalid_upper_bound = 8u8;
+
+        let secret = 2u64.pow(10u32);
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
+
+        let _ =
+            IndividualRangeProof::generate(secret, &blinding_factor, invalid_upper_bound).unwrap();
     }
 
     #[test]
@@ -135,10 +152,32 @@ mod tests {
         let commitment = PedersenGens::default().commit(Scalar::from(secret), blinding_factor);
 
         let proof =
-            IndividualRangeProof::generate(secret, &blinding_factor, valid_upper_bound)
-            .unwrap();
+            IndividualRangeProof::generate(secret, &blinding_factor, valid_upper_bound).unwrap();
 
         let res = proof.verify(&commitment.compress(), invalid_upper_bound);
+
+        assert_err!(
+            res,
+            Err(RangeProofError::BulletproofVerificationError(
+                ProofError::VerificationError
+            ))
+        );
+    }
+
+    #[test]
+    fn verification_error_when_secret_out_of_bounds_with_different_bounds_reverse() {
+        // secret = 2^32 > 2^8 = upper_bound
+        let valid_upper_bound = 64u8;
+        let invalid_upper_bound = 8u8;
+        let secret = 2u64.pow(10u32);
+
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
+        let commitment = PedersenGens::default().commit(Scalar::from(secret), blinding_factor);
+
+        let proof =
+            IndividualRangeProof::generate(secret, &blinding_factor, invalid_upper_bound).unwrap();
+
+        let res = proof.verify(&commitment.compress(), valid_upper_bound);
 
         assert_err!(
             res,
@@ -160,7 +199,7 @@ mod tests {
         // NOTE the proof generation succeeds even though the secret value is greater than the bound
         let proof =
             IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length)
-            .unwrap();
+                .unwrap();
 
         let res = proof.verify(&commitment.compress(), upper_bound_bit_length);
 
@@ -178,13 +217,14 @@ mod tests {
         let other_secret = 8u64; // for the commitment, for verification
 
         let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
-        let commitment = PedersenGens::default().commit(Scalar::from(other_secret), blinding_factor);
+        let commitment =
+            PedersenGens::default().commit(Scalar::from(other_secret), blinding_factor);
 
         let upper_bound_bit_length = 32u8;
 
         let proof =
             IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length)
-            .unwrap();
+                .unwrap();
 
         let res = proof.verify(&commitment.compress(), upper_bound_bit_length);
 
@@ -199,16 +239,18 @@ mod tests {
     #[test]
     fn verfication_error_when_commitment_not_same_as_blinding_used_for_generation() {
         let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
-        let other_blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
+        let other_blinding_factor =
+            Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
 
         let secret = 7u64;
-        let commitment = PedersenGens::default().commit(Scalar::from(secret), other_blinding_factor);
+        let commitment =
+            PedersenGens::default().commit(Scalar::from(secret), other_blinding_factor);
 
         let upper_bound_bit_length = 32u8;
 
         let proof =
             IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length)
-            .unwrap();
+                .unwrap();
 
         let res = proof.verify(&commitment.compress(), upper_bound_bit_length);
 

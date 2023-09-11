@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::binary_tree::{
     Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
 };
-use crate::inclusion_proof::{InclusionProof, InclusionProofError};
+use crate::inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
@@ -36,7 +36,6 @@ pub struct NdmSmt {
 impl NdmSmt {
     /// Constructor.
     /// TODO more docs
-    // TODO we should probably do a check to make sure the UserIDs are all unique, but not sure if this check should be here or in calling code
     #[allow(dead_code)]
     pub fn new(
         master_secret: D256,
@@ -50,8 +49,8 @@ impl NdmSmt {
         let salt_s_bytes = salt_s.as_bytes();
 
         // closure that is used to create new padding nodes
-        // TODO check how much copying is going on in this closure, maybe we can optimize
         let new_padding_node_content = |coord: &Coordinate| {
+            // TODO unfortunately we copy data here, maybe there is a way to do without copying
             let coord_bytes = coord.as_bytes();
             // pad_secret_bytes is given as 'w' in the DAPOL+ paper
             let pad_secret = generate_key(master_secret_bytes, &coord_bytes);
@@ -104,9 +103,21 @@ impl NdmSmt {
     /// The NdmSmt struct defines the content type that is used, and so must define how to extract
     /// the secret value (liability) and blinding factor for the range proof, which are both
     /// required for the range proof that is done in the [InclusionProof] constructor.
-    pub fn generate_inclusion_proof(
+    ///
+    /// `aggregation_factor` is used to determine how many of the range proofs are aggregated.
+    /// Those that do not form part of the aggregated proof are just proved individually. The
+    /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    //j
+    /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
+    /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
+    /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
+    /// because we are not expected to require bounds higher than $2^256$. Note that if the value
+    /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
+    pub fn generate_inclusion_proof_with_custom_range_proof_params(
         &self,
         user_id: &UserId,
+        aggregation_factor: AggregationFactor,
+        upper_bound_bit_length: u8,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
         let leaf_x_coord = self
             .user_mapping
@@ -115,7 +126,21 @@ impl NdmSmt {
 
         let path = self.tree.build_path_for(*leaf_x_coord)?;
 
-        Ok(InclusionProof::generate(path)?)
+        Ok(InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length)?)
+    }
+
+    /// Generate an inclusion proof for the given user_id.
+    ///
+    /// Use the default values for Bulletproof parameters:
+    /// - `aggregation_factor`: half of all the range proofs are aggregated
+    /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most real-world cases)
+    pub fn generate_inclusion_proof(
+        &self,
+        user_id: &UserId,
+    ) -> Result<InclusionProof<Hash>, NdmSmtError> {
+        let aggregation_factor = AggregationFactor::Divisor(2u8);
+        let upper_bound_bit_length = 64u8;
+        self.generate_inclusion_proof_with_custom_range_proof_params(user_id, aggregation_factor, upper_bound_bit_length)
     }
 }
 

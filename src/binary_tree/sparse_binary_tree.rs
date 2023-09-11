@@ -6,8 +6,6 @@ use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use thiserror::Error;
 
-// TODO maybe use concurrency for tree construction if it is too slow on the larger trees
-
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
 
@@ -33,7 +31,7 @@ pub trait Mergeable {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     pub y: u8, // from 0 to height
-    // TODO change to 2^248 (256 - 8) to allow large tree height, but still being able to do byte conversion of length 256 bits
+    // TODO this enforces a max tree height of 2^64 so we should make sure that is accounted for in other bits of the code, and make it easy to upgrade this max to something larger in the future
     pub x: u64, // from 0 to 2^y
 }
 
@@ -94,7 +92,6 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
 
             // make sure all x_coord < max
             if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
-                println!("max {:?}", max_leaves);
                 return Err(SparseBinaryTreeError::InvalidXCoord);
             }
 
@@ -119,51 +116,43 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
             nodes
         };
 
-        // TODO flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
-        let mut store = HashMap::with_capacity(max_leaves as usize);
+        let mut store = HashMap::new();
 
         // repeat for each layer of the tree
         for _i in 0..height - 1 {
-            // TODO (same concern as above) flesh out the limitations around this conversion (since usize can be u32 on 32-bit systems, effectively truncation the u64)
-            let num_nodes_next_layer = nodes.len() / 2 as usize;
             // create the next layer up of nodes from the current layer of nodes
             nodes = nodes
                 .into_iter()
                 // sort nodes into pairs (left & right siblings)
-                .fold(
-                    Vec::<MaybeUnmatchedPair<C>>::with_capacity(num_nodes_next_layer),
-                    |mut pairs, node| {
-                        let sibling = Sibling::from_node(node);
-                        match sibling {
-                            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                                left: Some(left_sibling),
-                                right: Option::None,
-                            }),
-                            Sibling::Right(right_sibling) => {
-                                let is_right_sibling_of_prev_node = pairs
+                .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
+                    let sibling = Sibling::from_node(node);
+                    match sibling {
+                        Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                            left: Some(left_sibling),
+                            right: Option::None,
+                        }),
+                        Sibling::Right(right_sibling) => {
+                            let is_right_sibling_of_prev_node = pairs
+                                .last_mut()
+                                .map(|pair| (&pair.left).as_ref())
+                                .flatten()
+                                .is_some_and(|left| right_sibling.0.is_right_sibling_of(&left.0));
+                            if is_right_sibling_of_prev_node {
+                                pairs
                                     .last_mut()
-                                    .map(|pair| (&pair.left).as_ref())
-                                    .flatten()
-                                    .is_some_and(|left| {
-                                        right_sibling.0.is_right_sibling_of(&left.0)
-                                    });
-                                if is_right_sibling_of_prev_node {
-                                    pairs
-                                        .last_mut()
-                                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                                        .expect("[Bug in tree constructor] Previous node not found")
-                                        .right = Option::Some(right_sibling);
-                                } else {
-                                    pairs.push(MaybeUnmatchedPair {
-                                        left: Option::None,
-                                        right: Some(right_sibling),
-                                    });
-                                }
+                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                    .expect("[Bug in tree constructor] Previous node not found")
+                                    .right = Option::Some(right_sibling);
+                            } else {
+                                pairs.push(MaybeUnmatchedPair {
+                                    left: Option::None,
+                                    right: Some(right_sibling),
+                                });
                             }
                         }
-                        pairs
-                    },
-                )
+                    }
+                    pairs
+                })
                 .into_iter()
                 // add padding nodes to unmatched pairs
                 .map(|pair| match (pair.left, pair.right) {
@@ -208,20 +197,6 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
             store,
             height,
         })
-    }
-}
-
-impl<C: Clone> Node<C> {
-    // TODO we won't need this anymore if the fields of Node are going to be public
-    pub fn new(coord: Coordinate, content: C) -> Self {
-        Node { coord, content }
-    }
-}
-
-impl Coordinate {
-    // TODO we won't need this anymore if the fields of Coordinate are going to be public
-    pub fn new(x: u64, y: u8) -> Self {
-        Coordinate { x, y }
     }
 }
 
@@ -295,7 +270,6 @@ pub enum NodeOrientation {
 
 impl Coordinate {
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
-    #[allow(dead_code)]
     pub fn as_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
         let (left, mid) = c.split_at_mut(1);

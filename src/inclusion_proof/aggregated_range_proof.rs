@@ -110,8 +110,6 @@ impl AggregatedRangeProof {
         }
 
         let pc_gens = PedersenGens::default();
-        // STENT TODO the first argument here cannot be greater than 64 so this puts a bound on the bit length param
-        //   also the 2nd param can't be greater than 16
         let bp_gens = BulletproofGens::new(upper_bound_bit_length as usize, next_pow_2 as usize);
 
         let (secrets, blinding_factors): (Vec<u64>, Vec<Scalar>) =
@@ -165,8 +163,6 @@ impl AggregatedRangeProof {
         // We slowly shave off parts of the 2 vectors (from the tail) till there is nothing left.
         while secrets.len() > 0 {
             if input_size & next_pow_2 > 0 {
-                // STENT TODO the first argument here cannot be greater than 64 so this puts a bound on the bit length param
-                //   also the 2nd param can't be greater than 16
                 let bp_gens =
                     BulletproofGens::new(upper_bound_bit_length as usize, next_pow_2 as usize);
                 let index = secrets.len() - next_pow_2 as usize;
