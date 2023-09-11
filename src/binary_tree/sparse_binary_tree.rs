@@ -433,13 +433,13 @@ mod tests {
     // TODO write a test that checks the total number of nodes in the tree is correct
 
     use super::*;
-
     use super::super::test_utils::{
         full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
-        TestContent, H256,
+        TestContent,
     };
-
     use crate::testing_utils::assert_err;
+
+    use primitive_types::H256;
 
     fn check_tree(tree: &SparseBinaryTree<TestContent>, height: u8) {
         assert_eq!(tree.height, height);
