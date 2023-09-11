@@ -55,14 +55,16 @@ pub struct InputLeafNode<C> {
 // ===========================================
 // Constructors.
 
-fn count(bit_map: u64, index: u64) -> u8 {
-    let mut total = 0;
-    for i in 0..index {
-        if bit_map & 1 << i != 0 {
-            total += 1;
-        }
+fn find_split_index<C>(leaves: &Vec<InputLeafNode<C>>, x_coord_mid: u64) -> usize {
+    let mut index = 0;
+    while leaves
+        .get(index)
+        .map_or(false, |leaf| leaf.x_coord <= x_coord_mid)
+    {
+        // TODO this default false is not good if it gets hit because that means there is a bug
+        index += 1;
     }
-    total
+    index
 }
 
 use std::sync::mpsc;
@@ -73,51 +75,50 @@ use std::thread;
 // if bit map is 1001 then u64 value will be 2^3 + 2^0
 // and last index would be 3
 fn dive<C: Clone + Mergeable + Send + 'static, F>(
-    bit_map: u64,            // Can we make it smaller than u64?
-    bit_map_last_index: u64, // supposed to be the index in the map with the last useful bit, will be tree_height for first iteration
+    x_coord_min: u64,
+    x_coord_max: u64,
     mut leaves: Vec<InputLeafNode<C>>,
     new_padding_node_content: Arc<F>,
 ) -> Node<C>
 where
     F: Fn(&Coordinate) -> C + Send + 'static + Sync,
 {
-    println!("function call, num leaves {:?}", leaves.len());
-    println!("bitmap 0b{:08b}", bit_map);
-    println!("last index {:?}\n", bit_map_last_index);
+    println!("\nfunction call, num leaves {:?}", leaves.len());
+    println!("x_coord_min {:?}", x_coord_min);
+    println!("x_coord_max {:?}", x_coord_max);
 
     // base case: reached layer above leaves
-    if bit_map_last_index == 2 {
+    if leaves.len() <= 2 {
+        // len should never reach 0
         println!("base case reached");
-        let pair = if bit_map & 2 != 0 {
+        let pair = if leaves.len() == 2 {
             let left = LeftSibling::from_node(leaves.remove(0).to_node());
-
-            let right = if bit_map & 1 != 0 {
-                RightSibling::from_node(leaves.remove(0).to_node())
-            } else {
-                left.new_sibling_padding_node_2(new_padding_node_content)
-            };
+            let right = RightSibling::from_node(leaves.remove(0).to_node());
             MatchedPair { left, right }
         } else {
-            // note we would not have gotten here if both leaves did not exist, so we can safely assume the following leaf node exists
-            let right = RightSibling::from_node(leaves.remove(0).to_node());
-            let left = right.new_sibling_padding_node_2(new_padding_node_content);
-            MatchedPair { left, right }
+            let node = Sibling::from_node(leaves.remove(0).to_node());
+            match node {
+                Sibling::Left(left) => MatchedPair {
+                    right: left.new_sibling_padding_node_2(new_padding_node_content),
+                    left,
+                },
+                Sibling::Right(right) => MatchedPair {
+                    left: right.new_sibling_padding_node_2(new_padding_node_content),
+                    right,
+                },
+            }
         };
 
         return pair.merge();
     }
 
-    let new_bit_map_last_index = bit_map_last_index / 2; // should always be a power of 2
-    let left_bit_map = bit_map >> new_bit_map_last_index;
-    let right_bit_map = bit_map;
-
-    // count the number of 1s in the 1st & 2nd halves of the bitmap
-    let left_count = count(left_bit_map, new_bit_map_last_index);
-    let right_count = count(right_bit_map, new_bit_map_last_index);
+    let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+    // count the number of nodes that belong under the left child node
+    let left_count = find_split_index(&leaves, x_coord_mid);
 
     // if count > 0 for 1st & 2nd half then spawn a new thread to go down the right node
-    let pair = if left_count > 0 && right_count > 0 {
-        let right_leaves = leaves.split_off(left_count as usize);
+    let pair = if 0 < left_count && left_count < leaves.len() - 1 {
+        let right_leaves = leaves.split_off(left_count);
         let left_leaves = leaves;
 
         let (tx, rx) = mpsc::channel();
@@ -126,13 +127,13 @@ where
         // for right child
         thread::spawn(move || {
             println!("thread spawned");
-            let node = dive(right_bit_map, new_bit_map_last_index, right_leaves, f);
+            let node = dive(x_coord_mid + 1, x_coord_max, right_leaves, f);
             tx.send(RightSibling::from_node(node)).unwrap();
         });
 
         let left = LeftSibling::from_node(dive(
-            left_bit_map,
-            new_bit_map_last_index,
+            x_coord_min,
+            x_coord_mid,
             left_leaves,
             new_padding_node_content,
         ));
@@ -142,8 +143,8 @@ where
     } else if left_count > 0 {
         // go down left child
         let left = LeftSibling::from_node(dive(
-            left_bit_map,
-            new_bit_map_last_index,
+            x_coord_min,
+            x_coord_mid,
             leaves,
             new_padding_node_content.clone(),
         ));
@@ -152,8 +153,8 @@ where
     } else {
         // go down right child
         let right = RightSibling::from_node(dive(
-            right_bit_map,
-            new_bit_map_last_index,
+            x_coord_mid + 1,
+            x_coord_max,
             leaves,
             new_padding_node_content.clone(),
         ));
@@ -677,26 +678,23 @@ mod tests {
     #[test]
     fn concurrent_tree() {
         let height = 4u8;
-
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
-        let mut bit_map = 0u64;
 
         for i in 0..(num_bottom_layer_nodes(height)) {
             if i < 4 {
-            leaves.push(InputLeafNode::<TestContent> {
-                x_coord: i as u64,
-                content: TestContent {
-                    hash: H256::default(),
-                    value: i as u32,
-                },
-            });
-            bit_map |= 1 << i;
+                leaves.push(InputLeafNode::<TestContent> {
+                    x_coord: i as u64,
+                    content: TestContent {
+                        hash: H256::default(),
+                        value: i as u32,
+                    },
+                });
             }
         }
 
         dive(
-            bit_map,
-            2u64.pow(height as u32 - 1),
+            0,
+            2u64.pow(height as u32 - 1) - 1,
             leaves,
             Arc::new(get_padding_function()),
         );
