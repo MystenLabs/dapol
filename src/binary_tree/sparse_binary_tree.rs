@@ -55,7 +55,7 @@ pub struct InputLeafNode<C> {
 // ===========================================
 // Constructors.
 
-fn count(bit_map: u64, index: u8) -> u8 {
+fn count(bit_map: u64, index: u64) -> u8 {
     let mut total = 0;
     for i in 0..index {
         if bit_map & 1 << i != 0 {
@@ -66,23 +66,28 @@ fn count(bit_map: u64, index: u8) -> u8 {
 }
 
 use std::sync::mpsc;
-use std::thread;
 use std::sync::Arc;
+use std::thread;
 
 // bit_map is going to be stored in u64 like so:
 // if bit map is 1001 then u64 value will be 2^3 + 2^0
 // and last index would be 3
 fn dive<C: Clone + Mergeable + Send + 'static, F>(
-    bit_map: u64,           // Can we make it smaller than u64?
-    bit_map_last_index: u8, // supposed to be the index in the map with the last useful bit, will be tree_height for first iteration
+    bit_map: u64,            // Can we make it smaller than u64?
+    bit_map_last_index: u64, // supposed to be the index in the map with the last useful bit, will be tree_height for first iteration
     mut leaves: Vec<InputLeafNode<C>>,
     new_padding_node_content: Arc<F>,
 ) -> Node<C>
 where
     F: Fn(&Coordinate) -> C + Send + 'static + Sync,
 {
+    println!("function call, num leaves {:?}", leaves.len());
+    println!("bitmap 0b{:08b}", bit_map);
+    println!("last index {:?}\n", bit_map_last_index);
+
     // base case: reached layer above leaves
-    if bit_map_last_index == 1 {
+    if bit_map_last_index == 2 {
+        println!("base case reached");
         let pair = if bit_map & 2 != 0 {
             let left = LeftSibling::from_node(leaves.remove(0).to_node());
 
@@ -120,12 +125,8 @@ where
 
         // for right child
         thread::spawn(move || {
-            let node = dive(
-                right_bit_map,
-                new_bit_map_last_index,
-                right_leaves,
-                f,
-            );
+            println!("thread spawned");
+            let node = dive(right_bit_map, new_bit_map_last_index, right_leaves, f);
             tx.send(RightSibling::from_node(node)).unwrap();
         });
 
@@ -160,7 +161,7 @@ where
         MatchedPair { left, right }
     };
 
-    return pair.merge();
+    pair.merge()
 }
 
 impl<C: Mergeable + Clone> SparseBinaryTree<C> {
@@ -671,5 +672,33 @@ mod tests {
         let tree = SparseBinaryTree::new(vec![leaf_0], height, &get_padding_function());
 
         assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
+    }
+
+    #[test]
+    fn concurrent_tree() {
+        let height = 4u8;
+
+        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
+        let mut bit_map = 0u64;
+
+        for i in 0..(num_bottom_layer_nodes(height)) {
+            if i < 4 {
+            leaves.push(InputLeafNode::<TestContent> {
+                x_coord: i as u64,
+                content: TestContent {
+                    hash: H256::default(),
+                    value: i as u32,
+                },
+            });
+            bit_map |= 1 << i;
+            }
+        }
+
+        dive(
+            bit_map,
+            2u64.pow(height as u32 - 1),
+            leaves,
+            Arc::new(get_padding_function()),
+        );
     }
 }
