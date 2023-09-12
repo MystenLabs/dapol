@@ -145,17 +145,29 @@ where
         let builder = thread::Builder::new().name(count.to_string());
 
         // for right child
-        builder.spawn(move || {
-            // println!("thread spawned");
-            let node = dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
-            // println!("thread about to send, node {:?}", node);
-            tx.send(RightSibling::from_node(node))
+        let right = if count < 50_000 {
+            builder.spawn(move || {
+                // println!("thread spawned");
+                let node = dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
+                // println!("thread about to send, node {:?}", node);
+                tx.send(RightSibling::from_node(node))
+                    .map_err(|err| {
+                        println!("ERROR STENT SEND {:?}", err);
+                        err
+                    })
+                    .unwrap();
+            });
+            let right = rx
+                .recv()
                 .map_err(|err| {
-                    println!("ERROR STENT SEND {:?}", err);
+                    println!("ERROR STENT REC {:?}", err);
                     err
                 })
                 .unwrap();
-        });
+            right
+        } else {
+            RightSibling::from_node(dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f))
+        };
 
         let left = LeftSibling::from_node(dive(
             x_coord_min,
@@ -165,13 +177,6 @@ where
             left_leaves,
             new_padding_node_content,
         ));
-        let right = rx
-            .recv()
-            .map_err(|err| {
-                println!("ERROR STENT REC {:?}", err);
-                err
-            })
-            .unwrap();
 
         MatchedPair { left, right }
     } else if left_count > 0 {
