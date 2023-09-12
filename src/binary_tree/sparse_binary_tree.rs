@@ -83,14 +83,9 @@ pub fn dive<C: Clone + Mergeable + Send + 'static, F>(
 where
     F: Fn(&Coordinate) -> C + Send + 'static + Sync,
 {
-    println!("\nfunction call, num leaves {:?}", leaves.len());
-    println!("x_coord_min {:?}", x_coord_min);
-    println!("x_coord_max {:?}", x_coord_max);
-
     // base case: reached layer above leaves
     if leaves.len() <= 2 {
         // len should never reach 0
-        println!("base case reached");
         let pair = if leaves.len() == 2 {
             let left = LeftSibling::from_node(leaves.remove(0).to_node());
             let right = RightSibling::from_node(leaves.remove(0).to_node());
@@ -126,7 +121,6 @@ where
 
         // for right child
         thread::spawn(move || {
-            println!("thread spawned");
             let node = dive(x_coord_mid + 1, x_coord_max, right_leaves, f);
             tx.send(RightSibling::from_node(node)).unwrap();
         });

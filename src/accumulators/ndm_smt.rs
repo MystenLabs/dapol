@@ -94,7 +94,7 @@ impl NdmSmt {
         }
 
         let leaves_test = vec![leaves.pop().unwrap()];
-        let tree = SparseBinaryTree::new(leaves_test, 8, &new_padding_node_content)?;
+        let tree = SparseBinaryTree::new(leaves_test, height, &new_padding_node_content)?;
         println!("done tree");
         let node = dive(0, 2u64.pow(height as u32 - 1), leaves, Arc::new(new_padding_node_content));
         println!("done dive");
