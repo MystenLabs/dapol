@@ -133,22 +133,23 @@ where
         let right_leaves = leaves.split_off(left_count);
         let left_leaves = leaves;
 
-        let (tx, rx) = mpsc::channel();
+        // let str = format!("x_coord_mid {} x_coord_max {}", x_coord_mid, x_coord_max);
+        // let count = {
+        //     let mut value = thread_count.lock().unwrap();
+        //     *value += 1;
+        //     // println!("STENT thread count {}", value);
+        //     value.clone()
+        // };
+
         let f = new_padding_node_content.clone();
 
-        // let str = format!("x_coord_mid {} x_coord_max {}", x_coord_mid, x_coord_max);
-        let count = {
-            let mut value = thread_count.lock().unwrap();
-            *value += 1;
-            // println!("STENT thread count {}", value);
-            value.clone()
-        };
-        let builder = thread::Builder::new().name(count.to_string());
-
         // for right child
-        let right = if count < 50_000 {
+        let right = if y > height - 3 {
+            let (tx, rx) = mpsc::channel();
+            let builder = thread::Builder::new(); //.name(count.to_string());
+
             builder.spawn(move || {
-                // println!("thread spawned");
+                println!("thread spawned");
                 let node = dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
                 // println!("thread about to send, node {:?}", node);
                 tx.send(RightSibling::from_node(node))
@@ -167,7 +168,14 @@ where
                 .unwrap();
             right
         } else {
-            RightSibling::from_node(dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f))
+            RightSibling::from_node(dive(
+                x_coord_mid + 1,
+                x_coord_max,
+                y - 1,
+                height,
+                right_leaves,
+                f,
+            ))
         };
 
         let left = LeftSibling::from_node(dive(
