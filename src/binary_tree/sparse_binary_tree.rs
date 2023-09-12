@@ -144,7 +144,7 @@ where
         let f = new_padding_node_content.clone();
 
         // for right child
-        let right = if y > height - 3 {
+        if y > height - 4 {
             let (tx, rx) = mpsc::channel();
             let builder = thread::Builder::new(); //.name(count.to_string());
 
@@ -159,6 +159,15 @@ where
                     })
                     .unwrap();
             });
+            let left = LeftSibling::from_node(dive(
+                x_coord_min,
+                x_coord_mid,
+                y - 1,
+                height,
+                left_leaves,
+                new_padding_node_content,
+            ));
+
             let right = rx
                 .recv()
                 .map_err(|err| {
@@ -166,28 +175,29 @@ where
                     err
                 })
                 .unwrap();
-            right
+
+                MatchedPair { left, right }
         } else {
-            RightSibling::from_node(dive(
+            let right = RightSibling::from_node(dive(
                 x_coord_mid + 1,
                 x_coord_max,
                 y - 1,
                 height,
                 right_leaves,
                 f,
-            ))
-        };
+            ));
 
-        let left = LeftSibling::from_node(dive(
-            x_coord_min,
-            x_coord_mid,
-            y - 1,
-            height,
-            left_leaves,
-            new_padding_node_content,
-        ));
+            let left = LeftSibling::from_node(dive(
+                x_coord_min,
+                x_coord_mid,
+                y - 1,
+                height,
+                left_leaves,
+                new_padding_node_content,
+            ));
 
-        MatchedPair { left, right }
+            MatchedPair { left, right }
+        }
     } else if left_count > 0 {
         // println!("left child");
         // go down left child
