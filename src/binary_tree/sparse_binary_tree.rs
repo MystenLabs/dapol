@@ -5,6 +5,7 @@
 use ::std::collections::HashMap;
 use ::std::fmt::Debug;
 use std::str::FromStr;
+use std::sync::Mutex;
 use thiserror::Error;
 
 /// Minimum tree height supported.
@@ -72,10 +73,12 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 
+static thread_count: Mutex<u32> = Mutex::new(0);
+
 // bit_map is going to be stored in u64 like so:
 // if bit map is 1001 then u64 value will be 2^3 + 2^0
 // and last index would be 3
-pub fn dive<C: Clone + Mergeable + Send + 'static, F>(
+pub fn dive<C: Clone + Mergeable + Send + 'static + Debug, F>(
     x_coord_min: u64,
     x_coord_max: u64,
     y: u8,
@@ -133,13 +136,24 @@ where
         let f = new_padding_node_content.clone();
 
         // let str = format!("x_coord_mid {} x_coord_max {}", x_coord_mid, x_coord_max);
-        let builder = thread::Builder::new().name(x_coord_mid.to_string());
+        let count = {
+            let mut value = thread_count.lock().unwrap();
+            *value += 1;
+            value
+        };
+        let builder = thread::Builder::new().name(count.to_string());
 
         // for right child
         builder.spawn(move || {
             // println!("thread spawned");
             let node = dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
-            tx.send(RightSibling::from_node(node)).unwrap();
+            // println!("thread about to send, node {:?}", node);
+            tx.send(RightSibling::from_node(node))
+                .map_err(|err| {
+                    println!("ERROR STENT SEND {:?}", err);
+                    err
+                })
+                .unwrap();
         });
 
         let left = LeftSibling::from_node(dive(
@@ -150,7 +164,13 @@ where
             left_leaves,
             new_padding_node_content,
         ));
-        let right = rx.recv().unwrap();
+        let right = rx
+            .recv()
+            .map_err(|err| {
+                println!("ERROR STENT REC {:?}", err);
+                err
+            })
+            .unwrap();
 
         MatchedPair { left, right }
     } else if left_count > 0 {
