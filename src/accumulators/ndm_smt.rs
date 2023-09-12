@@ -94,9 +94,16 @@ impl NdmSmt {
         }
 
         let leaves_test = vec![leaves.pop().unwrap()];
+        println!("leaves len {}", leaves.len());
+        // let mut leaves_test_2 = vec![leaves.remove(0), leaves.pop().unwrap()];
+        // leaves_test_2.sort_by(|a, b| a.x_coord.cmp(&b.x_coord));
+        // leaves_test_2.iter().for_each(|leaf| {
+        //     println!("x_coord {}", leaf.x_coord);
+        // });
         let tree = SparseBinaryTree::new(leaves_test, height, &new_padding_node_content)?;
         println!("done tree");
-        let node = dive(0, 2u64.pow(height as u32 - 1), leaves, Arc::new(new_padding_node_content));
+        leaves.sort_by(|a, b| a.x_coord.cmp(&b.x_coord));
+        let node = dive(0, 2u64.pow(height as u32 - 1), height-1, height, leaves, Arc::new(new_padding_node_content));
         println!("done dive");
 
         Ok(NdmSmt {
