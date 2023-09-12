@@ -49,6 +49,7 @@ pub struct SparseBinaryTree<C: Clone> {
 
 /// A simpler version of the Node struct that is used by the calling code to pass leaves to the tree constructor.
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct InputLeafNode<C> {
     pub content: C,
     pub x_coord: u64,
@@ -139,7 +140,7 @@ where
         let count = {
             let mut value = thread_count.lock().unwrap();
             *value += 1;
-            println!("STENT thread count {}", value);
+            // println!("STENT thread count {}", value);
             value.clone()
         };
         let builder = thread::Builder::new().name(count.to_string());

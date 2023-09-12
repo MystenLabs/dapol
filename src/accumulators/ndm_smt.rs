@@ -16,6 +16,9 @@ use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
 use crate::user::{User, UserId};
 
+use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 // -------------------------------------------------------------------------------------------------
 // NDM-SMT struct and methods
 
@@ -71,6 +74,10 @@ impl NdmSmt {
         let mut user_mapping = HashMap::with_capacity(users.len());
         let mut i = 0;
 
+    let start = SystemTime::now();
+        println!("  ndm start conversion of users to inputleafnode {:?}", start);
+
+        // TODO parallelize
         for user in users.into_iter() {
             let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
             i = i + 1;
@@ -93,18 +100,37 @@ impl NdmSmt {
             user_mapping.insert(user.id, x_coord);
         }
 
-        let leaves_test = vec![leaves.pop().unwrap()];
+        let end = SystemTime::now();
+        let dur = end.duration_since(start);
+        println!("  end {:?}", end);
+        println!("  duration {:?}", dur);
+
+        let leaves_other = leaves.clone();
         println!("leaves len {}", leaves.len());
-        // let mut leaves_test_2 = vec![leaves.remove(0), leaves.pop().unwrap()];
-        // leaves_test_2.sort_by(|a, b| a.x_coord.cmp(&b.x_coord));
-        // leaves_test_2.iter().for_each(|leaf| {
-        //     println!("x_coord {}", leaf.x_coord);
-        // });
-        let tree = SparseBinaryTree::new(leaves_test, height, &new_padding_node_content)?;
-        println!("done tree");
+
+        let start = SystemTime::now();
+        println!("  ndm start single threaded build {:?}", start);
+
+        let tree = SparseBinaryTree::new(leaves_other, height, &new_padding_node_content)?;
+
+        let end = SystemTime::now();
+        let dur = end.duration_since(start);
+        println!("  end {:?}", end);
+        println!("  duration {:?}", dur);
+
         leaves.sort_by(|a, b| a.x_coord.cmp(&b.x_coord));
+
+        let start = SystemTime::now();
+        println!("  ndm start multi threaded build {:?}", start);
+
         let node = dive(0, 2u64.pow(height as u32 - 1), height-1, height, leaves, Arc::new(new_padding_node_content));
-        println!("done dive");
+
+        let end = SystemTime::now();
+        let dur = end.duration_since(start);
+        println!("  end {:?}", end);
+        println!("  duration {:?}", dur);
+
+        assert_eq!(node, *tree.get_root());
 
         Ok(NdmSmt {
             tree,
