@@ -140,7 +140,7 @@ where
             let mut value = thread_count.lock().unwrap();
             *value += 1;
             println!("STENT thread count {}", value);
-            value
+            value.clone()
         };
         let builder = thread::Builder::new().name(count.to_string());
 
