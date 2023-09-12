@@ -82,7 +82,7 @@ pub fn dive<C: Clone + Mergeable + Send + 'static, F>(
     height: u8,
     mut leaves: Vec<InputLeafNode<C>>,
     new_padding_node_content: Arc<F>,
-) -> Box<Node<C>>
+) -> Node<C>
 where
     F: Fn(&Coordinate) -> C + Send + 'static + Sync,
 {
@@ -114,7 +114,7 @@ where
             }
         };
 
-        return Box::new(pair.merge());
+        return pair.merge();
     }
 
     let x_coord_mid = (x_coord_min + x_coord_max) / 2;
@@ -139,10 +139,10 @@ where
         builder.spawn(move || {
             // println!("thread spawned");
             let node = dive(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
-            tx.send(RightSibling::from_node(*node)).unwrap();
+            tx.send(RightSibling::from_node(node)).unwrap();
         });
 
-        let left = LeftSibling::from_node(*dive(
+        let left = LeftSibling::from_node(dive(
             x_coord_min,
             x_coord_mid,
             y - 1,
@@ -156,7 +156,7 @@ where
     } else if left_count > 0 {
         // println!("left child");
         // go down left child
-        let left = LeftSibling::from_node(*dive(
+        let left = LeftSibling::from_node(dive(
             x_coord_min,
             x_coord_mid,
             y - 1,
@@ -169,7 +169,7 @@ where
     } else {
         // println!("right child");
         // go down right child
-        let right = RightSibling::from_node(*dive(
+        let right = RightSibling::from_node(dive(
             x_coord_mid + 1,
             x_coord_max,
             y - 1,
@@ -181,7 +181,7 @@ where
         MatchedPair { left, right }
     };
 
-    Box::new(pair.merge())
+    pair.merge()
 }
 
 impl<C: Mergeable + Clone> SparseBinaryTree<C> {

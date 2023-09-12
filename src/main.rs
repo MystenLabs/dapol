@@ -54,24 +54,9 @@ fn new() {
     let tree_height = 32;
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
-    // let num_leaves: usize = 2usize.pow(12); // 4096
+    // let num_leaves: usize = 2usize.pow(14);
 
-    let items = build_item_list(num_leaves, tree_height);
-
-    let start = SystemTime::now();
-    println!("converting list now {:?}", start);
-
-    let users: Vec<User> = items
-        .iter()
-        .map(|item| User {
-            id: UserId::from_str("whatever").unwrap(),
-            liability: item.1.get_value(),
-        })
-        .collect();
-
-    let end = SystemTime::now();
-    let dur = end.duration_since(start);
-    println!("done converting item list, time now {:?}, duration {:?}", end, dur);
+    let users = build_item_list_new(num_leaves, tree_height);
 
     let master_secret: D256 = D256::from(3u64);
     let salt_b: D256 = D256::from(5u64);
@@ -107,6 +92,28 @@ where
     dapol
 }
 
+fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<User> {
+    let start = SystemTime::now();
+    println!("build_item_list_new {:?}", start);
+
+    let mut result = Vec::with_capacity(num_leaves);
+    for i in 0..num_leaves {
+        result.push(User {
+            liability: i as u64,
+            id: UserId::from_str(i.to_string().as_str()).unwrap(),
+        })
+    }
+
+    let end = SystemTime::now();
+    let dur = end.duration_since(start);
+    println!(
+        "done building item list new, time now {:?}, duration {:?}",
+        end, dur
+    );
+
+    result
+}
+
 fn build_item_list(
     num_leaves: usize,
     tree_height: usize,
@@ -125,13 +132,19 @@ fn build_item_list(
 
     let after_loop = SystemTime::now();
     let dur = after_loop.duration_since(start);
-    println!("built item list (next is sorting), time now {:?}, duration {:?}", after_loop, dur);
+    println!(
+        "built item list (next is sorting), time now {:?}, duration {:?}",
+        after_loop, dur
+    );
 
     result.sort_by_key(|(index, _)| *index);
 
     let end = SystemTime::now();
     let dur = end.duration_since(start);
-    println!("done building item list, time now {:?}, duration {:?}", end, dur);
+    println!(
+        "done building item list, time now {:?}, duration {:?}",
+        end, dur
+    );
 
     result
 }
