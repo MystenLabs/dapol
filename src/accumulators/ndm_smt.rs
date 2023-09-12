@@ -105,13 +105,14 @@ impl NdmSmt {
         println!("  end {:?}", end);
         println!("  duration {:?}", dur);
 
-        let leaves_other = leaves.clone();
+        // let leaves_other = leaves.clone();
         println!("leaves len {}", leaves.len());
 
         let start = SystemTime::now();
         println!("  ndm start single threaded build {:?}", start);
 
-        let tree = SparseBinaryTree::new(leaves_other, height, &new_padding_node_content)?;
+        let leaves_smol = vec![leaves.pop().unwrap()];
+        let tree = SparseBinaryTree::new(leaves_smol, height, &new_padding_node_content)?;
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);

@@ -53,8 +53,8 @@ fn new() {
 
     let tree_height = 32;
     // let num_leaves: usize = 2usize.pow(27); // 134M
-    // let num_leaves: usize = 2usize.pow(23); // 8.4M
-    let num_leaves: usize = 2usize.pow(17);
+    let num_leaves: usize = 2usize.pow(23); // 8.4M
+    // let num_leaves: usize = 2usize.pow(17);
 
     let users = build_item_list_new(num_leaves, tree_height);
 
