@@ -7,7 +7,7 @@
 //! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
 //! to as the leaf node's path.
 
-use super::sparse_binary_tree::{Coordinate, Mergeable, Node, SparseBinaryTree, MIN_HEIGHT};
+use super::{Coordinate, Mergeable, Node, SparseBinaryTree, sparse_binary_tree::MIN_HEIGHT};
 use super::NodeOrientation;
 use ::std::fmt::Debug;
 use thiserror::Error;
@@ -43,8 +43,8 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
 
         for y in 0..self.get_height() - 1 {
             let x_coord = match current_node.node_orientation() {
-                NodeOrientation::Left => current_node.get_x_coord() + 1,
-                NodeOrientation::Right => current_node.get_x_coord() - 1,
+                NodeOrientation::Left => current_node.coord.x + 1,
+                NodeOrientation::Right => current_node.coord.x - 1,
             };
 
             let sibling_coord = Coordinate { x: x_coord, y };
@@ -92,8 +92,8 @@ fn build_pair<'a, C: Mergeable + Clone>(
         })
     } else {
         Err(PathError::InvalidSibling {
-            node_that_needs_sibling: parent.get_coord().clone(),
-            sibling_given: node.get_coord().clone(),
+            node_that_needs_sibling: parent.coord.clone(),
+            sibling_given: node.coord.clone(),
         })
     }
 }
@@ -228,10 +228,10 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     fn merge(&self) -> Node<C> {
         Node {
             coord: Coordinate {
-                x: self.left.0.get_x_coord() / 2,
-                y: self.left.0.get_y_coord() + 1,
+                x: self.left.0.coord.x / 2,
+                y: self.left.0.coord.y + 1,
             },
-            content: C::merge(self.left.0.get_content(), self.right.0.get_content()),
+            content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
 }
