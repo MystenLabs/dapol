@@ -2,15 +2,15 @@
 //!
 //! TODO more docs
 
-use rand::{rngs::ThreadRng, distributions::Uniform, thread_rng, Rng};
+use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError, dive,
+    dive, Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
 };
-use crate::inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
@@ -74,8 +74,11 @@ impl NdmSmt {
         let mut user_mapping = HashMap::with_capacity(users.len());
         let mut i = 0;
 
-    let start = SystemTime::now();
-        println!("  ndm start conversion of users to inputleafnode {:?}", start);
+        let start = SystemTime::now();
+        println!(
+            "  ndm start conversion of users to inputleafnode {:?}",
+            start
+        );
 
         // TODO parallelize
         for user in users.into_iter() {
@@ -124,7 +127,14 @@ impl NdmSmt {
         let start = SystemTime::now();
         println!("  ndm start multi threaded build {:?}", start);
 
-        let node = dive(0, 2u64.pow(height as u32 - 1), height-1, height, leaves, Arc::new(new_padding_node_content));
+        let node = dive(
+            0,
+            2u64.pow(height as u32 - 1),
+            height - 1,
+            height,
+            leaves,
+            Arc::new(new_padding_node_content),
+        );
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);
@@ -170,7 +180,11 @@ impl NdmSmt {
 
         let path = self.tree.build_path_for(*leaf_x_coord)?;
 
-        Ok(InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length)?)
+        Ok(InclusionProof::generate(
+            path,
+            aggregation_factor,
+            upper_bound_bit_length,
+        )?)
     }
 
     /// Generate an inclusion proof for the given user_id.
@@ -184,7 +198,11 @@ impl NdmSmt {
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
-        self.generate_inclusion_proof_with_custom_range_proof_params(user_id, aggregation_factor, upper_bound_bit_length)
+        self.generate_inclusion_proof_with_custom_range_proof_params(
+            user_id,
+            aggregation_factor,
+            upper_bound_bit_length,
+        )
     }
 }
 

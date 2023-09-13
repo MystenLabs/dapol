@@ -11,7 +11,7 @@ pub use sparse_binary_tree::{
 mod binary_tree_path;
 pub use binary_tree_path::{Path, PathError};
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Helper functions that need to be made available to all submodules but kept private from calling code.
 
 impl<C: Clone> Node<C> {
@@ -27,7 +27,7 @@ impl<C: Clone> Node<C> {
     }
 }
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Test utils for submodules.
 
 #[cfg(test)]

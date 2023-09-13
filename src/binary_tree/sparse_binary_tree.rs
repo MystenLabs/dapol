@@ -1,61 +1,102 @@
 //! Sparse binary tree implementation.
 //!
-//! TODO more docs
+//! A sparse binary tree is a binary tree that is *full* but not necessarily
+//! *complete* or *perfect* (the definitions of which are taken from the
+//! [Wikipedia entry on binary trees](https://en.wikipedia.org/wiki/Binary_tree#Types_of_binary_trees)).
+//!
+//! The definition given in appendix C.2 (Accumulators) in the DAPOL+ paper
+//! defines a Sparse Merkle Tree (SMT) as being a Merkle tree that is *full* but
+//! not necessarily *complete* or *perfect*: "In an SMT, users are mapped to and
+//! reside in nodes at height 𝐻. Instead of constructing a full binary tree,
+//! only tree nodes that are necessary for Merkle proofs exist"
+//!
+//! The definition given by
+//! [Nervo's Rust implementation of an SMT](https://github.com/nervosnetwork/sparse-merkle-tree)
+//! says "A sparse Merkle tree is like a standard Merkle tree, except the
+//! contained data is indexed, and each datapoint is placed at the leaf that
+//! corresponds to that datapoint’s index." (see [medium article](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
+//! for more details). This is also a *full* but not necessarily *complete* or
+//! *perfect* binary tree, but the nodes must have a deterministic mapping
+//! (which is not a requirement in DAPOL+).
+//!
+//! Either way, in this file we use 'sparse binary tree' to mean a *full* binary
+//! tree.
+//!
+//! The tree is constructed from a vector of leaf nodes, all of which will
+//! be on the bottom layer of the tree. The tree is built up from these leaves,
+//! padding nodes added wherever needed in order to keep the tree *full*.
+//!
+//! A node is defined by it's index in the tree, which is an `(x, y)` coordinate.
+//! Both `x` & `y` start from 0, `x` increasing from left to right, and `y`
+//! increasing from bottom to top. The height of the tree is thus `max(y)+1`.
+//! The inputted leaves used to construct the tree must contain the `x`
+//! coordinate (their `y` coordinate will be 0).
 
-use ::std::collections::HashMap;
-use ::std::fmt::Debug;
-use std::str::FromStr;
+use std::collections::HashMap;
+use std::fmt::Debug;
 use std::sync::Mutex;
 use thiserror::Error;
+
+mod multi_threaded_utils;
+mod single_threaded_utils;
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Main structs and constructor.
 
-/// Fundamental structure of the tree, each element of the tree is a Node.
-/// The data contained in the node is completely generic, requiring only to have an associated merge function.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Node<C: Clone> {
-    pub coord: Coordinate,
-    pub content: C,
-}
-
-/// The generic content type must implement this trait to allow 2 sibling nodes to be combined to make a new parent node.
-pub trait Mergeable {
-    fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
-}
-
-/// Used to identify the location of a Node
-/// y is the vertical index (height) of the Node (0 being the bottom of the tree).
-/// x is the horizontal index of the Node (0 being the leftmost index).
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
-pub struct Coordinate {
-    pub y: u8, // from 0 to height
-    // TODO this enforces a max tree height of 2^64 so we should make sure that is accounted for in other bits of the code, and make it easy to upgrade this max to something larger in the future
-    pub x: u64, // from 0 to 2^y
-}
-
 /// Main data structure.
-/// All nodes are stored in a hash map, their index in the tree being the key.
+///
+/// Nodes are stored in a hash map, their index in the tree being the key.
+/// There is no guarantee that all of the nodes in the tree are stored. For
+/// space optimization there may be some nodes that are left out, but the
+/// leaf nodes that were originally fed into the tree builder are guaranteed
+/// to be stored.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct SparseBinaryTree<C: Clone> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
     height: u8,
 }
 
-/// A simpler version of the Node struct that is used by the calling code to pass leaves to the tree constructor.
-#[allow(dead_code)]
+/// Fundamental structure of the tree, each element of the tree is a Node.
+/// The data contained in the node is completely generic, requiring only to have
+/// an associated merge function.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Node<C: Clone> {
+    pub coord: Coordinate,
+    pub content: C,
+}
+
+/// Index of a [Node] in the tree.
+/// `y` is the vertical index (height) of the Node (0 being the bottom of the
+/// tree) and `x` is the horizontal index of the Node (0 being the leftmost
+/// index).
+#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+pub struct Coordinate {
+    pub y: u8, // from 0 to height
+    // TODO this enforces a max tree height of 2^64 so we should make sure that is accounted for in
+    // other bits of the code, and make it easy to upgrade this max to something larger in the
+    // future
+    pub x: u64, // from 0 to 2^y
+}
+
+/// The generic content type of a [Node] must implement this trait to allow 2
+/// sibling nodes to be combined to make a new parent node.
+pub trait Mergeable {
+    fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
+}
+
+/// A simpler version of the [Node] struct that is used as input to instantiate
+/// the tree builder.
 #[derive(Clone)]
 pub struct InputLeafNode<C> {
     pub content: C,
     pub x_coord: u64,
 }
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Constructors.
 
 fn find_split_index<C>(leaves: &Vec<InputLeafNode<C>>, x_coord_mid: u64) -> usize {
@@ -127,7 +168,8 @@ where
     let left_count = find_split_index(&leaves, x_coord_mid);
     // println!("left_count {}", left_count);
 
-    // if count > 0 for 1st & 2nd half then spawn a new thread to go down the right node
+    // if count > 0 for 1st & 2nd half then spawn a new thread to go down the right
+    // node
     let pair = if 0 < left_count && left_count < leaves.len() {
         // println!("2 children");
         let right_leaves = leaves.split_off(left_count);
@@ -176,7 +218,7 @@ where
                 })
                 .unwrap();
 
-                MatchedPair { left, right }
+            MatchedPair { left, right }
         } else {
             let right = RightSibling::from_node(dive(
                 x_coord_mid + 1,
@@ -230,9 +272,12 @@ where
 }
 
 impl<C: Mergeable + Clone> SparseBinaryTree<C> {
-    /// Create a new tree given the leaves, height and the padding node creation function.
-    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
-    // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in prev code)
+    /// Create a new tree given the leaves, height and the padding node creation
+    /// function. New padding nodes are given by a closure. Why a closure?
+    /// Because creating a padding node may require context outside of this
+    /// scope, where type C is defined, for example.
+    // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in
+    // prev code)
     #[allow(dead_code)]
     pub fn new<F>(
         leaves: Vec<InputLeafNode<C>>,
@@ -244,7 +289,8 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     {
         let max_leaves = num_bottom_layer_nodes(height);
 
-        // construct a sorted vector of leaf nodes and perform parameter correctness checks
+        // construct a sorted vector of leaf nodes and perform parameter correctness
+        // checks
         let mut nodes = {
             if leaves.len() as u64 > max_leaves {
                 return Err(SparseBinaryTreeError::TooManyLeaves);
@@ -314,7 +360,8 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
                             if is_right_sibling_of_prev_node {
                                 pairs
                                     .last_mut()
-                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                                    // this case should never be reached because of the way
+                                    // is_right_sibling_of_prev_node is built
                                     .expect("[Bug in tree constructor] Previous node not found")
                                     .right = Option::Some(right_sibling);
                             } else {
@@ -375,7 +422,6 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
 }
 
 #[derive(Error, Debug)]
-#[allow(dead_code)]
 pub enum SparseBinaryTreeError {
     #[error("Too many leaves for the given height")]
     TooManyLeaves,
@@ -389,7 +435,7 @@ pub enum SparseBinaryTreeError {
     DuplicateLeaves,
 }
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Accessor methods
 // TODO do we really need these getters? If Node is not going to be publicly an
 //  available API for this crate then we can just make the struct keys public
@@ -420,14 +466,15 @@ impl<C: Clone> SparseBinaryTree<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
         self.store.get(coord)
     }
-    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the underlying store.
+    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
+    /// underlying store.
     pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
         let coord = Coordinate { x: x_coord, y: 0 };
         self.get_node(&coord)
     }
 }
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Supporting structs, types and functions.
 
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
@@ -455,7 +502,8 @@ impl Coordinate {
 }
 
 impl<C: Clone> Node<C> {
-    /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
+    /// Return true if self is a) a left sibling and b) lives just to the left
+    /// of the other node.
     pub fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => {
@@ -465,7 +513,8 @@ impl<C: Clone> Node<C> {
         }
     }
 
-    /// Return true if self is a) a right sibling and b) lives just to the right of the other node.
+    /// Return true if self is a) a right sibling and b) lives just to the right
+    /// of the other node.
     pub fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => false,
@@ -477,7 +526,8 @@ impl<C: Clone> Node<C> {
         }
     }
 
-    /// Return the coordinates of this node's sibling, whether that be a right or a left sibling.
+    /// Return the coordinates of this node's sibling, whether that be a right
+    /// or a left sibling.
     pub fn get_sibling_coord(&self) -> Coordinate {
         match self.node_orientation() {
             NodeOrientation::Left => Coordinate {
@@ -492,8 +542,9 @@ impl<C: Clone> Node<C> {
     }
 
     /// Return the coordinates of this node's parent.
-    /// The x-coord divide-by-2 works for both left _and_ right siblings because of truncation.
-    /// Note that this function can be misused if tree height is not used to bound the y-coord from above.
+    /// The x-coord divide-by-2 works for both left _and_ right siblings because
+    /// of truncation. Note that this function can be misused if tree height
+    /// is not used to bound the y-coord from above.
     #[allow(dead_code)]
     pub fn get_parent_coord(&self) -> Coordinate {
         Coordinate {
@@ -525,7 +576,8 @@ impl<C: Clone> InputLeafNode<C> {
     }
 }
 
-/// Used to orient nodes inside a sibling pair so that the compiler can guarantee a left node is actually a left node.
+/// Used to orient nodes inside a sibling pair so that the compiler can
+/// guarantee a left node is actually a left node.
 pub enum Sibling<C: Clone> {
     Left(LeftSibling<C>),
     Right(RightSibling<C>),
@@ -550,7 +602,9 @@ pub struct MatchedPair<C: Mergeable + Clone> {
 }
 
 impl<C: Clone> LeftSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
     fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -576,7 +630,9 @@ impl<C: Clone> LeftSibling<C> {
 }
 
 impl<C: Clone> RightSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
     fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -624,13 +680,14 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     }
 }
 
-// ===========================================
+// -------------------------------------------------------------------------------------------------
 // Unit tests.
 
 #[cfg(test)]
 mod tests {
-    // TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
-    // TODO write a test that checks the total number of nodes in the tree is correct
+    // TODO test all edge cases where the first and last 2 nodes are either all
+    // present or all not or partially present TODO write a test that checks the
+    // total number of nodes in the tree is correct
 
     use super::super::test_utils::{
         full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
