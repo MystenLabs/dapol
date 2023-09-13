@@ -5,17 +5,17 @@ use std::sync::Arc;
 use std::thread;
 use std::sync::Mutex;
 
-use super::{InputLeafNode, Mergeable, LeftSibling, RightSibling, Coordinate, Node, MatchedPair, Sibling};
+use super::{Mergeable, LeftSibling, RightSibling, Coordinate, Node, MatchedPair, Sibling};
 
 // TODO unused
 static thread_count: Mutex<u32> = Mutex::new(0);
 
-fn find_split_index<C>(leaves: &Vec<InputLeafNode<C>>, x_coord_mid: u64) -> usize {
+fn find_split_index<C: Clone>(leaves: &Vec<Node<C>>, x_coord_mid: u64) -> usize {
     let mut index = 0;
     while leaves
         .get(index)
     // TODO this default false is not good if it gets hit because that means there is a bug
-        .map_or(false, |leaf| leaf.x_coord <= x_coord_mid)
+        .map_or(false, |leaf| leaf.coord.x <= x_coord_mid)
     {
         index += 1;
     }
@@ -54,7 +54,7 @@ pub fn build_node<C: Clone + Mergeable + Send + 'static + Debug, F>(
     x_coord_max: u64,
     y: u8,
     height: u8,
-    mut leaves: Vec<InputLeafNode<C>>,
+    mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
 ) -> Node<C>
 where
@@ -71,11 +71,11 @@ where
         // len should never reach 0
         // println!("base case reached");
         let pair = if leaves.len() == 2 {
-            let left = LeftSibling::from_node(leaves.remove(0).to_node());
-            let right = RightSibling::from_node(leaves.remove(0).to_node());
+            let left = LeftSibling::from_node(leaves.remove(0));
+            let right = RightSibling::from_node(leaves.remove(0));
             MatchedPair { left, right }
         } else {
-            let node = Sibling::from_node(leaves.remove(0).to_node());
+            let node = Sibling::from_node(leaves.remove(0));
             match node {
                 Sibling::Left(left) => MatchedPair {
                     right: left.new_sibling_padding_node_2(new_padding_node_content),

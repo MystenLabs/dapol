@@ -35,7 +35,9 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{Node, Coordinate, Mergeable};
+use crate::binary_tree::multi_threaded_builder;
+
+use super::{Coordinate, Mergeable, Node};
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
@@ -68,41 +70,39 @@ pub struct InputLeafNode<C> {
 // -------------------------------------------------------------------------------------------------
 // Tree builder.
 
-pub struct Builder<C, F>
-where
-    F: Fn(&Coordinate) -> C,
-{
-    build_method: BuildMethod,
+pub struct Builder<C> {
     height: Option<u8>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
-    padding_node_generator: Option<F>,
 }
 
-pub enum BuildMethod {
-    MultiThreaded,
-    SingleThreaded,
+pub struct MultiThreadedBuilder<C>
+where
+    C: Clone,
+{
+    height: u8,
+    leaf_nodes: Vec<Node<C>>,
 }
 
-impl<C, F> Builder<C, F>
+pub struct SingleThreadedBuilder<C>
+where
+    C: Clone,
+{
+    height: u8,
+    leaf_nodes: Vec<Node<C>>,
+}
+
+impl<C> Builder<C>
 where
     C: Clone + Mergeable,
-    F: Fn(&Coordinate) -> C,
 {
-    pub fn new() -> Builder<C, F> {
+    pub fn new() -> Self {
         Builder {
-            build_method: BuildMethod::MultiThreaded,
-            height: None,
-            leaf_nodes: None,
-            padding_node_generator: None,
+            height: None,     // TODO default to 32? Maybe here is not the best place
+            leaf_nodes: None, // TODO default to empty vec?
         }
     }
 
-    pub fn with_build_method(mut self, build_method: BuildMethod) -> Builder<C, F> {
-        self.build_method = build_method;
-        self
-    }
-
-    pub fn with_height(mut self, height: u8) -> Result<Builder<C, F>, TreeBuildError> {
+    pub fn with_height(mut self, height: u8) -> Result<Self, TreeBuildError> {
         if height < MIN_HEIGHT {
             return Err(TreeBuildError::HeightTooSmall);
         }
@@ -110,11 +110,11 @@ where
         Ok(self)
     }
 
-    /// Note the nodes do not have to be sorted in any way, this will be done in the build phase.
+    /// Note the nodes do not have to be pre-sorted, they are sorted here.
     pub fn with_leaf_nodes(
         mut self,
         leaf_nodes: Vec<InputLeafNode<C>>,
-    ) -> Result<Builder<C, F>, TreeBuildError> {
+    ) -> Result<Self, TreeBuildError> {
         if leaf_nodes.len() < 1 {
             return Err(TreeBuildError::NoLeaves);
         }
@@ -122,38 +122,49 @@ where
         Ok(self)
     }
 
-    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Builder<C, F> {
-        self.padding_node_generator = Some(padding_node_generator);
-        self
+    pub fn multi_threaded(self) -> Result<MultiThreadedBuilder<C>, TreeBuildError> {
+        MultiThreadedBuilder::new(self)
     }
 
-    pub fn build(self) -> Result<SparseBinaryTree<C>, TreeBuildError> {
-        use super::{single_threaded_builder, num_bottom_layer_nodes};
+    pub fn single_threaded(self) -> Result<SingleThreadedBuilder<C>, TreeBuildError> {
+        SingleThreadedBuilder::new(self)
+    }
+}
+
+impl<C> MultiThreadedBuilder<C>
+where
+    C: Clone + Mergeable,
+{
+    fn new(parent_builder: Builder<C>) -> Result<Self, TreeBuildError> {
+        use super::num_bottom_layer_nodes;
 
         // require certain fields to be set
-        let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
-        let height = self.height.ok_or(TreeBuildError::NoHeightProvided)?;
-        let padding_node_generator = self
-            .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+        let input_leaf_nodes = parent_builder
+            .leaf_nodes
+            .ok_or(TreeBuildError::NoLeafNodesProvided)?;
+        let height = parent_builder
+            .height
+            .ok_or(TreeBuildError::NoHeightProvided)?;
 
         let max_leaf_nodes = num_bottom_layer_nodes(height);
-        if leaf_nodes.len() as u64 > max_leaf_nodes {
+        if input_leaf_nodes.len() as u64 > max_leaf_nodes {
             return Err(TreeBuildError::TooManyLeaves);
         }
 
-        // TODO need to parallelize this for when MultiThreaded build type is selected.
+        // TODO need to parallelize this, it's currently the same as the single-threaded version
         // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
-        let mut nodes = {
+        let mut leaf_nodes = {
             // Translate InputLeafNode to Node.
-            let mut nodes: Vec<Node<C>> =
-                leaf_nodes.into_iter().map(|leaf| leaf.to_node()).collect();
+            let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
+                .into_iter()
+                .map(|leaf| leaf.to_node())
+                .collect();
 
             // Sort by x_coord ascending.
-            nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
             // Make sure all x_coord < max.
-            if nodes
+            if leaf_nodes
                 .last()
                 .is_some_and(|node| node.coord.x >= max_leaf_nodes)
             {
@@ -161,7 +172,7 @@ where
             }
 
             // Ensure no duplicates.
-            let duplicate_found = nodes
+            let duplicate_found = leaf_nodes
                 .iter()
                 .fold(
                     (max_leaf_nodes, false),
@@ -179,14 +190,118 @@ where
                 return Err(TreeBuildError::DuplicateLeaves);
             }
 
-            nodes
+            leaf_nodes
         };
 
-        // TODO use multi-threaded build
-        // let tree = SparseBinaryTree::new(leaf_nodes, height, &padding_node_generator)?;
+        Ok(MultiThreadedBuilder { height, leaf_nodes })
+    }
 
+    pub fn build<F>(self, padding_node_generator: F) -> Result<SparseBinaryTree<C>, TreeBuildError>
+    where
+        C: Debug + Send + 'static,
+        F: Fn(&Coordinate) -> C + Send + 'static + Sync,
+    {
+        use std::sync::Arc;
+
+        let height = self.height;
+        let x_coord_min = 0;
+        let x_coord_max = 2u64.pow(height as u32 - 1);
+        let y = height - 1;
+
+        let root = multi_threaded_builder::build_node(
+            x_coord_min,
+            x_coord_max,
+            y,
+            height,
+            self.leaf_nodes,
+            Arc::new(padding_node_generator),
+        );
+
+        let store = HashMap::new();
+
+        Ok(SparseBinaryTree {
+            root,
+            store,
+            height,
+        })
+    }
+}
+
+impl<C> SingleThreadedBuilder<C>
+where
+    C: Clone + Mergeable,
+{
+    fn new(parent_builder: Builder<C>) -> Result<Self, TreeBuildError> {
+        use super::num_bottom_layer_nodes;
+
+        // require certain fields to be set
+        let input_leaf_nodes = parent_builder
+            .leaf_nodes
+            .ok_or(TreeBuildError::NoLeafNodesProvided)?;
+        let height = parent_builder
+            .height
+            .ok_or(TreeBuildError::NoHeightProvided)?;
+
+        let max_leaf_nodes = num_bottom_layer_nodes(height);
+        if input_leaf_nodes.len() as u64 > max_leaf_nodes {
+            return Err(TreeBuildError::TooManyLeaves);
+        }
+
+        // TODO need to parallelize this, it's currently the same as the single-threaded version
+        // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
+        let mut leaf_nodes = {
+            // Translate InputLeafNode to Node.
+            let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
+                .into_iter()
+                .map(|leaf| leaf.to_node())
+                .collect();
+
+            // Sort by x_coord ascending.
+            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+            // Make sure all x_coord < max.
+            if leaf_nodes
+                .last()
+                .is_some_and(|node| node.coord.x >= max_leaf_nodes)
+            {
+                return Err(TreeBuildError::InvalidXCoord);
+            }
+
+            // Ensure no duplicates.
+            let duplicate_found = leaf_nodes
+                .iter()
+                .fold(
+                    (max_leaf_nodes, false),
+                    |(prev_x_coord, duplicate_found), node| {
+                        if duplicate_found || node.coord.x == prev_x_coord {
+                            (0, true)
+                        } else {
+                            (node.coord.x, false)
+                        }
+                    },
+                )
+                .1;
+
+            if duplicate_found {
+                return Err(TreeBuildError::DuplicateLeaves);
+            }
+
+            leaf_nodes
+        };
+
+        Ok(SingleThreadedBuilder { height, leaf_nodes })
+    }
+
+    pub fn build<F>(self, padding_node_generator: F) -> Result<SparseBinaryTree<C>, TreeBuildError>
+    where
+        C: Mergeable,
+        F: Fn(&Coordinate) -> C,
+    {
+        use super::single_threaded_builder;
+
+        let height = self.height;
         let (store, root) =
-            single_threaded_builder::build_tree(nodes, height, padding_node_generator);
+            single_threaded_builder::build_tree(self.leaf_nodes, height, padding_node_generator);
 
         Ok(SparseBinaryTree {
             root,
