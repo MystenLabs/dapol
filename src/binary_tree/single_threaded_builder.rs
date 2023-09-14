@@ -1,14 +1,41 @@
 use std::collections::HashMap;
 
-use super::{
-    Coordinate, MatchedPair, Node, Sibling,
-    Mergeable, LeftSibling, RightSibling,
-};
+use super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling};
 
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
     left: Option<LeftSibling<C>>,
     right: Option<RightSibling<C>>,
+}
+
+impl<C: Clone> LeftSibling<C> {
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let coord = self.0.get_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        let node = Node { coord, content };
+        RightSibling(node)
+    }
+}
+
+impl<C: Clone> RightSibling<C> {
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let coord = self.0.get_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        let node = Node { coord, content };
+        LeftSibling(node)
+    }
 }
 
 /// Create a new tree given the leaves, height and the padding node creation
@@ -33,7 +60,6 @@ where
         // Create the next layer up of nodes from the current layer of nodes.
         nodes = nodes
             .into_iter()
-
             // Sort nodes into pairs (left & right siblings).
             .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
                 let sibling = Sibling::from_node(node);
@@ -66,7 +92,6 @@ where
                 pairs
             })
             .into_iter()
-
             // Add padding nodes to unmatched pairs.
             .map(|pair| match (pair.left, pair.right) {
                 (Some(left), Some(right)) => MatchedPair { left, right },
@@ -83,7 +108,6 @@ where
                     panic!("[Bug in tree constructor] Invalid pair (None, None) found")
                 }
             })
-
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();

@@ -2,7 +2,10 @@
 //! TODO add more detailed documentation for all public functions/structs
 
 mod sparse_binary_tree;
-pub use sparse_binary_tree::{InputLeafNode, SparseBinaryTree, TreeBuildError, Builder, MultiThreadedBuilder, SingleThreadedBuilder};
+pub use sparse_binary_tree::{
+    Builder, InputLeafNode, MultiThreadedBuilder, SingleThreadedBuilder, SparseBinaryTree,
+    TreeBuildError,
+};
 
 mod multi_threaded_builder;
 mod single_threaded_builder;
@@ -173,18 +176,6 @@ struct MatchedPair<C: Mergeable + Clone> {
 // Supporting struct implementations.
 
 impl<C: Clone> LeftSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
-    /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
-    where
-        F: Fn(&Coordinate) -> C,
-    {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        RightSibling(node)
-    }
     fn from_node(node: Node<C>) -> Self {
         // TODO panic if node is not a left sibling
         Self(node)
@@ -192,18 +183,6 @@ impl<C: Clone> LeftSibling<C> {
 }
 
 impl<C: Clone> RightSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
-    /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
-    where
-        F: Fn(&Coordinate) -> C,
-    {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        LeftSibling(node)
-    }
     fn from_node(node: Node<C>) -> Self {
         // TODO panic if node is not a left sibling
         Self(node)

@@ -34,7 +34,10 @@ enum NumNodes {
 }
 
 impl<C: Clone> LeftSibling<C> {
-    fn new_sibling_padding_node_2<F>(&self, new_padding_node_content: Arc<F>) -> RightSibling<C>
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
+    fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> RightSibling<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -47,7 +50,10 @@ impl<C: Clone> LeftSibling<C> {
 
 // TODO move the other ones like this into the single-threaded file
 impl<C: Clone> RightSibling<C> {
-    fn new_sibling_padding_node_2<F>(&self, new_padding_node_content: Arc<F>) -> LeftSibling<C>
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
+    fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> LeftSibling<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -110,11 +116,11 @@ where
             let node = Sibling::from_node(leaves.remove(0));
             match node {
                 Sibling::Left(left) => MatchedPair {
-                    right: left.new_sibling_padding_node_2(new_padding_node_content),
+                    right: left.new_sibling_padding_node_arc(new_padding_node_content),
                     left,
                 },
                 Sibling::Right(right) => MatchedPair {
-                    left: right.new_sibling_padding_node_2(new_padding_node_content),
+                    left: right.new_sibling_padding_node_arc(new_padding_node_content),
                     right,
                 },
             }
@@ -200,7 +206,7 @@ where
                 leaves,
                 new_padding_node_content.clone(),
             ));
-            let right = left.new_sibling_padding_node_2(new_padding_node_content);
+            let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
         NumNodes::NoNodes => {
@@ -213,7 +219,7 @@ where
                 leaves,
                 new_padding_node_content.clone(),
             ));
-            let left = right.new_sibling_padding_node_2(new_padding_node_content);
+            let left = right.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
     };
