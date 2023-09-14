@@ -1,3 +1,5 @@
+//! TODO give explanation for the build algorithm.
+
 use std::fmt::Debug;
 use std::collections::HashMap;
 
@@ -92,7 +94,7 @@ where
     {
         let height = self.height;
         let x_coord_min = 0;
-        let x_coord_max = 2u64.pow(height as u32 - 1) - 1;
+        let x_coord_max = num_bottom_layer_nodes(height) - 1;
         let y = height - 1;
 
         let root = build_node(
@@ -104,6 +106,7 @@ where
             Arc::new(padding_node_generator),
         );
 
+        // TODO put some nodes in the store
         let store = HashMap::new();
 
         Ok(BinaryTree {
@@ -218,7 +221,7 @@ impl<C: Clone> RightSibling<C> {
 /// function anyway. If either case is reached then either there is a bug in the
 /// original calling code or there is a bug in the splitting algorithm in this
 /// function. There is no recovery from these 2 states so we panic.
-pub fn build_node<C, F>(
+fn build_node<C, F>(
     x_coord_min: u64,
     x_coord_max: u64,
     y: u8,

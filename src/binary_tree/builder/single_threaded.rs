@@ -148,7 +148,7 @@ impl<C: Clone> RightSibling<C> {
 /// scope, where type C is defined, for example.
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
-pub fn build_tree<C, F>(
+fn build_tree<C, F>(
     mut nodes: Vec<Node<C>>,
     height: u8,
     new_padding_node_content: F,
