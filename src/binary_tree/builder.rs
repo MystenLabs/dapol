@@ -1,43 +1,7 @@
-//! Sparse binary tree implementation.
-//!
-//! A sparse binary tree is a binary tree that is *full* but not necessarily
-//! *complete* or *perfect* (the definitions of which are taken from the
-//! [Wikipedia entry on binary trees](https://en.wikipedia.org/wiki/Binary_tree#Types_of_binary_trees)).
-//!
-//! The definition given in appendix C.2 (Accumulators) in the DAPOL+ paper
-//! defines a Sparse Merkle Tree (SMT) as being a Merkle tree that is *full* but
-//! not necessarily *complete* or *perfect*: "In an SMT, users are mapped to and
-//! reside in nodes at height 𝐻. Instead of constructing a full binary tree,
-//! only tree nodes that are necessary for Merkle proofs exist"
-//!
-//! The definition given by
-//! [Nervo's Rust implementation of an SMT](https://github.com/nervosnetwork/sparse-merkle-tree)
-//! says "A sparse Merkle tree is like a standard Merkle tree, except the
-//! contained data is indexed, and each datapoint is placed at the leaf that
-//! corresponds to that datapoint’s index." (see [medium article](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
-//! for more details). This is also a *full* but not necessarily *complete* or
-//! *perfect* binary tree, but the nodes must have a deterministic mapping
-//! (which is not a requirement in DAPOL+).
-//!
-//! Either way, in this file we use 'sparse binary tree' to mean a *full* binary
-//! tree.
-//!
-//! The tree is constructed from a vector of leaf nodes, all of which will
-//! be on the bottom layer of the tree. The tree is built up from these leaves,
-//! padding nodes added wherever needed in order to keep the tree *full*.
-//!
-//! A node is defined by it's index in the tree, which is an `(x, y)` coordinate.
-//! Both `x` & `y` start from 0, `x` increasing from left to right, and `y`
-//! increasing from bottom to top. The height of the tree is thus `max(y)+1`.
-//! The inputted leaves used to construct the tree must contain the `x`
-//! coordinate (their `y` coordinate will be 0).
-
-// TODO change the name of this file to builder and move the above doc to binary_tree
-
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{Coordinate, Mergeable, Node};
+use super::{Coordinate, Mergeable, Node, BinaryTree};
 
 mod multi_threaded;
 mod single_threaded;
@@ -46,20 +10,11 @@ mod single_threaded;
 pub static MIN_HEIGHT: u8 = 2;
 
 // -------------------------------------------------------------------------------------------------
-// Main structs and constructor.
+// Main structs.
 
-/// Main data structure.
-///
-/// Nodes are stored in a hash map, their index in the tree being the key.
-/// There is no guarantee that all of the nodes in the tree are stored. For
-/// space optimization there may be some nodes that are left out, but the
-/// leaf nodes that were originally fed into the tree builder are guaranteed
-/// to be stored.
-#[derive(Debug)]
-pub struct SparseBinaryTree<C: Clone> {
-    root: Node<C>,
-    store: HashMap<Coordinate, Node<C>>,
-    height: u8,
+pub struct TreeBuilder<C> {
+    height: Option<u8>,
+    leaf_nodes: Option<Vec<InputLeafNode<C>>>,
 }
 
 /// A simpler version of the [Node] struct that is used as input to instantiate
@@ -72,11 +27,6 @@ pub struct InputLeafNode<C> {
 
 // -------------------------------------------------------------------------------------------------
 // Tree builder.
-
-pub struct Builder<C> {
-    height: Option<u8>,
-    leaf_nodes: Option<Vec<InputLeafNode<C>>>,
-}
 
 pub struct MultiThreadedBuilder<C>
 where
@@ -94,12 +44,12 @@ where
     leaf_nodes: Vec<Node<C>>,
 }
 
-impl<C> Builder<C>
+impl<C> TreeBuilder<C>
 where
     C: Clone + Mergeable,
 {
     pub fn new() -> Self {
-        Builder {
+        TreeBuilder {
             height: None,     // TODO default to 32? Maybe here is not the best place
             leaf_nodes: None, // TODO default to empty vec?
         }
@@ -138,7 +88,7 @@ impl<C> MultiThreadedBuilder<C>
 where
     C: Clone + Mergeable,
 {
-    fn new(parent_builder: Builder<C>) -> Result<Self, TreeBuildError> {
+    fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
         use super::num_bottom_layer_nodes;
 
         // require certain fields to be set
@@ -199,7 +149,7 @@ where
         Ok(MultiThreadedBuilder { height, leaf_nodes })
     }
 
-    pub fn build<F>(self, padding_node_generator: F) -> Result<SparseBinaryTree<C>, TreeBuildError>
+    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
     where
         C: Debug + Send + 'static,
         F: Fn(&Coordinate) -> C + Send + 'static + Sync,
@@ -222,7 +172,7 @@ where
 
         let store = HashMap::new();
 
-        Ok(SparseBinaryTree {
+        Ok(BinaryTree {
             root,
             store,
             height,
@@ -234,7 +184,7 @@ impl<C> SingleThreadedBuilder<C>
 where
     C: Clone + Mergeable,
 {
-    fn new(parent_builder: Builder<C>) -> Result<Self, TreeBuildError> {
+    fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
         use super::num_bottom_layer_nodes;
 
         // require certain fields to be set
@@ -295,7 +245,7 @@ where
         Ok(SingleThreadedBuilder { height, leaf_nodes })
     }
 
-    pub fn build<F>(self, padding_node_generator: F) -> Result<SparseBinaryTree<C>, TreeBuildError>
+    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
     where
         C: Debug,
         F: Fn(&Coordinate) -> C,
@@ -305,7 +255,7 @@ where
         let (store, root) =
             single_threaded::build_tree(leaf_nodes, height, padding_node_generator);
 
-        Ok(SparseBinaryTree {
+        Ok(BinaryTree {
             root,
             store,
             height,
@@ -336,28 +286,6 @@ pub enum TreeBuildError {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Accessor methods.
-
-impl<C: Clone> SparseBinaryTree<C> {
-    pub fn get_height(&self) -> u8 {
-        self.height
-    }
-    pub fn get_root(&self) -> &Node<C> {
-        &self.root
-    }
-    /// Attempt to find a Node via it's coordinate in the underlying store.
-    pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
-        self.store.get(coord)
-    }
-    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
-    /// underlying store.
-    pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
-        let coord = Coordinate { x: x_coord, y: 0 };
-        self.get_node(&coord)
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
 // Unit tests.
 
 #[cfg(test)]
@@ -375,7 +303,7 @@ mod tests {
 
     use primitive_types::H256;
 
-    fn check_tree(tree: &SparseBinaryTree<TestContent>, height: u8) {
+    fn check_tree(tree: &BinaryTree<TestContent>, height: u8) {
         assert_eq!(tree.height, height);
     }
 
@@ -417,8 +345,8 @@ mod tests {
             });
         }
 
-        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function());
-        assert_err!(tree, Err(SparseBinaryTreeError::TooManyLeaves));
+        let tree = BinaryTree::new(leaves, height, &get_padding_function());
+        assert_err!(tree, Err(BinaryTreeError::TooManyLeaves));
     }
 
     #[test]
@@ -447,13 +375,13 @@ mod tests {
             },
         };
 
-        let tree = SparseBinaryTree::new(
+        let tree = BinaryTree::new(
             vec![leaf_0, leaf_1, leaf_2],
             height,
             &get_padding_function(),
         );
 
-        assert_err!(tree, Err(SparseBinaryTreeError::DuplicateLeaves));
+        assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
     }
 
     #[test]
@@ -468,9 +396,9 @@ mod tests {
             },
         };
 
-        let tree = SparseBinaryTree::new(vec![leaf_0], height, &get_padding_function());
+        let tree = BinaryTree::new(vec![leaf_0], height, &get_padding_function());
 
-        assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
+        assert_err!(tree, Err(BinaryTreeError::HeightTooSmall));
     }
 
     #[test]

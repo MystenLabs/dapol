@@ -1,9 +1,42 @@
-//! TODO add module-level documentation
-//! TODO add more detailed documentation for all public functions/structs
+//! Sparse binary tree implementation.
+//!
+//! A sparse binary tree is a binary tree that is *full* but not necessarily
+//! *complete* or *perfect* (the definitions of which are taken from the
+//! [Wikipedia entry on binary trees](https://en.wikipedia.org/wiki/Binary_tree#Types_of_binary_trees)).
+//!
+//! The definition given in appendix C.2 (Accumulators) in the DAPOL+ paper
+//! defines a Sparse Merkle Tree (SMT) as being a Merkle tree that is *full* but
+//! not necessarily *complete* or *perfect*: "In an SMT, users are mapped to and
+//! reside in nodes at height 𝐻. Instead of constructing a full binary tree,
+//! only tree nodes that are necessary for Merkle proofs exist"
+//!
+//! The definition given by
+//! [Nervo's Rust implementation of an SMT](https://github.com/nervosnetwork/sparse-merkle-tree)
+//! says "A sparse Merkle tree is like a standard Merkle tree, except the
+//! contained data is indexed, and each datapoint is placed at the leaf that
+//! corresponds to that datapoint’s index." (see [medium article](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
+//! for more details). This is also a *full* but not necessarily *complete* or
+//! *perfect* binary tree, but the nodes must have a deterministic mapping
+//! (which is not a requirement in DAPOL+).
+//!
+//! Either way, in this file we use 'sparse binary tree' to mean a *full* binary
+//! tree.
+//!
+//! The tree is constructed from a vector of leaf nodes, all of which will
+//! be on the bottom layer of the tree. The tree is built up from these leaves,
+//! padding nodes added wherever needed in order to keep the tree *full*.
+//!
+//! A node is defined by it's index in the tree, which is an `(x, y)` coordinate.
+//! Both `x` & `y` start from 0, `x` increasing from left to right, and `y`
+//! increasing from bottom to top. The height of the tree is thus `max(y)+1`.
+//! The inputted leaves used to construct the tree must contain the `x`
+//! coordinate (their `y` coordinate will be 0).
+
+use std::collections::HashMap;
 
 mod builder;
 pub use builder::{
-    Builder, InputLeafNode, MultiThreadedBuilder, SingleThreadedBuilder, SparseBinaryTree,
+    TreeBuilder, InputLeafNode, MultiThreadedBuilder, SingleThreadedBuilder,
     TreeBuildError,
 };
 
@@ -12,6 +45,20 @@ pub use path::{Path, PathError};
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
+
+/// Main data structure.
+///
+/// Nodes are stored in a hash map, their index in the tree being the key.
+/// There is no guarantee that all of the nodes in the tree are stored. For
+/// space optimization there may be some nodes that are left out, but the
+/// leaf nodes that were originally fed into the tree builder are guaranteed
+/// to be stored.
+#[derive(Debug)]
+pub struct BinaryTree<C: Clone> {
+    root: Node<C>,
+    store: HashMap<Coordinate, Node<C>>,
+    height: u8,
+}
 
 /// Fundamental structure of the tree, each element of the tree is a Node.
 /// The data contained in the node is completely generic, requiring only to have
@@ -39,6 +86,28 @@ pub struct Coordinate {
 /// sibling nodes to be combined to make a new parent node.
 pub trait Mergeable {
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self;
+}
+
+// -------------------------------------------------------------------------------------------------
+// Accessor methods.
+
+impl<C: Clone> BinaryTree<C> {
+    pub fn get_height(&self) -> u8 {
+        self.height
+    }
+    pub fn get_root(&self) -> &Node<C> {
+        &self.root
+    }
+    /// Attempt to find a Node via it's coordinate in the underlying store.
+    pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
+        self.store.get(coord)
+    }
+    /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
+    /// underlying store.
+    pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
+        let coord = Coordinate { x: x_coord, y: 0 };
+        self.get_node(&coord)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -261,7 +330,7 @@ mod test_utils {
     }
 
     // tree has a full bottom layer, and, subsequently, all other layers
-    pub fn full_tree() -> (SparseBinaryTree<TestContent>, u8) {
+    pub fn full_tree() -> (BinaryTree<TestContent>, u8) {
         let height = 4u8;
         let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
 
@@ -275,7 +344,7 @@ mod test_utils {
             });
         }
 
-        let tree = SparseBinaryTree::new(leaves, height, &get_padding_function())
+        let tree = BinaryTree::new(leaves, height, &get_padding_function())
             .expect("Tree construction should not have produced an error");
 
         (tree, height)
@@ -285,7 +354,7 @@ mod test_utils {
     pub fn tree_with_single_leaf(
         x_coord_of_leaf: u64,
         height: u8,
-    ) -> SparseBinaryTree<TestContent> {
+    ) -> BinaryTree<TestContent> {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
@@ -294,14 +363,14 @@ mod test_utils {
             },
         };
 
-        let tree = SparseBinaryTree::new(vec![leaf], height, &get_padding_function())
+        let tree = BinaryTree::new(vec![leaf], height, &get_padding_function())
             .expect("Tree construction should not have produced an error");
 
         tree
     }
 
     // a selection of leaves dispersed sparsely along the bottom layer
-    pub fn tree_with_sparse_leaves() -> (SparseBinaryTree<TestContent>, u8) {
+    pub fn tree_with_sparse_leaves() -> (BinaryTree<TestContent>, u8) {
         let height = 5u8;
 
         // note the nodes are not in order here (wrt x-coord) so this test also somewhat covers the sorting code in the constructor
@@ -334,7 +403,7 @@ mod test_utils {
             },
         };
 
-        let tree = SparseBinaryTree::new(
+        let tree = BinaryTree::new(
             vec![leaf_0, leaf_1, leaf_2, leaf_3],
             height,
             &get_padding_function(),

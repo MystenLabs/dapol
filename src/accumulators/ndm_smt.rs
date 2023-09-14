@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    Builder, Coordinate, InputLeafNode, PathError, SparseBinaryTree, TreeBuildError,
+    TreeBuilder, Coordinate, InputLeafNode, PathError, BinaryTree, TreeBuildError,
 };
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
@@ -35,7 +35,7 @@ pub struct NdmSmt {
     master_secret: D256,
     salt_b: D256,
     salt_s: D256,
-    tree: SparseBinaryTree<Content>,
+    tree: BinaryTree<Content>,
     user_mapping: HashMap<UserId, u64>,
 }
 
@@ -158,7 +158,7 @@ impl NdmSmt {
         let start = SystemTime::now();
         println!("  ndm start single threaded build {:?}", start);
 
-        let tree_2 = Builder::new()
+        let tree_2 = TreeBuilder::new()
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes.clone())?
             .single_threaded()?
@@ -172,7 +172,7 @@ impl NdmSmt {
         let start = SystemTime::now();
         println!("  ndm start multi threaded build {:?}", start);
 
-        let tree = Builder::new()
+        let tree = TreeBuilder::new()
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes)?
             .multi_threaded()?

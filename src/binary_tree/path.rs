@@ -7,8 +7,9 @@
 //! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
 //! to as the leaf node's path.
 
-use super::{Coordinate, Mergeable, Node, SparseBinaryTree, builder::MIN_HEIGHT};
+use super::{Coordinate, Mergeable, Node, BinaryTree, builder::MIN_HEIGHT};
 use super::NodeOrientation;
+
 use ::std::fmt::Debug;
 use thiserror::Error;
 
@@ -25,7 +26,7 @@ pub struct Path<C: Clone> {
 // -------------------------------------------------------------------------------------------------
 // Constructor
 
-impl<C: Mergeable + Clone> SparseBinaryTree<C> {
+impl<C: Mergeable + Clone> BinaryTree<C> {
     /// Construct the path up the tree from the leaf node at the given x-coord on the bottom layer
     /// to the root node. Put all the sibling nodes for the path into a vector and use this vector
     /// to create a [Path] struct and return it. The vector is ordered from bottom layer (first)
@@ -246,7 +247,7 @@ mod tests {
     };
     use super::*;
 
-    fn check_path_siblings(tree: &SparseBinaryTree<TestContent>, proof: &Path<TestContent>) {
+    fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
         assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
     }
 
