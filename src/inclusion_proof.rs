@@ -55,11 +55,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
     /// because we are not expected to require bounds higher than $2^256$. Note that if the value
     /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
-    pub fn generate(
-        path: Path<FullNodeContent<H>>,
-        aggregation_factor: AggregationFactor,
-        upper_bound_bit_length: u8,
-    ) -> Result<Self, InclusionProofError> {
+    pub fn generate(path: Path<FullNodeContent<H>>, aggregation_factor: AggregationFactor, upper_bound_bit_length: u8) -> Result<Self, InclusionProofError> {
         // Is this cast safe? Yes because the tree height (which is the same as the length of the
         // input) is also stored as a u8, and so there would never be more siblings than max(u8).
         // TODO might be worth using a bounded vector for siblings. If the tree height changes
@@ -68,19 +64,12 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         let aggregation_index = aggregation_factor.apply_to(tree_height);
 
         let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
-        let mut nodes_for_individual_proofs =
-            nodes_for_aggregation.split_off(aggregation_index as usize);
+        let mut nodes_for_individual_proofs = nodes_for_aggregation.split_off(aggregation_index as usize);
 
         let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {
             false => {
-                let aggregation_tuples = nodes_for_aggregation
-                    .into_iter()
-                    .map(|node| (node.content.liability, node.content.blinding_factor))
-                    .collect();
-                Some(AggregatedRangeProof::generate(
-                    &aggregation_tuples,
-                    upper_bound_bit_length,
-                )?)
+                let aggregation_tuples = nodes_for_aggregation.into_iter().map(|node| (node.content.liability, node.content.blinding_factor)).collect();
+                Some(AggregatedRangeProof::generate(&aggregation_tuples, upper_bound_bit_length)?)
             }
             true => None,
         };
@@ -89,13 +78,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             false => Some(
                 nodes_for_individual_proofs
                     .into_iter()
-                    .map(|node| {
-                        IndividualRangeProof::generate(
-                            node.content.liability,
-                            &node.content.blinding_factor,
-                            upper_bound_bit_length,
-                        )
-                    })
+                    .map(|node| IndividualRangeProof::generate(node.content.liability, &node.content.blinding_factor, upper_bound_bit_length))
                     .collect::<Result<Vec<_>, _>>()?,
             ),
             true => None,
@@ -126,14 +109,10 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 
             // PartialEq for HiddenNodeContent does not depend on the commitment so we can
             // make this whatever we like
-            let dummy_commitment =
-                PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+            let dummy_commitment = PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
             let root = Node {
                 content: HiddenNodeContent::new(dummy_commitment, root_hash),
-                coord: Coordinate {
-                    x: 0,
-                    y: tree_height - 1,
-                },
+                coord: Coordinate { x: 0, y: tree_height - 1 },
             };
 
             self.path.verify(&root)?;
@@ -144,15 +123,9 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 
             let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
 
-            let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-                .path
-                .nodes_from_bottom_to_top()?
-                .iter()
-                .map(|node| node.content.commitment.compress())
-                .collect();
+            let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self.path.nodes_from_bottom_to_top()?.iter().map(|node| node.content.commitment.compress()).collect();
 
-            let commitments_for_individual_proofs =
-                commitments_for_aggregated_proofs.split_off(aggregation_index);
+            let commitments_for_individual_proofs = commitments_for_aggregated_proofs.split_off(aggregation_index);
 
             if let Some(proofs) = &self.individual_range_proofs {
                 commitments_for_individual_proofs
@@ -163,14 +136,23 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             }
 
             if let Some(proof) = &self.aggregated_range_proof {
-                proof.verify(
-                    &commitments_for_aggregated_proofs,
-                    self.upper_bound_bit_length,
-                )?;
+                proof.verify(&commitments_for_aggregated_proofs, self.upper_bound_bit_length)?;
             }
         }
 
         Ok(())
+    }
+
+    pub fn print_proof(&self) {
+        println!("inclusion proof siblings:");
+        println!("");
+
+        for i in &self.path.siblings {
+            println!("sibling.coord {:?}", i.coord);
+            println!("sibling.content.commitment 0x{}", hex::encode(i.content.commitment.compress().as_bytes()));
+            println!("sibling.content.hash {:?}", i.content.hash);
+            println!("");
+        }
     }
 }
 
@@ -341,12 +323,7 @@ mod tests {
         };
 
         // we need to construct the root hash & commitment for verification testing
-        let (parent_hash, parent_commitment) = build_parent(
-            leaf.content.commitment,
-            sibling1.content.commitment,
-            leaf.content.hash,
-            sibling1.content.hash,
-        );
+        let (parent_hash, parent_commitment) = build_parent(leaf.content.commitment, sibling1.content.commitment, leaf.content.hash, sibling1.content.hash);
 
         // sibling at (0,1)
         let liability = 30u64;
@@ -361,12 +338,7 @@ mod tests {
         };
 
         // we need to construct the root hash & commitment for verification testing
-        let (parent_hash, parent_commitment) = build_parent(
-            sibling2.content.commitment,
-            parent_commitment,
-            sibling2.content.hash,
-            parent_hash,
-        );
+        let (parent_hash, parent_commitment) = build_parent(sibling2.content.commitment, parent_commitment, sibling2.content.hash, parent_hash);
 
         // sibling at (1,2)
         let liability = 144u64;
@@ -381,12 +353,7 @@ mod tests {
         };
 
         // we need to construct the root hash & commitment for verification testing
-        let (root_hash, root_commitment) = build_parent(
-            parent_commitment,
-            sibling3.content.commitment,
-            parent_hash,
-            sibling3.content.hash,
-        );
+        let (root_hash, root_commitment) = build_parent(parent_commitment, sibling3.content.commitment, parent_hash, sibling3.content.hash);
 
         (
             Path {
@@ -398,12 +365,7 @@ mod tests {
         )
     }
 
-    fn build_parent(
-        left_commitment: RistrettoPoint,
-        right_commitment: RistrettoPoint,
-        left_hash: H256,
-        right_hash: H256,
-    ) -> (H256, RistrettoPoint) {
+    fn build_parent(left_commitment: RistrettoPoint, right_commitment: RistrettoPoint, left_hash: H256, right_hash: H256) -> (H256, RistrettoPoint) {
         let parent_commitment = left_commitment + right_commitment;
 
         // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
@@ -436,8 +398,7 @@ mod tests {
 
         let (path, _root_commitment, root_hash) = build_test_path();
 
-        let proof =
-            InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+        let proof = InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
         proof.verify(root_hash).unwrap();
     }
 

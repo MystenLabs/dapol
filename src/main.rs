@@ -27,6 +27,6 @@ fn main() {
     let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, height, users).unwrap();
     ndsmt.print_tree();
 
-    //let proof = ndsmt.generate_inclusion_proof(&UserId::from_str("user1 ID").unwrap()).unwrap();
-    //println!("{:?}", proof);
+    let proof = ndsmt.generate_inclusion_proof(&UserId::from_str("user1 ID").unwrap()).unwrap();
+    proof.print_proof();
 }
