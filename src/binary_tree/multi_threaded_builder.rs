@@ -1,25 +1,36 @@
 use std::fmt::Debug;
 
-use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
-use std::sync::Mutex;
 
-use super::{Mergeable, LeftSibling, RightSibling, Coordinate, Node, MatchedPair, Sibling};
+use super::{
+    num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling,
+    Sibling,
+};
 
-// TODO unused
-static thread_count: Mutex<u32> = Mutex::new(0);
+/// Returns the index `i` in `nodes` where `nodes[i].coord.x <= x_coord_mid`
+/// but `nodes[i+1].coord.x > x_coord_mid`.
+/// Requires `nodes` to be sorted according to the x-coord field.
+/// If all nodes satisfy `node.coord.x <= mid` then `AllNodes` is returned.
+/// If no nodes satisfy `node.coord.x <= mid` then `NoNodes` is returned.
+// TODO can be optimized using a binary search
+fn get_num_nodes_left_of<C: Clone>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+    nodes
+        .iter()
+        .rposition(|leaf| leaf.coord.x <= x_coord_mid)
+        .map_or(NumNodes::NoNodes, |index| {
+            if index == nodes.len() - 1 {
+                NumNodes::AllNodes
+            } else {
+                NumNodes::SomeNodes(index)
+            }
+        })
+}
 
-fn find_split_index<C: Clone>(leaves: &Vec<Node<C>>, x_coord_mid: u64) -> usize {
-    let mut index = 0;
-    while leaves
-        .get(index)
-    // TODO this default false is not good if it gets hit because that means there is a bug
-        .map_or(false, |leaf| leaf.coord.x <= x_coord_mid)
-    {
-        index += 1;
-    }
-    index
+enum NumNodes {
+    AllNodes,
+    NoNodes,
+    SomeNodes(usize),
 }
 
 impl<C: Clone> LeftSibling<C> {
@@ -34,6 +45,7 @@ impl<C: Clone> LeftSibling<C> {
     }
 }
 
+// TODO move the other ones like this into the single-threaded file
 impl<C: Clone> RightSibling<C> {
     fn new_sibling_padding_node_2<F>(&self, new_padding_node_content: Arc<F>) -> LeftSibling<C>
     where
@@ -46,7 +58,20 @@ impl<C: Clone> RightSibling<C> {
     }
 }
 
-pub fn build_node<C: Clone + Mergeable + Send + 'static + Debug, F>(
+/// Recursive multi-threaded function for building a node by exploring the tree
+/// from top-to-bottom.
+///
+/// `leaves` must be sorted according to the nodes' x-coords. There is no panic
+/// protection that checks for this.
+///
+/// Node length should never exceed the max number of bottom-layer nodes for a
+/// sub-tree with height `y` since this means there are more nodes than can fit
+/// into the sub-tree. Similarly, node length should never reach 0 since that
+/// means we did not need do any work for this sub-tree but we entered the
+/// function anyway. If either case is reached then either there is a bug in the
+/// original calling code or there is a bug in the splitting algorithm in this
+/// function. There is no recovery from these 2 states so we panic.
+pub fn build_node<C, F>(
     x_coord_min: u64,
     x_coord_max: u64,
     y: u8,
@@ -55,18 +80,28 @@ pub fn build_node<C: Clone + Mergeable + Send + 'static + Debug, F>(
     new_padding_node_content: Arc<F>,
 ) -> Node<C>
 where
-    F: Fn(&Coordinate) -> C + Send + 'static + Sync,
+    C: Debug + Clone + Mergeable + Send + 'static,
+    F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
-    assert!(leaves.len() <= 2usize.pow(y as u32));
+    // TODO maybe we should return a result instead of panicking for these asserts?
+    {
+        let max_nodes = num_bottom_layer_nodes(y);
+        assert!(
+            leaves.len() <= max_nodes as usize,
+            "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
+            leaves.len(),
+            max_nodes
+        );
 
-    // println!("\nfunction call, num leaves {:?}", leaves.len());
-    // println!("x_coord_min {:?}", x_coord_min);
-    // println!("x_coord_max {:?}", x_coord_max);
+        assert_ne!(
+            leaves.len(),
+            0,
+            "[bug in multi-threaded node builder] Leaf node length cannot be 0"
+        );
+    }
 
-    // base case: reached layer above leaves
+    // Base case: reached the 2nd-to-bottom layer.
     if y == 1 {
-        // len should never reach 0
-        // println!("base case reached");
         let pair = if leaves.len() == 2 {
             let left = LeftSibling::from_node(leaves.remove(0));
             let right = RightSibling::from_node(leaves.remove(0));
@@ -88,110 +123,99 @@ where
         return pair.merge();
     }
 
+    // This value is used to split the leaves into left and right.
+    // Nodes in the left vector have x-coord <= mid, and
+    // those in the right vector have x-coord > mid.
     let x_coord_mid = (x_coord_min + x_coord_max) / 2;
-    // println!("x_coord_mid {}", x_coord_mid);
-    // count the number of nodes that belong under the left child node
-    let left_count = find_split_index(&leaves, x_coord_mid);
-    // println!("left_count {}", left_count);
 
-    // if count > 0 for 1st & 2nd half then spawn a new thread to go down the right
-    // node
-    let pair = if 0 < left_count && left_count < leaves.len() {
-        // println!("2 children");
-        let right_leaves = leaves.split_off(left_count);
-        let left_leaves = leaves;
+    let pair = match get_num_nodes_left_of(x_coord_mid, &leaves) {
+        NumNodes::SomeNodes(index) => {
+            let right_leaves = leaves.split_off(index + 1);
+            let left_leaves = leaves;
 
-        // let str = format!("x_coord_mid {} x_coord_max {}", x_coord_mid, x_coord_max);
-        // let count = {
-        //     let mut value = thread_count.lock().unwrap();
-        //     *value += 1;
-        //     // println!("STENT thread count {}", value);
-        //     value.clone()
-        // };
+            let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
 
-        let f = new_padding_node_content.clone();
+            // Split off a thread to build the right child, but only do this if we are above
+            // a certain height otherwise we are at risk of spawning too many threads.
+            // TODO make this 4 a variable, actually we should make a struct that contains a bunch of the static data not needed in every iteration of the recursion
+            if y > height - 4 {
+                let right_handler = thread::spawn(move || -> RightSibling<C> {
+                    println!("thread spawned");
+                    let node = build_node(
+                        x_coord_mid + 1,
+                        x_coord_max,
+                        y - 1,
+                        height,
+                        right_leaves,
+                        new_padding_node_content_ref,
+                    );
+                    RightSibling::from_node(node)
+                });
 
-        // for right child
-        if y > height - 4 {
-            let (tx, rx) = mpsc::channel();
-            let builder = thread::Builder::new(); //.name(count.to_string());
+                let left = LeftSibling::from_node(build_node(
+                    x_coord_min,
+                    x_coord_mid,
+                    y - 1,
+                    height,
+                    left_leaves,
+                    new_padding_node_content,
+                ));
 
-            builder.spawn(move || {
-                println!("thread spawned");
-                let node = build_node(x_coord_mid + 1, x_coord_max, y - 1, height, right_leaves, f);
-                // println!("thread about to send, node {:?}", node);
-                tx.send(RightSibling::from_node(node))
-                    .map_err(|err| {
-                        println!("ERROR STENT SEND {:?}", err);
-                        err
-                    })
-                    .unwrap();
-            });
+                // If there is a problem joining onto the thread then there is no way to recover
+                // so panic.
+                let right = right_handler
+                    .join()
+                    .expect("Couldn't join on the associated thread");
+
+                MatchedPair { left, right }
+            } else {
+                let right = RightSibling::from_node(build_node(
+                    x_coord_mid + 1,
+                    x_coord_max,
+                    y - 1,
+                    height,
+                    right_leaves,
+                    new_padding_node_content_ref,
+                ));
+
+                let left = LeftSibling::from_node(build_node(
+                    x_coord_min,
+                    x_coord_mid,
+                    y - 1,
+                    height,
+                    left_leaves,
+                    new_padding_node_content,
+                ));
+
+                MatchedPair { left, right }
+            }
+        }
+        NumNodes::AllNodes => {
+            // Go down left child only (there are no leaves living on the right side).
             let left = LeftSibling::from_node(build_node(
                 x_coord_min,
                 x_coord_mid,
                 y - 1,
                 height,
-                left_leaves,
-                new_padding_node_content,
+                leaves,
+                new_padding_node_content.clone(),
             ));
-
-            let right = rx
-                .recv()
-                .map_err(|err| {
-                    println!("ERROR STENT REC {:?}", err);
-                    err
-                })
-                .unwrap();
-
+            let right = left.new_sibling_padding_node_2(new_padding_node_content);
             MatchedPair { left, right }
-        } else {
+        }
+        NumNodes::NoNodes => {
+            // Go down right child only (there are no leaves living on the left side).
             let right = RightSibling::from_node(build_node(
                 x_coord_mid + 1,
                 x_coord_max,
                 y - 1,
                 height,
-                right_leaves,
-                f,
+                leaves,
+                new_padding_node_content.clone(),
             ));
-
-            let left = LeftSibling::from_node(build_node(
-                x_coord_min,
-                x_coord_mid,
-                y - 1,
-                height,
-                left_leaves,
-                new_padding_node_content,
-            ));
-
+            let left = right.new_sibling_padding_node_2(new_padding_node_content);
             MatchedPair { left, right }
         }
-    } else if left_count > 0 {
-        // println!("left child");
-        // go down left child
-        let left = LeftSibling::from_node(build_node(
-            x_coord_min,
-            x_coord_mid,
-            y - 1,
-            height,
-            leaves,
-            new_padding_node_content.clone(),
-        ));
-        let right = left.new_sibling_padding_node_2(new_padding_node_content);
-        MatchedPair { left, right }
-    } else {
-        // println!("right child");
-        // go down right child
-        let right = RightSibling::from_node(build_node(
-            x_coord_mid + 1,
-            x_coord_max,
-            y - 1,
-            height,
-            leaves,
-            new_padding_node_content.clone(),
-        ));
-        let left = right.new_sibling_padding_node_2(new_padding_node_content);
-        MatchedPair { left, right }
     };
 
     pair.merge()

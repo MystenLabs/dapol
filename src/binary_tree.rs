@@ -238,6 +238,7 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
 /// TODO latex `max = 2^(height-1)`
+// TODO change name to 'max'
 pub fn num_bottom_layer_nodes(height: u8) -> u64 {
     2u64.pow(height as u32 - 1)
 }
