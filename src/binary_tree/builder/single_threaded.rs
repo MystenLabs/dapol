@@ -1,7 +1,105 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling};
+use super::super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling, BinaryTree};
+use super::{TreeBuilder, TreeBuildError};
+
+// -------------------------------------------------------------------------------------------------
+// Main struct.
+
+pub struct SingleThreadedBuilder<C>
+where
+    C: Clone,
+{
+    height: u8,
+    leaf_nodes: Vec<Node<C>>,
+}
+
+impl<C> SingleThreadedBuilder<C>
+where
+    C: Clone + Mergeable,
+{
+    pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
+        use super::super::num_bottom_layer_nodes;
+
+        // require certain fields to be set
+        let input_leaf_nodes = parent_builder
+            .leaf_nodes
+            .ok_or(TreeBuildError::NoLeafNodesProvided)?;
+        let height = parent_builder
+            .height
+            .ok_or(TreeBuildError::NoHeightProvided)?;
+
+        let max_leaf_nodes = num_bottom_layer_nodes(height);
+        if input_leaf_nodes.len() as u64 > max_leaf_nodes {
+            return Err(TreeBuildError::TooManyLeaves);
+        }
+
+        // TODO need to parallelize this, it's currently the same as the single-threaded version
+        // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
+        let mut leaf_nodes = {
+            // Translate InputLeafNode to Node.
+            let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
+                .into_iter()
+                .map(|leaf| leaf.to_node())
+                .collect();
+
+            // Sort by x_coord ascending.
+            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+            // Make sure all x_coord < max.
+            if leaf_nodes
+                .last()
+                .is_some_and(|node| node.coord.x >= max_leaf_nodes)
+            {
+                return Err(TreeBuildError::InvalidXCoord);
+            }
+
+            // Ensure no duplicates.
+            let duplicate_found = leaf_nodes
+                .iter()
+                .fold(
+                    (max_leaf_nodes, false),
+                    |(prev_x_coord, duplicate_found), node| {
+                        if duplicate_found || node.coord.x == prev_x_coord {
+                            (0, true)
+                        } else {
+                            (node.coord.x, false)
+                        }
+                    },
+                )
+                .1;
+
+            if duplicate_found {
+                return Err(TreeBuildError::DuplicateLeaves);
+            }
+
+            leaf_nodes
+        };
+
+        Ok(SingleThreadedBuilder { height, leaf_nodes })
+    }
+
+    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
+    where
+        C: Debug,
+        F: Fn(&Coordinate) -> C,
+    {
+        let height = self.height;
+        let mut leaf_nodes = self.leaf_nodes;
+        let (store, root) =
+            build_tree(leaf_nodes, height, padding_node_generator);
+
+        Ok(BinaryTree {
+            root,
+            store,
+            height,
+        })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Supporting structs.
 
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
@@ -38,6 +136,9 @@ impl<C: Clone> RightSibling<C> {
         LeftSibling(node)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Build algorithm.
 
 /// Create a new tree given the leaves, height and the padding node creation
 /// function. New padding nodes are given by a closure. Why a closure?

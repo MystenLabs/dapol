@@ -7,7 +7,7 @@
 //! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
 //! to as the leaf node's path.
 
-use super::{Coordinate, Mergeable, Node, BinaryTree, builder::MIN_HEIGHT};
+use super::{Coordinate, Mergeable, Node, BinaryTree, MIN_HEIGHT};
 use super::NodeOrientation;
 
 use ::std::fmt::Debug;

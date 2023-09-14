@@ -36,12 +36,15 @@ use std::collections::HashMap;
 
 mod builder;
 pub use builder::{
-    TreeBuilder, InputLeafNode, MultiThreadedBuilder, SingleThreadedBuilder,
+    TreeBuilder, InputLeafNode,
     TreeBuildError,
 };
 
 mod path;
 pub use path::{Path, PathError};
+
+/// Minimum tree height supported.
+pub static MIN_HEIGHT: u8 = 2;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.

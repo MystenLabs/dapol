@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{Coordinate, Mergeable, Node, BinaryTree};
+use super::{Coordinate, Mergeable, Node, BinaryTree, MIN_HEIGHT};
 
 mod multi_threaded;
-mod single_threaded;
 
-/// Minimum tree height supported.
-pub static MIN_HEIGHT: u8 = 2;
+mod single_threaded;
+use single_threaded::SingleThreadedBuilder;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
@@ -29,14 +28,6 @@ pub struct InputLeafNode<C> {
 // Tree builder.
 
 pub struct MultiThreadedBuilder<C>
-where
-    C: Clone,
-{
-    height: u8,
-    leaf_nodes: Vec<Node<C>>,
-}
-
-pub struct SingleThreadedBuilder<C>
 where
     C: Clone,
 {
@@ -171,89 +162,6 @@ where
         );
 
         let store = HashMap::new();
-
-        Ok(BinaryTree {
-            root,
-            store,
-            height,
-        })
-    }
-}
-
-impl<C> SingleThreadedBuilder<C>
-where
-    C: Clone + Mergeable,
-{
-    fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
-        use super::num_bottom_layer_nodes;
-
-        // require certain fields to be set
-        let input_leaf_nodes = parent_builder
-            .leaf_nodes
-            .ok_or(TreeBuildError::NoLeafNodesProvided)?;
-        let height = parent_builder
-            .height
-            .ok_or(TreeBuildError::NoHeightProvided)?;
-
-        let max_leaf_nodes = num_bottom_layer_nodes(height);
-        if input_leaf_nodes.len() as u64 > max_leaf_nodes {
-            return Err(TreeBuildError::TooManyLeaves);
-        }
-
-        // TODO need to parallelize this, it's currently the same as the single-threaded version
-        // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
-        let mut leaf_nodes = {
-            // Translate InputLeafNode to Node.
-            let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
-                .into_iter()
-                .map(|leaf| leaf.to_node())
-                .collect();
-
-            // Sort by x_coord ascending.
-            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
-
-            // Make sure all x_coord < max.
-            if leaf_nodes
-                .last()
-                .is_some_and(|node| node.coord.x >= max_leaf_nodes)
-            {
-                return Err(TreeBuildError::InvalidXCoord);
-            }
-
-            // Ensure no duplicates.
-            let duplicate_found = leaf_nodes
-                .iter()
-                .fold(
-                    (max_leaf_nodes, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
-                .1;
-
-            if duplicate_found {
-                return Err(TreeBuildError::DuplicateLeaves);
-            }
-
-            leaf_nodes
-        };
-
-        Ok(SingleThreadedBuilder { height, leaf_nodes })
-    }
-
-    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
-    where
-        C: Debug,
-        F: Fn(&Coordinate) -> C,
-    {
-        let height = self.height;
-        let mut leaf_nodes = self.leaf_nodes;
-        let (store, root) =
-            single_threaded::build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(BinaryTree {
             root,
