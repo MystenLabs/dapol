@@ -175,20 +175,6 @@ struct MatchedPair<C: Mergeable + Clone> {
 // -------------------------------------------------------------------------------------------------
 // Supporting struct implementations.
 
-impl<C: Clone> LeftSibling<C> {
-    fn from_node(node: Node<C>) -> Self {
-        // TODO panic if node is not a left sibling
-        Self(node)
-    }
-}
-
-impl<C: Clone> RightSibling<C> {
-    fn from_node(node: Node<C>) -> Self {
-        // TODO panic if node is not a left sibling
-        Self(node)
-    }
-}
-
 impl<C: Clone> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {

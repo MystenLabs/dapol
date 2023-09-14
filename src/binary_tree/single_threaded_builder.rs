@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling};
 
@@ -50,7 +51,7 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> (HashMap<Coordinate, Node<C>>, Node<C>)
 where
-    C: Clone + Mergeable,
+    C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
     let mut store = HashMap::new();
@@ -64,16 +65,20 @@ where
             .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
                 let sibling = Sibling::from_node(node);
                 match sibling {
+                    // If we have found a left sibling then create a new pair.
                     Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
                         left: Some(left_sibling),
                         right: Option::None,
                     }),
+                    // If we have found a right sibling then either add to an existing pair with a left sibling or create a new pair containing only the right sibling.
                     Sibling::Right(right_sibling) => {
+
                         let is_right_sibling_of_prev_node = pairs
                             .last_mut()
                             .map(|pair| (&pair.left).as_ref())
                             .flatten()
                             .is_some_and(|left| right_sibling.0.is_right_sibling_of(&left.0));
+
                         if is_right_sibling_of_prev_node {
                             pairs
                                 .last_mut()

@@ -32,6 +32,8 @@
 //! The inputted leaves used to construct the tree must contain the `x`
 //! coordinate (their `y` coordinate will be 0).
 
+// TODO change the name of this file to builder and move the above doc to binary_tree
+
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -205,7 +207,7 @@ where
 
         let height = self.height;
         let x_coord_min = 0;
-        let x_coord_max = 2u64.pow(height as u32 - 1);
+        let x_coord_max = 2u64.pow(height as u32 - 1) - 1;
         let y = height - 1;
 
         let root = multi_threaded_builder::build_node(
@@ -294,7 +296,7 @@ where
 
     pub fn build<F>(self, padding_node_generator: F) -> Result<SparseBinaryTree<C>, TreeBuildError>
     where
-        C: Mergeable,
+        C: Debug,
         F: Fn(&Coordinate) -> C,
     {
         use super::single_threaded_builder;

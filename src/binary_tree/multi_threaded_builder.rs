@@ -5,7 +5,7 @@ use std::thread;
 
 use super::{
     num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling,
-    Sibling,
+    Sibling, NodeOrientation,
 };
 
 /// Returns the index `i` in `nodes` where `nodes[i].coord.x <= x_coord_mid`
@@ -46,9 +46,20 @@ impl<C: Clone> LeftSibling<C> {
         let node = Node { coord, content };
         RightSibling(node)
     }
+
+    /// Create a new left sibling.
+    ///
+    /// Panic if the given node is not a left sibling node.
+    /// Since this code is only used internally for tree construction, and this state is unrecoverable, panicking is the best option. It is a sanity check and should never actually happen unless code is changed.
+    fn from_node(node: Node<C>) -> Self {
+        // TODO change the name of this function: remove 'node'
+        match node.node_orientation() {
+            NodeOrientation::Right => panic!("[bug in the ] not left node"),
+            NodeOrientation::Left => Self(node),
+        }
+    }
 }
 
-// TODO move the other ones like this into the single-threaded file
 impl<C: Clone> RightSibling<C> {
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
@@ -62,6 +73,17 @@ impl<C: Clone> RightSibling<C> {
         let node = Node { coord, content };
         LeftSibling(node)
     }
+
+    /// Create a new right sibling.
+    ///
+    /// Panic if the given node is not a right sibling node.
+    /// Since this code is only used internally for tree construction, and this state is unrecoverable, panicking is the best option. It is a sanity check and should never actually happen unless code is changed.
+    fn from_node(node: Node<C>) -> Self {
+        match node.node_orientation() {
+            NodeOrientation::Left => panic!("TODO not right node"),
+            NodeOrientation::Right => Self(node),
+        }
+    }
 }
 
 /// Recursive multi-threaded function for building a node by exploring the tree
@@ -69,6 +91,8 @@ impl<C: Clone> RightSibling<C> {
 ///
 /// `leaves` must be sorted according to the nodes' x-coords. There is no panic
 /// protection that checks for this.
+///
+/// Height is a natural number, while y is a counting number.
 ///
 /// Node length should never exceed the max number of bottom-layer nodes for a
 /// sub-tree with height `y` since this means there are more nodes than can fit
@@ -91,7 +115,7 @@ where
 {
     // TODO maybe we should return a result instead of panicking for these asserts?
     {
-        let max_nodes = num_bottom_layer_nodes(y);
+        let max_nodes = num_bottom_layer_nodes(y + 1);
         assert!(
             leaves.len() <= max_nodes as usize,
             "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
@@ -103,6 +127,17 @@ where
             leaves.len(),
             0,
             "[bug in multi-threaded node builder] Leaf node length cannot be 0"
+        );
+
+        assert!(
+            x_coord_min % 2 == 0,
+            "[bug in multi-threaded node builder] x_coord_min ({}) must be a multiple of 2 or 0",
+            x_coord_min
+        );
+
+        assert!(x_coord_max % 2 == 1,
+            "[bug in multi-threaded node builder] x_coord_max ({}) must not be a multiple of 2",
+                x_coord_max
         );
     }
 

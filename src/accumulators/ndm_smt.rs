@@ -7,8 +7,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    Builder, Coordinate, InputLeafNode, PathError, SparseBinaryTree,
-    TreeBuildError,
+    Builder, Coordinate, InputLeafNode, PathError, SparseBinaryTree, TreeBuildError,
 };
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
@@ -16,14 +15,12 @@ use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
 use crate::user::{User, UserId};
 
-use std::time::Duration;
-use std::time::{SystemTime, UNIX_EPOCH};
-
+use std::time::SystemTime;
 
 use rayon::prelude::*;
-        use std::sync::Arc;
-        use std::thread;
-        use std::sync::Mutex;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::thread;
 
 // -------------------------------------------------------------------------------------------------
 // NDM-SMT struct and methods
@@ -122,9 +119,9 @@ impl NdmSmt {
         let user_mapping_ref = Arc::clone(&user_mapping);
         let handle = thread::spawn(move || {
             let mut my_user_mapping = user_mapping_ref.lock().unwrap();
-            tuples
-                .into_iter()
-                .for_each(|(user, x_coord)| {my_user_mapping.insert(user.id, x_coord);});
+            tuples.into_iter().for_each(|(user, x_coord)| {
+                my_user_mapping.insert(user.id, x_coord);
+            });
         });
 
         // let mut leaves = Vec::with_capacity(users.len());
@@ -158,13 +155,19 @@ impl NdmSmt {
         // println!("leaves len {}", leaves.len());
         println!("leaves len {}", leaf_nodes.len());
 
-        // let start = SystemTime::now();
-        // println!("  ndm start single threaded build {:?}", start);
+        let start = SystemTime::now();
+        println!("  ndm start single threaded build {:?}", start);
 
-        // let end = SystemTime::now();
-        // let dur = end.duration_since(start);
-        // println!("  end {:?}", end);
-        // println!("  duration {:?}", dur);
+        let tree_2 = Builder::new()
+            .with_height(height)?
+            .with_leaf_nodes(leaf_nodes.clone())?
+            .single_threaded()?
+            .build(new_padding_node_content)?;
+
+        let end = SystemTime::now();
+        let dur = end.duration_since(start);
+        println!("  end {:?}", end);
+        println!("  duration {:?}", dur);
 
         let start = SystemTime::now();
         println!("  ndm start multi threaded build {:?}", start);
@@ -183,6 +186,8 @@ impl NdmSmt {
         handle.join().unwrap();
         let lock = Arc::try_unwrap(user_mapping).expect("Lock still has multiple owners");
         let user_mapping = lock.into_inner().expect("Mutex cannot be locked");
+
+        assert_eq!(tree.get_root(), tree_2.get_root());
 
         Ok(NdmSmt {
             tree,
