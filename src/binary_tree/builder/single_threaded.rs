@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling};
+use super::super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling};
 
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {

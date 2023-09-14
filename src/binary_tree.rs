@@ -1,14 +1,11 @@
 //! TODO add module-level documentation
 //! TODO add more detailed documentation for all public functions/structs
 
-mod sparse_binary_tree;
-pub use sparse_binary_tree::{
+mod builder;
+pub use builder::{
     Builder, InputLeafNode, MultiThreadedBuilder, SingleThreadedBuilder, SparseBinaryTree,
     TreeBuildError,
 };
-
-mod multi_threaded_builder;
-mod single_threaded_builder;
 
 mod binary_tree_path;
 pub use binary_tree_path::{Path, PathError};

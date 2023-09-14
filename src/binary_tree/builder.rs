@@ -37,9 +37,10 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use crate::binary_tree::multi_threaded_builder;
-
 use super::{Coordinate, Mergeable, Node};
+
+mod multi_threaded;
+mod single_threaded;
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
@@ -210,7 +211,7 @@ where
         let x_coord_max = 2u64.pow(height as u32 - 1) - 1;
         let y = height - 1;
 
-        let root = multi_threaded_builder::build_node(
+        let root = multi_threaded::build_node(
             x_coord_min,
             x_coord_max,
             y,
@@ -299,12 +300,10 @@ where
         C: Debug,
         F: Fn(&Coordinate) -> C,
     {
-        use super::single_threaded_builder;
-
         let height = self.height;
         let mut leaf_nodes = self.leaf_nodes;
         let (store, root) =
-            single_threaded_builder::build_tree(leaf_nodes, height, padding_node_generator);
+            single_threaded::build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(SparseBinaryTree {
             root,

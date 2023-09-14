@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::thread;
 
-use super::{
+use super::super::{
     num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling,
     Sibling, NodeOrientation,
 };
