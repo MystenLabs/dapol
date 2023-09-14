@@ -75,7 +75,6 @@ impl NdmSmt {
         };
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
-        let user_mapping = Arc::new(Mutex::new(HashMap::with_capacity(users.len())));
 
         let start = SystemTime::now();
         println!(
@@ -119,6 +118,7 @@ impl NdmSmt {
             })
             .collect::<Vec<InputLeafNode<Content>>>();
 
+        let user_mapping = Arc::new(Mutex::new(HashMap::new()));
         let user_mapping_ref = Arc::clone(&user_mapping);
         let handle = thread::spawn(move || {
             let mut my_user_mapping = user_mapping_ref.lock().unwrap();
