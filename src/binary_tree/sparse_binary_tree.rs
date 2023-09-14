@@ -300,8 +300,9 @@ where
         use super::single_threaded_builder;
 
         let height = self.height;
+        let mut leaf_nodes = self.leaf_nodes;
         let (store, root) =
-            single_threaded_builder::build_tree(self.leaf_nodes, height, padding_node_generator);
+            single_threaded_builder::build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(SparseBinaryTree {
             root,

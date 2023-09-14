@@ -2,7 +2,7 @@
 //! TODO add more detailed documentation for all public functions/structs
 
 mod sparse_binary_tree;
-pub use sparse_binary_tree::{InputLeafNode, SparseBinaryTree};
+pub use sparse_binary_tree::{InputLeafNode, SparseBinaryTree, TreeBuildError, Builder, MultiThreadedBuilder, SingleThreadedBuilder};
 
 mod multi_threaded_builder;
 mod single_threaded_builder;
