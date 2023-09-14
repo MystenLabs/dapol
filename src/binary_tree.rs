@@ -7,8 +7,8 @@ pub use builder::{
     TreeBuildError,
 };
 
-mod binary_tree_path;
-pub use binary_tree_path::{Path, PathError};
+mod path;
+pub use path::{Path, PathError};
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
