@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::super::{Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling, BinaryTree};
-use super::{TreeBuilder, TreeBuildError};
+use super::super::{
+    BinaryTree, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling,
+};
+use super::{TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
@@ -35,8 +37,9 @@ where
             return Err(TreeBuildError::TooManyLeaves);
         }
 
-        // TODO need to parallelize this, it's currently the same as the single-threaded version
-        // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
+        // TODO need to parallelize this, it's currently the same as the single-threaded
+        // version Construct a sorted vector of leaf nodes and perform parameter
+        // correctness checks.
         let mut leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
@@ -87,8 +90,7 @@ where
     {
         let height = self.height;
         let mut leaf_nodes = self.leaf_nodes;
-        let (store, root) =
-            build_tree(leaf_nodes, height, padding_node_generator);
+        let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(BinaryTree {
             root,
@@ -144,8 +146,8 @@ impl<C: Clone> RightSibling<C> {
 /// function. New padding nodes are given by a closure. Why a closure?
 /// Because creating a padding node may require context outside of this
 /// scope, where type C is defined, for example.
-// TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in
-// prev code)
+// TODO there should be a warning if the height/leaves < min_sparsity (which was
+// set to 2 in prev code)
 pub fn build_tree<C, F>(
     mut nodes: Vec<Node<C>>,
     height: u8,
@@ -171,9 +173,9 @@ where
                         left: Some(left_sibling),
                         right: Option::None,
                     }),
-                    // If we have found a right sibling then either add to an existing pair with a left sibling or create a new pair containing only the right sibling.
+                    // If we have found a right sibling then either add to an existing pair with a
+                    // left sibling or create a new pair containing only the right sibling.
                     Sibling::Right(right_sibling) => {
-
                         let is_right_sibling_of_prev_node = pairs
                             .last_mut()
                             .map(|pair| (&pair.left).as_ref())

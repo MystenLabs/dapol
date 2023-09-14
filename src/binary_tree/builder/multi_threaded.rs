@@ -4,8 +4,8 @@ use std::sync::Arc;
 use std::thread;
 
 use super::super::{
-    num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling,
-    Sibling, NodeOrientation,
+    num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, NodeOrientation,
+    RightSibling, Sibling,
 };
 
 /// Returns the index `i` in `nodes` where `nodes[i].coord.x <= x_coord_mid`
@@ -50,7 +50,9 @@ impl<C: Clone> LeftSibling<C> {
     /// Create a new left sibling.
     ///
     /// Panic if the given node is not a left sibling node.
-    /// Since this code is only used internally for tree construction, and this state is unrecoverable, panicking is the best option. It is a sanity check and should never actually happen unless code is changed.
+    /// Since this code is only used internally for tree construction, and this
+    /// state is unrecoverable, panicking is the best option. It is a sanity
+    /// check and should never actually happen unless code is changed.
     fn from_node(node: Node<C>) -> Self {
         // TODO change the name of this function: remove 'node'
         match node.node_orientation() {
@@ -77,7 +79,9 @@ impl<C: Clone> RightSibling<C> {
     /// Create a new right sibling.
     ///
     /// Panic if the given node is not a right sibling node.
-    /// Since this code is only used internally for tree construction, and this state is unrecoverable, panicking is the best option. It is a sanity check and should never actually happen unless code is changed.
+    /// Since this code is only used internally for tree construction, and this
+    /// state is unrecoverable, panicking is the best option. It is a sanity
+    /// check and should never actually happen unless code is changed.
     fn from_node(node: Node<C>) -> Self {
         match node.node_orientation() {
             NodeOrientation::Left => panic!("TODO not right node"),
@@ -135,9 +139,10 @@ where
             x_coord_min
         );
 
-        assert!(x_coord_max % 2 == 1,
+        assert!(
+            x_coord_max % 2 == 1,
             "[bug in multi-threaded node builder] x_coord_max ({}) must not be a multiple of 2",
-                x_coord_max
+            x_coord_max
         );
     }
 
@@ -178,7 +183,8 @@ where
 
             // Split off a thread to build the right child, but only do this if we are above
             // a certain height otherwise we are at risk of spawning too many threads.
-            // TODO make this 4 a variable, actually we should make a struct that contains a bunch of the static data not needed in every iteration of the recursion
+            // TODO make this 4 a variable, actually we should make a struct that contains a
+            // bunch of the static data not needed in every iteration of the recursion
             if y > height - 4 {
                 let right_handler = thread::spawn(move || -> RightSibling<C> {
                     println!("thread spawned");

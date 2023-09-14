@@ -26,19 +26,16 @@
 //! be on the bottom layer of the tree. The tree is built up from these leaves,
 //! padding nodes added wherever needed in order to keep the tree *full*.
 //!
-//! A node is defined by it's index in the tree, which is an `(x, y)` coordinate.
-//! Both `x` & `y` start from 0, `x` increasing from left to right, and `y`
-//! increasing from bottom to top. The height of the tree is thus `max(y)+1`.
-//! The inputted leaves used to construct the tree must contain the `x`
-//! coordinate (their `y` coordinate will be 0).
+//! A node is defined by it's index in the tree, which is an `(x, y)`
+//! coordinate. Both `x` & `y` start from 0, `x` increasing from left to right,
+//! and `y` increasing from bottom to top. The height of the tree is thus
+//! `max(y)+1`. The inputted leaves used to construct the tree must contain the
+//! `x` coordinate (their `y` coordinate will be 0).
 
 use std::collections::HashMap;
 
 mod builder;
-pub use builder::{
-    TreeBuilder, InputLeafNode,
-    TreeBuildError,
-};
+pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
 
 mod path;
 pub use path::{Path, PathError};
@@ -131,7 +128,8 @@ impl Coordinate {
 
 impl<C: Clone> Node<C> {
     /// Returns left if this node is a left sibling and vice versa for right.
-    /// Since we are working with a binary tree we can tell if the node is a left sibling of the above layer by checking the x_coord modulus 2.
+    /// Since we are working with a binary tree we can tell if the node is a
+    /// left sibling of the above layer by checking the x_coord modulus 2.
     /// Since x_coord starts from 0 we check if the modulus is equal to 0.
     fn node_orientation(&self) -> NodeOrientation {
         if self.coord.x % 2 == 0 {
@@ -313,7 +311,8 @@ mod test_utils {
                 hasher.update(&right_sibling.value.to_le_bytes());
                 hasher.update(left_sibling.hash.as_bytes());
                 hasher.update(right_sibling.hash.as_bytes());
-                hasher.finalize_as_h256() // TODO double check the output of this thing
+                hasher.finalize_as_h256() // TODO double check the output of
+                                          // this thing
             };
 
             TestContent {
@@ -354,10 +353,7 @@ mod test_utils {
     }
 
     // only 1 bottom-layer leaf node is present in the whole tree
-    pub fn tree_with_single_leaf(
-        x_coord_of_leaf: u64,
-        height: u8,
-    ) -> BinaryTree<TestContent> {
+    pub fn tree_with_single_leaf(x_coord_of_leaf: u64, height: u8) -> BinaryTree<TestContent> {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
@@ -376,7 +372,8 @@ mod test_utils {
     pub fn tree_with_sparse_leaves() -> (BinaryTree<TestContent>, u8) {
         let height = 5u8;
 
-        // note the nodes are not in order here (wrt x-coord) so this test also somewhat covers the sorting code in the constructor
+        // note the nodes are not in order here (wrt x-coord) so this test also somewhat
+        // covers the sorting code in the constructor
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 6,
             content: TestContent {

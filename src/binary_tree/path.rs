@@ -1,22 +1,22 @@
 //! Data structures and methods related to paths in a binary tree.
 //!
-//! A path in a binary tree goes from a leaf node to the root node. For each node (starting from
-//! the leaf node) one follows the path by moving to the parent node; since the root node has
-//! no parent this is the end of the path.
+//! A path in a binary tree goes from a leaf node to the root node. For each
+//! node (starting from the leaf node) one follows the path by moving to the
+//! parent node; since the root node has no parent this is the end of the path.
 //!
-//! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
-//! to as the leaf node's path.
+//! A path is uniquely determined by the leaf node and only the leaf node. It
+//! can thus be referred to as the leaf node's path.
 
-use super::{Coordinate, Mergeable, Node, BinaryTree, MIN_HEIGHT};
 use super::NodeOrientation;
+use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_HEIGHT};
 
-use ::std::fmt::Debug;
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// All the sibling nodes for the nodes in a leaf node's path.
-/// The nodes are ordered from bottom layer (first) to root node (last, not included).
-/// The leaf node + the siblings can be used to reconstruct the actual nodes in the path as well
-/// as the root node.
+/// The nodes are ordered from bottom layer (first) to root node (last, not
+/// included). The leaf node + the siblings can be used to reconstruct the
+/// actual nodes in the path as well as the root node.
 #[derive(Debug)]
 pub struct Path<C: Clone> {
     pub leaf: Node<C>,
@@ -27,9 +27,10 @@ pub struct Path<C: Clone> {
 // Constructor
 
 impl<C: Mergeable + Clone> BinaryTree<C> {
-    /// Construct the path up the tree from the leaf node at the given x-coord on the bottom layer
-    /// to the root node. Put all the sibling nodes for the path into a vector and use this vector
-    /// to create a [Path] struct and return it. The vector is ordered from bottom layer (first)
+    /// Construct the path up the tree from the leaf node at the given x-coord
+    /// on the bottom layer to the root node. Put all the sibling nodes for
+    /// the path into a vector and use this vector to create a [Path] struct
+    /// and return it. The vector is ordered from bottom layer (first)
     /// to root node (last, not included).
     pub fn build_path_for(&self, leaf_x_coord: u64) -> Result<Path<C>, PathError> {
         let coord = Coordinate {
@@ -100,14 +101,15 @@ fn build_pair<'a, C: Mergeable + Clone>(
 }
 
 impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
-    /// Verify that the given list of sibling nodes + the base leaf node matches the given root node.
+    /// Verify that the given list of sibling nodes + the base leaf node matches
+    /// the given root node.
     ///
-    /// This is done by reconstructing each node in the path, from bottom layer to the root, using
-    /// the given leaf and sibling nodes, and then comparing the resulting root node to the given
-    /// root node.
+    /// This is done by reconstructing each node in the path, from bottom layer
+    /// to the root, using the given leaf and sibling nodes, and then
+    /// comparing the resulting root node to the given root node.
     ///
-    /// An error is returned if the number of siblings is less than the min amount, or the
-    /// constructed root node does not match the given one.
+    /// An error is returned if the number of siblings is less than the min
+    /// amount, or the constructed root node does not match the given one.
     pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
         let mut parent = self.leaf.clone();
 
@@ -129,9 +131,9 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 
     /// Return a vector containing only the nodes the tree path.
     ///
-    /// The path nodes have to be constructed using the leaf & sibling nodes in [Path] because
-    /// they are not stored explicitly. The order of the returned path nodes is bottom first (leaf)
-    /// and top last (root).
+    /// The path nodes have to be constructed using the leaf & sibling nodes in
+    /// [Path] because they are not stored explicitly. The order of the
+    /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [Path] data is invalid.
     pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathError> {
@@ -198,25 +200,28 @@ pub enum PathError {
 
 /// A reference to a left sibling node.
 ///
-/// It is like [super][sparse_binary_tree][LeftSibling] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][LeftSibling]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][LeftSibling] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
 
 /// A reference to a right sibling node.
 ///
-/// It is like [super][sparse_binary_tree][RightSibling] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][RightSibling]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][RightSibling] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
 ///
-/// It is like [super][sparse_binary_tree][MatchedPair] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][MatchedPair]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][MatchedPair] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct MatchedPairRef<'a, C: Mergeable + Clone> {
     left: LeftSiblingRef<'a, C>,

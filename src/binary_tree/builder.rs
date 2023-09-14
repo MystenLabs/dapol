@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{Coordinate, Mergeable, Node, BinaryTree, MIN_HEIGHT};
+use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_HEIGHT};
 
 mod multi_threaded;
 
@@ -95,8 +95,9 @@ where
             return Err(TreeBuildError::TooManyLeaves);
         }
 
-        // TODO need to parallelize this, it's currently the same as the single-threaded version
-        // Construct a sorted vector of leaf nodes and perform parameter correctness checks.
+        // TODO need to parallelize this, it's currently the same as the single-threaded
+        // version Construct a sorted vector of leaf nodes and perform parameter
+        // correctness checks.
         let mut leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
