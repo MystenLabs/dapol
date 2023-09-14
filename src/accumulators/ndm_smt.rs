@@ -123,6 +123,9 @@ impl NdmSmt {
                 my_user_mapping.insert(user.id, x_coord);
             });
         });
+        // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
+        use std::mem::size_of_val;
+        println!("The size of `input_leaf_nodes` is {}", size_of_val(&*leaf_nodes));
 
         // let mut leaves = Vec::with_capacity(users.len());
         // for user in users.into_iter() {
