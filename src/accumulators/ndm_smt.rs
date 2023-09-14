@@ -4,11 +4,10 @@
 
 use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use std::collections::HashMap;
-use std::sync::Arc;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    Builder, Coordinate, InputLeafNode, MultiThreadedBuilder, PathError, SparseBinaryTree,
+    Builder, Coordinate, InputLeafNode, PathError, SparseBinaryTree,
     TreeBuildError,
 };
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
@@ -19,6 +18,12 @@ use crate::user::{User, UserId};
 
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+
+use rayon::prelude::*;
+        use std::sync::Arc;
+        use std::thread;
+        use std::sync::Mutex;
 
 // -------------------------------------------------------------------------------------------------
 // NDM-SMT struct and methods
@@ -70,9 +75,7 @@ impl NdmSmt {
         };
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
-        let mut leaves = Vec::with_capacity(users.len());
-        let mut user_mapping = HashMap::with_capacity(users.len());
-        let mut i = 0;
+        let user_mapping = Arc::new(Mutex::new(HashMap::with_capacity(users.len())));
 
         let start = SystemTime::now();
         println!(
@@ -80,50 +83,95 @@ impl NdmSmt {
             start
         );
 
-        // TODO parallelize
-        for user in users.into_iter() {
-            let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
-            i = i + 1;
+        // [single] first create vec with x_coords
+        // join with users vec
+        // [multiple] then generate keys, map to leaf node and
+        // [single] add into map
 
-            let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
-            let w_bytes: [u8; 32] = w.into();
-            let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-            let user_salt = generate_key(&w_bytes, salt_s_bytes);
-
-            leaves.push(InputLeafNode {
-                content: Content::new_leaf(
-                    user.liability,
-                    blinding_factor.into(),
-                    user.id.clone(),
-                    user_salt.into(),
-                ),
-                x_coord,
-            });
-
-            user_mapping.insert(user.id, x_coord);
+        let mut x_coords = Vec::<u64>::with_capacity(users.len());
+        for i in 0..users.len() {
+            x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
         }
 
+        let tuples = users
+            .into_iter()
+            .zip(x_coords.into_iter())
+            .collect::<Vec<(User, u64)>>();
+
+        let leaf_nodes = tuples
+            .par_iter()
+            // .into_par_iter()
+            .map(|(user, x_coord)| {
+                let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
+                let w_bytes: [u8; 32] = w.into();
+                let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
+                let user_salt = generate_key(&w_bytes, salt_s_bytes);
+
+                InputLeafNode {
+                    content: Content::new_leaf(
+                        user.liability,
+                        blinding_factor.into(),
+                        user.id.clone(),
+                        user_salt.into(),
+                    ),
+                    x_coord: *x_coord,
+                }
+            })
+            .collect::<Vec<InputLeafNode<Content>>>();
+
+        let user_mapping_ref = Arc::clone(&user_mapping);
+        let handle = thread::spawn(move || {
+            let mut my_user_mapping = user_mapping_ref.lock().unwrap();
+            tuples
+                .into_iter()
+                .for_each(|(user, x_coord)| {my_user_mapping.insert(user.id, x_coord);});
+        });
+
+        // let mut leaves = Vec::with_capacity(users.len());
+        // for user in users.into_iter() {
+        //     let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
+        //     i = i + 1;
+
+        //     let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
+        //     let w_bytes: [u8; 32] = w.into();
+        //     let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
+        //     let user_salt = generate_key(&w_bytes, salt_s_bytes);
+
+        //     leaves.push(InputLeafNode {
+        //         content: Content::new_leaf(
+        //             user.liability,
+        //             blinding_factor.into(),
+        //             user.id.clone(),
+        //             user_salt.into(),
+        //         ),
+        //         x_coord,
+        //     });
+
+        //     user_mapping.insert(user.id, x_coord);
+        // }
+
         let end = SystemTime::now();
         let dur = end.duration_since(start);
         println!("  end {:?}", end);
         println!("  duration {:?}", dur);
 
-        println!("leaves len {}", leaves.len());
+        // println!("leaves len {}", leaves.len());
+        println!("leaves len {}", leaf_nodes.len());
 
-        let start = SystemTime::now();
-        println!("  ndm start single threaded build {:?}", start);
+        // let start = SystemTime::now();
+        // println!("  ndm start single threaded build {:?}", start);
 
-        let end = SystemTime::now();
-        let dur = end.duration_since(start);
-        println!("  end {:?}", end);
-        println!("  duration {:?}", dur);
+        // let end = SystemTime::now();
+        // let dur = end.duration_since(start);
+        // println!("  end {:?}", end);
+        // println!("  duration {:?}", dur);
 
         let start = SystemTime::now();
         println!("  ndm start multi threaded build {:?}", start);
 
         let tree = Builder::new()
             .with_height(height)?
-            .with_leaf_nodes(leaves)?
+            .with_leaf_nodes(leaf_nodes)?
             .multi_threaded()?
             .build(new_padding_node_content)?;
 
@@ -131,6 +179,10 @@ impl NdmSmt {
         let dur = end.duration_since(start);
         println!("  end {:?}", end);
         println!("  duration {:?}", dur);
+
+        handle.join().unwrap();
+        let lock = Arc::try_unwrap(user_mapping).expect("Lock still has multiple owners");
+        let user_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
         Ok(NdmSmt {
             tree,
