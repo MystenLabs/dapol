@@ -2,14 +2,12 @@
 //!
 //! TODO more docs
 
-use rand::{rngs::ThreadRng, distributions::Uniform, thread_rng, Rng};
+use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::binary_tree::{
-    Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError,
-};
-use crate::inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
+use crate::binary_tree::{Coordinate, InputLeafNode, PathError, SparseBinaryTree, SparseBinaryTreeError};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
@@ -36,13 +34,7 @@ impl NdmSmt {
     /// Constructor.
     /// TODO more docs
     #[allow(dead_code)]
-    pub fn new(
-        master_secret: D256,
-        salt_b: D256,
-        salt_s: D256,
-        height: u8,
-        users: Vec<User>,
-    ) -> Result<Self, NdmSmtError> {
+    pub fn new(master_secret: D256, salt_b: D256, salt_s: D256, height: u8, users: Vec<User>) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
@@ -74,12 +66,7 @@ impl NdmSmt {
             let user_salt = generate_key(&w_bytes, salt_s_bytes);
 
             leaves.push(InputLeafNode {
-                content: Content::new_leaf(
-                    user.liability,
-                    blinding_factor.into(),
-                    user.id.clone(),
-                    user_salt.into(),
-                ),
+                content: Content::new_leaf(user.liability, blinding_factor.into(), user.id.clone(), user_salt.into()),
                 x_coord,
             });
 
@@ -118,10 +105,7 @@ impl NdmSmt {
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
-        let leaf_x_coord = self
-            .user_mapping
-            .get(user_id)
-            .ok_or(NdmSmtError::UserIdNotFound)?;
+        let leaf_x_coord = self.user_mapping.get(user_id).ok_or(NdmSmtError::UserIdNotFound)?;
 
         let path = self.tree.build_path_for(*leaf_x_coord)?;
 
@@ -133,13 +117,34 @@ impl NdmSmt {
     /// Use the default values for Bulletproof parameters:
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most real-world cases)
-    pub fn generate_inclusion_proof(
-        &self,
-        user_id: &UserId,
-    ) -> Result<InclusionProof<Hash>, NdmSmtError> {
+    pub fn generate_inclusion_proof(&self, user_id: &UserId) -> Result<InclusionProof<Hash>, NdmSmtError> {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
         self.generate_inclusion_proof_with_custom_range_proof_params(user_id, aggregation_factor, upper_bound_bit_length)
+    }
+
+    pub fn print_tree(&self) {
+        println!("tree data:");
+        println!("");
+
+        println!("treeheight {:?}", self.tree.get_height());
+        println!("");
+
+        println!("root.coord {:?}", self.tree.get_root().coord);
+        println!("root.content.liability {:?}", self.tree.get_root().content.liability);
+        println!("root.content.blinding_factor 0x{}", hex::encode(self.tree.get_root().content.blinding_factor.as_bytes()));
+        println!("root.content.commitment 0x{}", hex::encode(self.tree.get_root().content.commitment.compress().as_bytes()));
+        println!("root.content.hash {:?}", self.tree.get_root().content.hash);
+        println!("");
+
+        for (coord, content) in self.tree.get_store() {
+            println!("node.coord {:?}", coord);
+            println!("node.content.liability {:?}", content.content.liability);
+            println!("node.content.blinding_factor 0x{}", hex::encode(content.content.blinding_factor.as_bytes()));
+            println!("node.content.commitment 0x{}", hex::encode(content.content.commitment.compress().as_bytes()));
+            println!("node.content.hash {:?}", content.content.hash);
+            println!("");
+        }
     }
 }
 
@@ -202,9 +207,7 @@ impl RandomXCoordGenerator {
     /// collision, as long as i <= max_value.
     fn new_unique_x_coord(&mut self, i: u64) -> Result<u64, OutOfBoundsError> {
         if i > self.max_value {
-            return Err(OutOfBoundsError {
-                max_value: self.max_value,
-            });
+            return Err(OutOfBoundsError { max_value: self.max_value });
         }
 
         let range = Uniform::from(i..self.max_value);

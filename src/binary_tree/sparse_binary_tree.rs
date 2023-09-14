@@ -60,11 +60,7 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     // TODO there should be a warning if the height/leaves < min_sparsity (which was set to 2 in prev code)
     #[allow(dead_code)]
-    pub fn new<F>(
-        leaves: Vec<InputLeafNode<C>>,
-        height: u8,
-        new_padding_node_content: &F,
-    ) -> Result<SparseBinaryTree<C>, SparseBinaryTreeError>
+    pub fn new<F>(leaves: Vec<InputLeafNode<C>>, height: u8, new_padding_node_content: &F) -> Result<SparseBinaryTree<C>, SparseBinaryTreeError>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -98,16 +94,13 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
             // ensure no duplicates
             let duplicate_found = nodes
                 .iter()
-                .fold(
-                    (max_leaves, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
+                .fold((max_leaves, false), |(prev_x_coord, duplicate_found), node| {
+                    if duplicate_found || node.coord.x == prev_x_coord {
+                        (0, true)
+                    } else {
+                        (node.coord.x, false)
+                    }
+                })
                 .1;
             if duplicate_found {
                 return Err(SparseBinaryTreeError::DuplicateLeaves);
@@ -181,22 +174,13 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
         }
 
         // if the root node is not present then there is a bug in the above code
-        let root = nodes
-            .pop()
-            .expect("[Bug in tree constructor] Unable to find root node");
+        let root = nodes.pop().expect("[Bug in tree constructor] Unable to find root node");
 
-        assert!(
-            nodes.len() == 0,
-            "[Bug in tree constructor] Should be no nodes left to process"
-        );
+        assert!(nodes.len() == 0, "[Bug in tree constructor] Should be no nodes left to process");
 
         store.insert(root.coord.clone(), root.clone());
 
-        Ok(SparseBinaryTree {
-            root,
-            store,
-            height,
-        })
+        Ok(SparseBinaryTree { root, store, height })
     }
 }
 
@@ -242,6 +226,9 @@ impl<C: Clone> SparseBinaryTree<C> {
     pub fn get_root(&self) -> &Node<C> {
         &self.root
     }
+    pub fn get_store(&self) -> &HashMap<Coordinate, Node<C>> {
+        &self.store
+    }
     /// Attempt to find a Node via it's coordinate in the underlying store.
     pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
         self.store.get(coord)
@@ -284,9 +271,7 @@ impl<C: Clone> Node<C> {
     /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
     pub fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
-            NodeOrientation::Left => {
-                self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
-            }
+            NodeOrientation::Left => self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x,
             NodeOrientation::Right => false,
         }
     }
@@ -295,11 +280,7 @@ impl<C: Clone> Node<C> {
     pub fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
         match self.node_orientation() {
             NodeOrientation::Left => false,
-            NodeOrientation::Right => {
-                self.coord.x > 0
-                    && self.coord.y == other.coord.y
-                    && self.coord.x - 1 == other.coord.x
-            }
+            NodeOrientation::Right => self.coord.x > 0 && self.coord.y == other.coord.y && self.coord.x - 1 == other.coord.x,
         }
     }
 
@@ -343,10 +324,7 @@ impl<C: Clone> InputLeafNode<C> {
     fn to_node(self) -> Node<C> {
         Node {
             content: self.content,
-            coord: Coordinate {
-                x: self.x_coord,
-                y: 0,
-            },
+            coord: Coordinate { x: self.x_coord, y: 0 },
         }
     }
 }
@@ -432,11 +410,8 @@ mod tests {
     // TODO test all edge cases where the first and last 2 nodes are either all present or all not or partially present
     // TODO write a test that checks the total number of nodes in the tree is correct
 
+    use super::super::test_utils::{full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves, TestContent};
     use super::*;
-    use super::super::test_utils::{
-        full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
-        TestContent,
-    };
     use crate::testing_utils::assert_err;
 
     use primitive_types::H256;
@@ -493,31 +468,18 @@ mod tests {
 
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 7,
-            content: TestContent {
-                hash: H256::default(),
-                value: 1,
-            },
+            content: TestContent { hash: H256::default(), value: 1 },
         };
         let leaf_1 = InputLeafNode::<TestContent> {
             x_coord: 1,
-            content: TestContent {
-                hash: H256::default(),
-                value: 2,
-            },
+            content: TestContent { hash: H256::default(), value: 2 },
         };
         let leaf_2 = InputLeafNode::<TestContent> {
             x_coord: 7,
-            content: TestContent {
-                hash: H256::default(),
-                value: 3,
-            },
+            content: TestContent { hash: H256::default(), value: 3 },
         };
 
-        let tree = SparseBinaryTree::new(
-            vec![leaf_0, leaf_1, leaf_2],
-            height,
-            &get_padding_function(),
-        );
+        let tree = SparseBinaryTree::new(vec![leaf_0, leaf_1, leaf_2], height, &get_padding_function());
 
         assert_err!(tree, Err(SparseBinaryTreeError::DuplicateLeaves));
     }
@@ -528,10 +490,7 @@ mod tests {
 
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 0,
-            content: TestContent {
-                hash: H256::default(),
-                value: 1,
-            },
+            content: TestContent { hash: H256::default(), value: 1 },
         };
 
         let tree = SparseBinaryTree::new(vec![leaf_0], height, &get_padding_function());
