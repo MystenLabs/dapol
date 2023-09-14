@@ -40,7 +40,7 @@ where
         // TODO need to parallelize this, it's currently the same as the single-threaded
         // version Construct a sorted vector of leaf nodes and perform parameter
         // correctness checks.
-        let mut leaf_nodes = {
+        let leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
                 .into_iter()
@@ -89,7 +89,7 @@ where
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height;
-        let mut leaf_nodes = self.leaf_nodes;
+        let leaf_nodes = self.leaf_nodes;
         let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(BinaryTree {

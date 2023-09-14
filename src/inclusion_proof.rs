@@ -68,7 +68,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         let aggregation_index = aggregation_factor.apply_to(tree_height);
 
         let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
-        let mut nodes_for_individual_proofs =
+        let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
         let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {

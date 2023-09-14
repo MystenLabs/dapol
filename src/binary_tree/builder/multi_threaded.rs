@@ -42,7 +42,7 @@ where
         // TODO need to parallelize this, it's currently the same as the single-threaded
         // version Construct a sorted vector of leaf nodes and perform parameter
         // correctness checks.
-        let mut leaf_nodes = {
+        let leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
                 .into_iter()

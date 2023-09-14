@@ -1,7 +1,6 @@
-use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_HEIGHT};
+use super::{BinaryTree, Mergeable, MIN_HEIGHT};
 
 mod multi_threaded;
 use multi_threaded::MultiThreadedBuilder;
