@@ -1,3 +1,11 @@
+//! Builder pattern for the binary tree.
+//!
+//! There are 2 options for builder type:
+//! - [single-threaded]
+//! - [multi-threaded]
+//! Both require a vector of leaf nodes (which will live on the bottom layer
+//! of the tree) and the tree height.
+
 use std::fmt::Debug;
 
 use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
@@ -27,17 +35,28 @@ pub struct InputLeafNode<C> {
 // -------------------------------------------------------------------------------------------------
 // Implementation.
 
+/// Example:
+/// ```
+/// let tree = TreeBuilder::new()
+///     .with_height(height)?
+///     .with_leaf_nodes(leaf_nodes)?
+///     .with_single_threaded_build_algorithm()?
+///     .with_padding_node_generator(new_padding_node_content)
+///     .build()?;
+/// ```
 impl<C> TreeBuilder<C>
 where
     C: Clone + Mergeable,
 {
     pub fn new() -> Self {
         TreeBuilder {
-            height: None,     // TODO default to 32? Maybe here is not the best place
-            leaf_nodes: None, // TODO default to empty vec?
+            height: None,
+            leaf_nodes: None,
         }
     }
 
+    /// Set the height of the tree.
+    /// Will return an error if `height` is <= the min allowed height.
     pub fn with_height(mut self, height: u8) -> Result<Self, TreeBuildError> {
         if height < MIN_HEIGHT {
             return Err(TreeBuildError::HeightTooSmall);
@@ -50,6 +69,7 @@ where
     /// to represent in the tree. All leaf nodes are assumed to be on the bottom
     /// layer of the tree. Note the nodes do not have to be pre-sorted, sorting
     /// will occur downstream.
+    /// Will return an error if `leaf_nodes` is empty.
     pub fn with_leaf_nodes(
         mut self,
         leaf_nodes: Vec<InputLeafNode<C>>,
@@ -61,7 +81,7 @@ where
         Ok(self)
     }
 
-    /// High performance build algorithm.
+    /// High performance build algorithm utilizing parallelization.
     pub fn with_multi_threaded_build_algorithm<F>(self) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
     where
         C: Debug + Send + 'static,
