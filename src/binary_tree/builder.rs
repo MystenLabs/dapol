@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use super::{BinaryTree, Mergeable, MIN_HEIGHT};
+use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
 mod multi_threaded;
 use multi_threaded::MultiThreadedBuilder;
@@ -58,15 +58,22 @@ where
         Ok(self)
     }
 
-    pub fn multi_threaded(self) -> Result<MultiThreadedBuilder<C>, TreeBuildError> {
+    pub fn multi_threaded<F>(self) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
+    where
+        C: Debug + Send + 'static,
+        F: Fn(&Coordinate) -> C + Send + 'static + Sync,
+    {
         MultiThreadedBuilder::new(self)
     }
 
-    pub fn single_threaded(self) -> Result<SingleThreadedBuilder<C>, TreeBuildError> {
+    pub fn single_threaded<F>(self) -> Result<SingleThreadedBuilder<C, F>, TreeBuildError>
+    where
+        C: Debug,
+        F: Fn(&Coordinate) -> C,
+    {
         SingleThreadedBuilder::new(self)
     }
 }
-
 
 use thiserror::Error;
 

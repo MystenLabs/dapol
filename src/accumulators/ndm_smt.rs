@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    TreeBuilder, Coordinate, InputLeafNode, PathError, BinaryTree, TreeBuildError,
+    BinaryTree, Coordinate, InputLeafNode, PathError, TreeBuildError, TreeBuilder,
 };
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
@@ -125,7 +125,10 @@ impl NdmSmt {
         });
         // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
         use std::mem::size_of_val;
-        println!("The size of `input_leaf_nodes` is {}", size_of_val(&*leaf_nodes));
+        println!(
+            "The size of `input_leaf_nodes` is {}",
+            size_of_val(&*leaf_nodes)
+        );
 
         // let mut leaves = Vec::with_capacity(users.len());
         // for user in users.into_iter() {
@@ -165,7 +168,8 @@ impl NdmSmt {
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes.clone())?
             .single_threaded()?
-            .build(new_padding_node_content)?;
+            .with_padding_node_generator(new_padding_node_content)
+            .build()?;
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);
@@ -179,7 +183,8 @@ impl NdmSmt {
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes)?
             .multi_threaded()?
-            .build(new_padding_node_content)?;
+            .with_padding_node_generator(new_padding_node_content)
+            .build()?;
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);

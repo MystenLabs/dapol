@@ -9,17 +9,19 @@ use super::{TreeBuildError, TreeBuilder};
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
-pub struct SingleThreadedBuilder<C>
+pub struct SingleThreadedBuilder<C, F>
 where
     C: Clone,
 {
     height: u8,
     leaf_nodes: Vec<Node<C>>,
+    padding_node_generator: Option<F>,
 }
 
-impl<C> SingleThreadedBuilder<C>
+impl<C, F> SingleThreadedBuilder<C, F>
 where
-    C: Clone + Mergeable,
+    C: Debug + Clone + Mergeable,
+    F: Fn(&Coordinate) -> C,
 {
     pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
         use super::super::num_bottom_layer_nodes;
@@ -80,14 +82,23 @@ where
             leaf_nodes
         };
 
-        Ok(SingleThreadedBuilder { height, leaf_nodes })
+        Ok(SingleThreadedBuilder {
+            height,
+            leaf_nodes,
+            padding_node_generator: None,
+        })
     }
 
-    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
-    where
-        C: Debug,
-        F: Fn(&Coordinate) -> C,
-    {
+    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
+        self.padding_node_generator = Some(padding_node_generator);
+        self
+    }
+
+    pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
+        let padding_node_generator = self
+            .padding_node_generator
+            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+
         let height = self.height;
         let leaf_nodes = self.leaf_nodes;
         let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);

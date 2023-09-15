@@ -1,7 +1,34 @@
-//! TODO give explanation for the build algorithm.
+//! Binary tree builder that utilizes parallelization to get the best build
+//! time.
+//!
+//! The build algorithm starts from the root node and makes it's way down
+//! to the bottom layer, splitting off a new thread at each junction.
+//! A recursive function is used to do the traversal since every node above
+//! the bottom layer can be viewed as the root node of a sub-tree of the main
+//! tree. So every recursive iteration has an associated thread, root node that
+//! needs building, and 2 child nodes that it will use to build the root node.
+//! Construction of the child nodes is done using a recursive call. The base
+//! case happens when a thread reaches a layer above the bottom layer, where the
+//! children are the leaf nodes inputted by the original calling code.
+//!
+//! Because the tree is sparse not all of the paths to the bottom layer need
+//! to be traversed--only those paths that will end in a bottom-layer leaf
+//! node. At each junction a thread will first
+//! determine if it needs to traverse either the left child, the right child
+//! or both. If both then it will spawn a new thread to traverse the right
+//! child before traversing the left itself, and if only left/right need to be
+//! traversed then it will do so itself without spawning a new thread. Note that
+//! children that do not need traversal are padding nodes, and are constructed
+//! using the closure given by the calling code. Each
+//! thread uses a sorted vector of bottom-layer leaf nodes to determine if a
+//! child needs traversing: the idea is that at each recursive iteration the
+//! vector should contain all the leaf nodes that will live at the bottom of
+//! the sub-tree (no more and no less). The first iteration will have all the
+//! input leaf nodes, and will split the vector between the left & right
+//! recursive calls, each of which will split the vector to their children, etc.
 
-use std::fmt::Debug;
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use std::sync::Arc;
 use std::thread;
@@ -10,25 +37,37 @@ use super::super::{
     num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, NodeOrientation,
     RightSibling, Sibling,
 };
-use super::{TreeBuilder, TreeBuildError, BinaryTree};
+use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
-pub struct MultiThreadedBuilder<C>
+pub struct MultiThreadedBuilder<C, F>
 where
     C: Clone,
 {
     height: u8,
     leaf_nodes: Vec<Node<C>>,
+    padding_node_generator: Option<F>,
 }
 
-impl<C> MultiThreadedBuilder<C>
+/// Example:
+/// ```
+/// let tree = TreeBuilder::new()
+///     .with_height(height)?
+///     .with_leaf_nodes(leaf_nodes)?
+///     .multi_threaded()?
+///     .with_padding_node_generator(new_padding_node_content)
+///     .build()?;
+/// ```
+impl<C, F> MultiThreadedBuilder<C, F>
 where
-    C: Clone + Mergeable,
+    C: Debug + Clone + Mergeable + Send + 'static,
+    F: Fn(&Coordinate) -> C + Send + 'static + Sync,
 {
+    /// Constructor for the builder, to be called by the [super][TreeBuilder].
     pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
-        // require certain fields to be set
+        // Require certain fields to be set on the parent builder.
         let input_leaf_nodes = parent_builder
             .leaf_nodes
             .ok_or(TreeBuildError::NoLeafNodesProvided)?;
@@ -84,14 +123,23 @@ where
             leaf_nodes
         };
 
-        Ok(MultiThreadedBuilder { height, leaf_nodes })
+        Ok(MultiThreadedBuilder {
+            height,
+            leaf_nodes,
+            padding_node_generator: None,
+        })
     }
 
-    pub fn build<F>(self, padding_node_generator: F) -> Result<BinaryTree<C>, TreeBuildError>
-    where
-        C: Debug + Send + 'static,
-        F: Fn(&Coordinate) -> C + Send + 'static + Sync,
-    {
+    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
+        self.padding_node_generator = Some(padding_node_generator);
+        self
+    }
+    /// Construct the binary tree.
+    pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
+        let padding_node_generator = self
+            .padding_node_generator
+            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+
         let height = self.height;
         let x_coord_min = 0;
         let x_coord_max = num_bottom_layer_nodes(height) - 1;
