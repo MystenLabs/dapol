@@ -39,9 +39,6 @@ where
             return Err(TreeBuildError::TooManyLeaves);
         }
 
-        // TODO need to parallelize this, it's currently the same as the single-threaded
-        // version Construct a sorted vector of leaf nodes and perform parameter
-        // correctness checks.
         let leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
@@ -61,23 +58,15 @@ where
             }
 
             // Ensure no duplicates.
-            let duplicate_found = leaf_nodes
-                .iter()
-                .fold(
-                    (max_leaf_nodes, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
-                .1;
-
-            if duplicate_found {
-                return Err(TreeBuildError::DuplicateLeaves);
-            }
+            let i = leaf_nodes.iter();
+            let i_plus_1 = {
+                let mut i = leaf_nodes.iter();
+                i.next();
+                i
+            };
+            i.zip(i_plus_1)
+                .find(|(prev, curr)| prev.coord.x == curr.coord.x)
+                .ok_or(TreeBuildError::DuplicateLeaves)?;
 
             leaf_nodes
         };

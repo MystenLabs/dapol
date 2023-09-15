@@ -52,7 +52,7 @@ where
         leaf_nodes: Vec<InputLeafNode<C>>,
     ) -> Result<Self, TreeBuildError> {
         if leaf_nodes.len() < 1 {
-            return Err(TreeBuildError::NoLeaves);
+            return Err(TreeBuildError::EmptyLeaves);
         }
         self.leaf_nodes = Some(leaf_nodes);
         Ok(self)
@@ -87,8 +87,8 @@ pub enum TreeBuildError {
     NoPaddingNodeGeneratorProvided,
     #[error("Too many leaves for the given height")]
     TooManyLeaves,
-    #[error("Must provide at least 1 leaf")]
-    NoLeaves,
+    #[error("Leaf nodes cannot be empty")]
+    EmptyLeaves,
     #[error("X coords for leaves must be less than 2^height")]
     InvalidXCoord,
     #[error("Height cannot be smaller than {MIN_HEIGHT:?}")]

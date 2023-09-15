@@ -32,6 +32,7 @@ use std::fmt::Debug;
 
 use std::sync::Arc;
 use std::thread;
+use rayon::prelude::*;
 
 use super::super::{
     num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, NodeOrientation,
@@ -67,6 +68,11 @@ where
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
+    ///
+    /// The leaf node vector is cleaned in the following ways:
+    /// - sorted according to their x-coord
+    /// - all x-coord <= max
+    /// - checked for duplicates (duplicate if same x-coords)
     pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
         // Require certain fields to be set on the parent builder.
         let input_leaf_nodes = parent_builder
@@ -81,18 +87,15 @@ where
             return Err(TreeBuildError::TooManyLeaves);
         }
 
-        // TODO need to parallelize this, it's currently the same as the single-threaded
-        // version Construct a sorted vector of leaf nodes and perform parameter
-        // correctness checks.
         let leaf_nodes = {
             // Translate InputLeafNode to Node.
             let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
-                .into_iter()
+                .into_par_iter()
                 .map(|leaf| leaf.to_node())
                 .collect();
 
             // Sort by x_coord ascending.
-            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+            leaf_nodes.par_sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
             // Make sure all x_coord < max.
             if leaf_nodes
@@ -103,23 +106,15 @@ where
             }
 
             // Ensure no duplicates.
-            let duplicate_found = leaf_nodes
-                .iter()
-                .fold(
-                    (max_leaf_nodes, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
-                .1;
-
-            if duplicate_found {
-                return Err(TreeBuildError::DuplicateLeaves);
-            }
+            let i = leaf_nodes.iter();
+            let i_plus_1 = {
+                let mut i = leaf_nodes.iter();
+                i.next();
+                i
+            };
+            i.zip(i_plus_1)
+                .find(|(prev, curr)| prev.coord.x == curr.coord.x)
+                .ok_or(TreeBuildError::DuplicateLeaves)?;
 
             leaf_nodes
         };
@@ -282,10 +277,15 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
+/// Parameters for the recursive build function.
+///
 /// `x_coord_mid` is used to split the leaves into left and right vectors.
 /// Nodes in the left vector have x-coord <= mid, and
 /// those in the right vector have x-coord > mid.
-// TODO more docs
+///
+/// `max_thread_spawn_height` is there to prevent more threads being spawned
+/// than there are cores to execute them. If too many threads are spawned then
+/// the parallelization can actually be detrimental to the run-time.
 #[derive(Clone)]
 struct RecursionParams {
     pub x_coord_min: u64,
@@ -492,3 +492,8 @@ where
 
     pair.merge()
 }
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+// TODO
