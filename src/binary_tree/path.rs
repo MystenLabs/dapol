@@ -44,7 +44,7 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
         let mut siblings = Vec::with_capacity(self.get_height() as usize);
 
         for y in 0..self.get_height() - 1 {
-            let x_coord = match current_node.node_orientation() {
+            let x_coord = match current_node.orientation() {
                 NodeOrientation::Left => current_node.coord.x + 1,
                 NodeOrientation::Right => current_node.coord.x - 1,
             };

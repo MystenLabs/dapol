@@ -131,7 +131,7 @@ impl<C: Clone> Node<C> {
     /// Since we are working with a binary tree we can tell if the node is a
     /// left sibling of the above layer by checking the x_coord modulus 2.
     /// Since x_coord starts from 0 we check if the modulus is equal to 0.
-    fn node_orientation(&self) -> NodeOrientation {
+    fn orientation(&self) -> NodeOrientation {
         if self.coord.x % 2 == 0 {
             NodeOrientation::Left
         } else {
@@ -142,7 +142,7 @@ impl<C: Clone> Node<C> {
     /// Return true if self is a) a left sibling and b) lives just to the left
     /// of the other node.
     fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
-        match self.node_orientation() {
+        match self.orientation() {
             NodeOrientation::Left => {
                 self.coord.y == other.coord.y && self.coord.x + 1 == other.coord.x
             }
@@ -153,7 +153,7 @@ impl<C: Clone> Node<C> {
     /// Return true if self is a) a right sibling and b) lives just to the right
     /// of the other node.
     fn is_right_sibling_of(&self, other: &Node<C>) -> bool {
-        match self.node_orientation() {
+        match self.orientation() {
             NodeOrientation::Left => false,
             NodeOrientation::Right => {
                 self.coord.x > 0
@@ -166,7 +166,7 @@ impl<C: Clone> Node<C> {
     /// Return the coordinates of this node's sibling, whether that be a right
     /// or a left sibling.
     fn get_sibling_coord(&self) -> Coordinate {
-        match self.node_orientation() {
+        match self.orientation() {
             NodeOrientation::Left => Coordinate {
                 y: self.coord.y,
                 x: self.coord.x + 1,
@@ -245,7 +245,7 @@ struct MatchedPair<C: Mergeable + Clone> {
 impl<C: Clone> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {
-        match node.node_orientation() {
+        match node.orientation() {
             NodeOrientation::Left => Sibling::Left(LeftSibling(node)),
             NodeOrientation::Right => Sibling::Right(RightSibling(node)),
         }

@@ -207,7 +207,7 @@ impl<C: Clone> LeftSibling<C> {
     /// check and should never actually happen unless code is changed.
     fn from_node(node: Node<C>) -> Self {
         // TODO change the name of this function: remove 'node'
-        match node.node_orientation() {
+        match node.orientation() {
             NodeOrientation::Right => panic!(
                 "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
             ),
@@ -240,7 +240,7 @@ impl<C: Clone> RightSibling<C> {
     /// state is unrecoverable, panicking is the best option. It is a sanity
     /// check and should never actually happen unless code is changed.
     fn from_node(node: Node<C>) -> Self {
-        match node.node_orientation() {
+        match node.orientation() {
             NodeOrientation::Left => panic!(
                 "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
             ),
