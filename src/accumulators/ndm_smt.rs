@@ -167,7 +167,7 @@ impl NdmSmt {
         let tree_2 = TreeBuilder::new()
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes.clone())?
-            .single_threaded()?
+            .with_single_threaded_build_algorithm()?
             .with_padding_node_generator(new_padding_node_content)
             .build()?;
 
@@ -182,7 +182,7 @@ impl NdmSmt {
         let tree = TreeBuilder::new()
             .with_height(height)?
             .with_leaf_nodes(leaf_nodes)?
-            .multi_threaded()?
+            .with_multi_threaded_build_algorithm()?
             .with_padding_node_generator(new_padding_node_content)
             .build()?;
 

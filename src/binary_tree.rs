@@ -40,6 +40,9 @@ pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
 mod path;
 pub use path::{Path, PathError};
 
+mod utils;
+use utils::{ErrOnSome, ErrUnlessTrue};
+
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
 

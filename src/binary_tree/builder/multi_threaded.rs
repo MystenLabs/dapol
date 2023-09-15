@@ -35,8 +35,8 @@ use std::sync::Arc;
 use std::thread;
 
 use super::super::{
-    num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, NodeOrientation,
-    RightSibling, Sibling,
+    num_bottom_layer_nodes, Coordinate, ErrOnSome, ErrUnlessTrue, LeftSibling, MatchedPair,
+    Mergeable, Node, NodeOrientation, RightSibling, Sibling,
 };
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
@@ -57,7 +57,7 @@ where
 /// let tree = TreeBuilder::new()
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
-///     .multi_threaded()?
+///     .with_single_threaded_build_algorithm()?
 ///     .with_padding_node_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
@@ -98,12 +98,10 @@ where
             leaf_nodes.par_sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
             // Make sure all x_coord < max.
-            if leaf_nodes
+            leaf_nodes
                 .last()
-                .is_some_and(|node| node.coord.x >= max_leaf_nodes)
-            {
-                return Err(TreeBuildError::InvalidXCoord);
-            }
+                .map(|node| node.coord.x < max_leaf_nodes)
+                .err_unless_true(TreeBuildError::InvalidXCoord)?;
 
             // Ensure no duplicates.
             let i = leaf_nodes.iter();
@@ -112,12 +110,9 @@ where
                 i.next();
                 i
             };
-            if i.zip(i_plus_1)
+            i.zip(i_plus_1)
                 .find(|(prev, curr)| prev.coord.x == curr.coord.x)
-                .is_some()
-            {
-                return Err(TreeBuildError::DuplicateLeaves);
-            }
+                .err_on_some(TreeBuildError::DuplicateLeaves)?;
 
             leaf_nodes
         };
@@ -129,6 +124,9 @@ where
         })
     }
 
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
     pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
         self.padding_node_generator = Some(padding_node_generator);
         self

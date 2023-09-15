@@ -46,7 +46,10 @@ where
         Ok(self)
     }
 
-    /// Note the nodes do not have to be pre-sorted, they are sorted here.
+    /// The leaf nodes are those that correspond to the data that we are trying
+    /// to represent in the tree. All leaf nodes are assumed to be on the bottom
+    /// layer of the tree. Note the nodes do not have to be pre-sorted, sorting
+    /// will occur downstream.
     pub fn with_leaf_nodes(
         mut self,
         leaf_nodes: Vec<InputLeafNode<C>>,
@@ -58,15 +61,17 @@ where
         Ok(self)
     }
 
-    pub fn multi_threaded<F>(self) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
+    /// High performance build algorithm.
+    pub fn with_multi_threaded_build_algorithm<F>(self) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
     where
         C: Debug + Send + 'static,
-        F: Fn(&Coordinate) -> C + Send + 'static + Sync,
+        F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         MultiThreadedBuilder::new(self)
     }
 
-    pub fn single_threaded<F>(self) -> Result<SingleThreadedBuilder<C, F>, TreeBuildError>
+    /// Regular build algorithm.
+    pub fn with_single_threaded_build_algorithm<F>(self) -> Result<SingleThreadedBuilder<C, F>, TreeBuildError>
     where
         C: Debug,
         F: Fn(&Coordinate) -> C,

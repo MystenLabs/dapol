@@ -1,8 +1,18 @@
+//! Binary tree builder that does not utilize parallelization.
+//!
+//! It is recommended to rather use [super][multi_threaded] for better
+//! performance.
+//!
+//! The build algorithm starts with the inputted bottom-layer leaf nodes, adds
+//! padding nodes where required, and then constructs the next layer by merging
+//! pairs of sibling nodes together.
+
 use std::collections::HashMap;
 use std::fmt::Debug;
 
 use super::super::{
-    BinaryTree, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, RightSibling, Sibling,
+    BinaryTree, Coordinate, ErrOnSome, ErrUnlessTrue, LeftSibling, MatchedPair, Mergeable, Node,
+    RightSibling, Sibling,
 };
 use super::{TreeBuildError, TreeBuilder};
 
@@ -18,6 +28,15 @@ where
     padding_node_generator: Option<F>,
 }
 
+/// Example:
+/// ```
+/// let tree = TreeBuilder::new()
+///     .with_height(height)?
+///     .with_leaf_nodes(leaf_nodes)?
+///     .with_single_threaded_build_algorithm()?
+///     .with_padding_node_generator(new_padding_node_content)
+///     .build()?;
+/// ```
 impl<C, F> SingleThreadedBuilder<C, F>
 where
     C: Debug + Clone + Mergeable,
@@ -50,12 +69,10 @@ where
             leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
             // Make sure all x_coord < max.
-            if leaf_nodes
+            leaf_nodes
                 .last()
-                .is_some_and(|node| node.coord.x >= max_leaf_nodes)
-            {
-                return Err(TreeBuildError::InvalidXCoord);
-            }
+                .map(|node| node.coord.x < max_leaf_nodes)
+                .err_unless_true(TreeBuildError::InvalidXCoord)?;
 
             // Ensure no duplicates.
             let i = leaf_nodes.iter();
@@ -64,12 +81,9 @@ where
                 i.next();
                 i
             };
-            if i.zip(i_plus_1)
+            i.zip(i_plus_1)
                 .find(|(prev, curr)| prev.coord.x == curr.coord.x)
-                .is_some()
-            {
-                return Err(TreeBuildError::DuplicateLeaves);
-            }
+                .err_on_some(TreeBuildError::DuplicateLeaves)?;
 
             leaf_nodes
         };
@@ -81,6 +95,9 @@ where
         })
     }
 
+    /// New padding nodes are given by a closure. Why a closure? Because
+    /// creating a padding node may require context outside of this scope, where
+    /// type C is defined, for example.
     pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
         self.padding_node_generator = Some(padding_node_generator);
         self
@@ -145,17 +162,20 @@ impl<C: Clone> RightSibling<C> {
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
-/// Create a new tree given the leaves, height and the padding node creation
-/// function. New padding nodes are given by a closure. Why a closure?
-/// Because creating a padding node may require context outside of this
-/// scope, where type C is defined, for example.
+type Store<C> = HashMap<Coordinate, Node<C>>;
+type RootNode<C> = Node<C>;
+
+/// Construct a new binary tree.
+///
+/// The nodes are stored in a hashmap, which is returned along with the root node
+/// (which is also stored in the hashmap).
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
 fn build_tree<C, F>(
     mut nodes: Vec<Node<C>>,
     height: u8,
     new_padding_node_content: F,
-) -> (HashMap<Coordinate, Node<C>>, Node<C>)
+) -> (Store<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
