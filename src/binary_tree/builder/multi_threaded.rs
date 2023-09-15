@@ -60,10 +60,11 @@ where
 ///     .with_padding_node_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
+/// The type traits on `C` & `F` are required for thread spawning.
 impl<C, F> MultiThreadedBuilder<C, F>
 where
     C: Debug + Clone + Mergeable + Send + 'static,
-    F: Fn(&Coordinate) -> C + Send + 'static + Sync,
+    F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
     pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
@@ -134,22 +135,15 @@ where
         self.padding_node_generator = Some(padding_node_generator);
         self
     }
+
     /// Construct the binary tree.
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         let padding_node_generator = self
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        let height = self.height;
-        let x_coord_min = 0;
-        let x_coord_max = num_bottom_layer_nodes(height) - 1;
-        let y = height - 1;
-
         let root = build_node(
-            x_coord_min,
-            x_coord_max,
-            y,
-            height,
+            RecursionParams::new(self.height),
             self.leaf_nodes,
             Arc::new(padding_node_generator),
         );
@@ -160,7 +154,7 @@ where
         Ok(BinaryTree {
             root,
             store,
-            height,
+            height: self.height,
         })
     }
 }
@@ -193,6 +187,9 @@ enum NumNodes {
     SomeNodes(usize),
 }
 
+/// Each node (except the root node) has a sibling. This is guaranteed by
+/// the fact that we use a *full* binary tree. Each node is either a
+/// left or a right sibling.
 impl<C: Clone> LeftSibling<C> {
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
@@ -216,12 +213,17 @@ impl<C: Clone> LeftSibling<C> {
     fn from_node(node: Node<C>) -> Self {
         // TODO change the name of this function: remove 'node'
         match node.node_orientation() {
-            NodeOrientation::Right => panic!("[bug in the ] not left node"),
+            NodeOrientation::Right => panic!(
+                "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
+            ),
             NodeOrientation::Left => Self(node),
         }
     }
 }
 
+/// Each node (except the root node) has a sibling. This is guaranteed by
+/// the fact that we use a *full* binary tree. Each node is either a
+/// left or a right sibling.
 impl<C: Clone> RightSibling<C> {
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
@@ -244,8 +246,35 @@ impl<C: Clone> RightSibling<C> {
     /// check and should never actually happen unless code is changed.
     fn from_node(node: Node<C>) -> Self {
         match node.node_orientation() {
-            NodeOrientation::Left => panic!("TODO not right node"),
+            NodeOrientation::Left => panic!(
+                "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
+            ),
             NodeOrientation::Right => Self(node),
+        }
+    }
+}
+
+impl<C: Mergeable + Clone> MatchedPair<C> {
+    /// Create a pair of left and right sibling nodes from only 1 node and the
+    /// padding node generation function.
+    ///
+    /// This function is made to be used by multiple threads that share
+    /// `new_padding_node_content`.
+    fn from_node<F>(node: Node<C>, new_padding_node_content: Arc<F>) -> Self
+    where
+        C: Send + 'static,
+        F: Fn(&Coordinate) -> C + Send + Sync + 'static,
+    {
+        let sibling = Sibling::from_node(node);
+        match sibling {
+            Sibling::Left(left) => MatchedPair {
+                right: left.new_sibling_padding_node_arc(new_padding_node_content),
+                left,
+            },
+            Sibling::Right(right) => MatchedPair {
+                left: right.new_sibling_padding_node_arc(new_padding_node_content),
+                right,
+            },
         }
     }
 }
@@ -253,14 +282,75 @@ impl<C: Clone> RightSibling<C> {
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
-// TODO need more docs
-/// Recursive multi-threaded function for building a node by exploring the tree
-/// from top-to-bottom.
+/// `x_coord_mid` is used to split the leaves into left and right vectors.
+/// Nodes in the left vector have x-coord <= mid, and
+/// those in the right vector have x-coord > mid.
+// TODO more docs
+#[derive(Clone)]
+struct RecursionParams {
+    pub x_coord_min: u64,
+    pub x_coord_mid: u64,
+    pub x_coord_max: u64,
+    pub y: u8,
+    pub height: u8,
+    pub max_thread_spawn_height: u8,
+}
+
+impl RecursionParams {
+    fn new(height: u8) -> Self {
+        let x_coord_min = 0;
+        // x-coords start from 0, hence the `- 1`.
+        let x_coord_max = num_bottom_layer_nodes(height) - 1;
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+        // y-coords also start from 0, hence the `- 1`.
+        let y = height - 1;
+        // TODO should be a parameter
+        let max_thread_spawn_height = height - 4;
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y,
+            height,
+            max_thread_spawn_height,
+        }
+    }
+
+    fn into_left_child(mut self) -> Self {
+        self.x_coord_max = self.x_coord_mid;
+        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
+        self.y -= 1;
+        self
+    }
+
+    fn into_right_child(mut self) -> Self {
+        self.x_coord_min = self.x_coord_mid + 1;
+        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
+        self.y -= 1;
+        self
+    }
+}
+
+/// Recursive, multi-threaded function for building a node by exploring the tree
+/// from top-to-bottom. See docs at the top of the file for an explanation of
+/// how it works.
+///
+/// `x_coord_min` and `x_coord_max` are the bounds of the sub-tree with respect
+/// to the x-coords of the bottom layer of the main tree. Thus
+/// `x_coord_max - x_coord_min - 1` will always be a power of 2. Example: if you
+/// have a tree with a height of 5 then its bottom layer nodes will have
+/// x-coord ranging from 0 to 15 (min & max), and the sub-tree whose root node
+/// is the right child of the main tree's root node will have leaf nodes whose
+/// x-coords range from 8 to 15 (min & max).
+///
+/// `height` is a natural number (1 onwards), while `y` is a counting number (0
+/// onwards). `height` represents the height of the whole tree, while `y` is
+/// is the height of the sub-tree associated with a specific recursive
+/// iteration.
 ///
 /// `leaves` must be sorted according to the nodes' x-coords. There is no panic
 /// protection that checks for this.
-///
-/// Height is a natural number, while y is a counting number.
 ///
 /// Node length should never exceed the max number of bottom-layer nodes for a
 /// sub-tree with height `y` since this means there are more nodes than can fit
@@ -270,10 +360,7 @@ impl<C: Clone> RightSibling<C> {
 /// original calling code or there is a bug in the splitting algorithm in this
 /// function. There is no recovery from these 2 states so we panic.
 fn build_node<C, F>(
-    x_coord_min: u64,
-    x_coord_max: u64,
-    y: u8,
-    height: u8,
+    params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
 ) -> Node<C>
@@ -281,9 +368,8 @@ where
     C: Debug + Clone + Mergeable + Send + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
-    // TODO maybe we should return a result instead of panicking for these asserts?
     {
-        let max_nodes = num_bottom_layer_nodes(y + 1);
+        let max_nodes = num_bottom_layer_nodes(params.y + 1);
         assert!(
             leaves.len() <= max_nodes as usize,
             "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
@@ -298,47 +384,40 @@ where
         );
 
         assert!(
-            x_coord_min % 2 == 0,
+            params.x_coord_min % 2 == 0,
             "[bug in multi-threaded node builder] x_coord_min ({}) must be a multiple of 2 or 0",
-            x_coord_min
+            params.x_coord_min
         );
 
         assert!(
-            x_coord_max % 2 == 1,
+            params.x_coord_max % 2 == 1,
             "[bug in multi-threaded node builder] x_coord_max ({}) must not be a multiple of 2",
-            x_coord_max
+            params.x_coord_max
+        );
+
+        let v = params.x_coord_max - params.x_coord_min + 1;
+        assert!(
+            (v & (v - 1)) == 0,
+            "[bug in multi-threaded node builder] x_coord_max - x_coord_min + 1 ({}) must be a power of 2",
+            v
         );
     }
 
     // Base case: reached the 2nd-to-bottom layer.
-    if y == 1 {
+    // There are either 2 or 1 leaves left (which is checked above).
+    if params.y == 1 {
         let pair = if leaves.len() == 2 {
             let left = LeftSibling::from_node(leaves.remove(0));
             let right = RightSibling::from_node(leaves.remove(0));
             MatchedPair { left, right }
         } else {
-            let node = Sibling::from_node(leaves.remove(0));
-            match node {
-                Sibling::Left(left) => MatchedPair {
-                    right: left.new_sibling_padding_node_arc(new_padding_node_content),
-                    left,
-                },
-                Sibling::Right(right) => MatchedPair {
-                    left: right.new_sibling_padding_node_arc(new_padding_node_content),
-                    right,
-                },
-            }
+            MatchedPair::from_node(leaves.remove(0), new_padding_node_content)
         };
 
         return pair.merge();
     }
 
-    // This value is used to split the leaves into left and right.
-    // Nodes in the left vector have x-coord <= mid, and
-    // those in the right vector have x-coord > mid.
-    let x_coord_mid = (x_coord_min + x_coord_max) / 2;
-
-    let pair = match get_num_nodes_left_of(x_coord_mid, &leaves) {
+    let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::SomeNodes(index) => {
             let right_leaves = leaves.split_off(index + 1);
             let left_leaves = leaves;
@@ -347,16 +426,13 @@ where
 
             // Split off a thread to build the right child, but only do this if we are above
             // a certain height otherwise we are at risk of spawning too many threads.
-            // TODO make this 4 a variable, actually we should make a struct that contains a
-            // bunch of the static data not needed in every iteration of the recursion
-            if y > height - 4 {
+            if params.y > params.max_thread_spawn_height {
+                let params_clone = params.clone();
                 let right_handler = thread::spawn(move || -> RightSibling<C> {
+                    // TODO get rid of this after testing
                     println!("thread spawned");
                     let node = build_node(
-                        x_coord_mid + 1,
-                        x_coord_max,
-                        y - 1,
-                        height,
+                        params_clone.into_right_child(),
                         right_leaves,
                         new_padding_node_content_ref,
                     );
@@ -364,36 +440,27 @@ where
                 });
 
                 let left = LeftSibling::from_node(build_node(
-                    x_coord_min,
-                    x_coord_mid,
-                    y - 1,
-                    height,
+                    params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
                 ));
 
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
-                let right = right_handler
-                    .join()
-                    .expect("Couldn't join on the associated thread");
+                let right = right_handler.join().expect(
+                    "[bug in multi-threaded node builder] Couldn't join on the associated thread",
+                );
 
                 MatchedPair { left, right }
             } else {
                 let right = RightSibling::from_node(build_node(
-                    x_coord_mid + 1,
-                    x_coord_max,
-                    y - 1,
-                    height,
+                    params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
                 ));
 
                 let left = LeftSibling::from_node(build_node(
-                    x_coord_min,
-                    x_coord_mid,
-                    y - 1,
-                    height,
+                    params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
                 ));
@@ -404,10 +471,7 @@ where
         NumNodes::AllNodes => {
             // Go down left child only (there are no leaves living on the right side).
             let left = LeftSibling::from_node(build_node(
-                x_coord_min,
-                x_coord_mid,
-                y - 1,
-                height,
+                params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
             ));
@@ -417,10 +481,7 @@ where
         NumNodes::NoNodes => {
             // Go down right child only (there are no leaves living on the left side).
             let right = RightSibling::from_node(build_node(
-                x_coord_mid + 1,
-                x_coord_max,
-                y - 1,
-                height,
+                params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
             ));
