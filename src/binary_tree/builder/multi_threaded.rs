@@ -30,9 +30,9 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use rayon::prelude::*;
 use std::sync::Arc;
 use std::thread;
-use rayon::prelude::*;
 
 use super::super::{
     num_bottom_layer_nodes, Coordinate, LeftSibling, MatchedPair, Mergeable, Node, NodeOrientation,
@@ -112,9 +112,12 @@ where
                 i.next();
                 i
             };
-            i.zip(i_plus_1)
+            if i.zip(i_plus_1)
                 .find(|(prev, curr)| prev.coord.x == curr.coord.x)
-                .ok_or(TreeBuildError::DuplicateLeaves)?;
+                .is_some()
+            {
+                return Err(TreeBuildError::DuplicateLeaves);
+            }
 
             leaf_nodes
         };

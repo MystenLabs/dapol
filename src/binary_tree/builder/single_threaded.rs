@@ -64,9 +64,12 @@ where
                 i.next();
                 i
             };
-            i.zip(i_plus_1)
+            if i.zip(i_plus_1)
                 .find(|(prev, curr)| prev.coord.x == curr.coord.x)
-                .ok_or(TreeBuildError::DuplicateLeaves)?;
+                .is_some()
+            {
+                return Err(TreeBuildError::DuplicateLeaves);
+            }
 
             leaf_nodes
         };
