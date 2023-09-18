@@ -25,8 +25,10 @@ pub struct TreeBuilder<C> {
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
 }
 
-/// A simpler version of the [Node] struct that is used as input to instantiate
-/// the tree builder.
+/// A simpler version of the [Node] struct that is used as input to
+/// the tree builder. Since the node parameters are all assumed to be on the
+/// bottom layer of the tree only the x-coord is required, the y-coord is fixed
+/// and determined by the tree height.
 #[derive(Debug, Clone)]
 pub struct InputLeafNode<C> {
     pub content: C,

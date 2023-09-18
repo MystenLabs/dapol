@@ -41,8 +41,8 @@ mod path;
 pub use path::{Path, PathError};
 
 mod utils;
-use utils::{ErrOnSome, ErrUnlessTrue};
 pub use utils::num_bottom_layer_nodes;
+use utils::{ErrOnSome, ErrUnlessTrue};
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
@@ -95,6 +95,7 @@ pub trait Mergeable {
 // -------------------------------------------------------------------------------------------------
 // Accessor methods.
 
+// TODO remove the 'get'
 impl<C: Clone> BinaryTree<C> {
     pub fn get_height(&self) -> u8 {
         self.height
@@ -118,7 +119,14 @@ impl<C: Clone> BinaryTree<C> {
 // Implementations.
 
 impl Coordinate {
+    // TODO 256 bits is not the min space required, 8 + 64 = 72 bits is
     /// Copy internal data and return as bytes.
+    ///
+    /// [Coordinate] is encoded into a 256-bit storage space, using a byte
+    /// array. The y-coord takes up a byte only, so it is placed at the
+    /// beginning of the array. The x-coord takes up 8 bytes and it occupies
+    /// the next 8 elements of the array, directly after the first element.
+    /// Both x- & y-coords are given in Little Endian byte order.
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
     pub fn as_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
@@ -170,16 +178,11 @@ impl<C: Clone> Node<C> {
     /// Return the coordinates of this node's sibling, whether that be a right
     /// or a left sibling.
     fn get_sibling_coord(&self) -> Coordinate {
-        match self.orientation() {
-            NodeOrientation::Left => Coordinate {
-                y: self.coord.y,
-                x: self.coord.x + 1,
-            },
-            NodeOrientation::Right => Coordinate {
-                y: self.coord.y,
-                x: self.coord.x - 1,
-            },
-        }
+        let x = match self.orientation() {
+            NodeOrientation::Left => self.coord.x + 1,
+            NodeOrientation::Right => self.coord.x - 1,
+        };
+        Coordinate { y: self.coord.y, x }
     }
 
     /// Return the coordinates of this node's parent.
@@ -219,6 +222,7 @@ impl<C: Clone> InputLeafNode<C> {
 // Supporting structs.
 
 /// Used to organise nodes into left/right siblings.
+#[derive(Debug, PartialEq)]
 enum NodeOrientation {
     Left,
     Right,
@@ -260,10 +264,7 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {
-            coord: Coordinate {
-                y: self.left.0.coord.y + 1,
-                x: self.left.0.coord.x / 2,
-            },
+            coord: self.left.0.get_parent_coord(),
             content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
@@ -272,4 +273,194 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO test the functions in Node & Coordinate impls
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::binary_tree::utils::test_utils::{
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+    };
+
+    #[test]
+    fn coord_byte_conversion_correct() {
+        let x = 258;
+        let y = 12;
+        let coord = Coordinate { x, y };
+        let bytes = coord.as_bytes();
+
+        assert_eq!(bytes.len(), 32, "Byte array should be 256 bits");
+
+        assert_eq!(
+            bytes[0], y,
+            "1st element of byte array should be equal to y-coord"
+        );
+
+        assert_eq!(
+            bytes[1], 2,
+            "2nd element of byte array should be equal to least significant byte of x-coord"
+        ); // 256, x-coord
+
+        assert_eq!(
+            bytes[2], 1,
+            "3rd element of byte array should be equal to most significant byte of x-coord"
+        ); // 2, x-coord
+
+        for i in 3..32 {
+            assert_eq!(
+                bytes[i], 0,
+                "4th-last elements of byte array should be equal to 0"
+            );
+        }
+    }
+
+    #[test]
+    fn node_orientation_correctly_determined() {
+        let height = 8;
+
+        let x_coord = 0;
+        let left_node = single_leaf(x_coord, height).to_node();
+        assert_eq!(left_node.orientation(), NodeOrientation::Left);
+
+        let x_coord = 1;
+        let right_node = single_leaf(x_coord, height).to_node();
+        assert_eq!(right_node.orientation(), NodeOrientation::Right);
+    }
+
+    #[test]
+    fn is_sibling_of_works() {
+        let height = 5;
+
+        let x_coord = 16;
+        let left_node = single_leaf(x_coord, height).to_node();
+        let x_coord = 17;
+        let right_node = single_leaf(x_coord, height).to_node();
+
+        assert!(right_node.is_right_sibling_of(&left_node));
+        assert!(!right_node.is_left_sibling_of(&left_node));
+        assert!(left_node.is_left_sibling_of(&right_node));
+        assert!(!left_node.is_right_sibling_of(&right_node));
+
+        // check no other nodes trigger true for sibling check
+        for i in 0..num_bottom_layer_nodes(height) {
+            let node = single_leaf(i, height).to_node();
+            if left_node.coord.x != i && right_node.coord.x != i {
+                assert!(!right_node.is_right_sibling_of(&node));
+                assert!(!right_node.is_left_sibling_of(&node));
+                assert!(!left_node.is_left_sibling_of(&node));
+                assert!(!left_node.is_right_sibling_of(&node));
+            }
+        }
+    }
+
+    #[test]
+    fn sibling_coord_calculated_correctly() {
+        let height = 8;
+        let x_coord = 5;
+        let right_node = single_leaf(x_coord, height).to_node();
+        let sibling_coord = right_node.get_sibling_coord();
+        assert_eq!(
+            sibling_coord.y, 0,
+            "Sibling should be on the bottom layer (y-coord == 0)"
+        );
+        assert_eq!(sibling_coord.x, 4, "Sibling's x-coord should be 1 less than the node's x-coord because the node is a right sibling");
+
+        let x_coord = 0;
+        let left_node = single_leaf(x_coord, height).to_node();
+        let sibling_coord = left_node.get_sibling_coord();
+        assert_eq!(
+            sibling_coord.y, 0,
+            "Sibling should be on the bottom layer (y-coord == 0)"
+        );
+        assert_eq!(sibling_coord.x, 1, "Sibling's x-coord should be 1 more than the node's x-coord because the node is a left sibling");
+    }
+
+    #[test]
+    fn parent_coord_calculated_correctly() {
+        let height = 8;
+
+        let x_coord = 5;
+        let right_node = single_leaf(x_coord, height).to_node();
+        let right_parent_coord = right_node.get_parent_coord();
+
+        let x_coord = 4;
+        let left_node = single_leaf(x_coord, height).to_node();
+        let left_parent_coord = left_node.get_parent_coord();
+
+        assert_eq!(
+            right_parent_coord, left_parent_coord,
+            "Left and right siblings should have same parent coord"
+        );
+        assert_eq!(
+            right_parent_coord.y, 1,
+            "Parent's y-coord should be 1 more than child's"
+        );
+        assert_eq!(
+            right_parent_coord.x, 2,
+            "Parent's x-coord should be half the child's"
+        );
+    }
+
+    #[test]
+    fn input_node_correctly_converted_to_node() {
+        let height = 8;
+        let x_coord = 5;
+        let input_node = single_leaf(x_coord, height);
+        let content = input_node.content.clone();
+        let node = input_node.to_node();
+
+        assert_eq!(
+            node.coord.x, 5,
+            "Node's x-coord should match input leaf node's"
+        );
+        assert_eq!(
+            node.coord.y, 0,
+            "Node's y-coord should be 0 because all input nodes are assumed to be on bottom layer"
+        );
+        assert_eq!(content, node.content);
+    }
+
+    #[test]
+    fn sibling_from_node_works() {
+        let height = 8;
+
+        let x_coord = 11;
+        let right_node = single_leaf(x_coord, height).to_node();
+        let sibling = Sibling::from_node(right_node);
+        match sibling {
+            Sibling::Left(_) => panic!("Node should be a right sibling"),
+            Sibling::Right(_) => {}
+        }
+
+        let x_coord = 16;
+        let left_node = single_leaf(x_coord, height).to_node();
+        let sibling = Sibling::from_node(left_node);
+        match sibling {
+            Sibling::Right(_) => panic!("Node should be a left sibling"),
+            Sibling::Left(_) => {}
+        }
+    }
+
+    #[test]
+    fn matched_pair_merge_works() {
+            let height = 8;
+
+        let x_coord = 17;
+        let right_node = single_leaf(x_coord, height).to_node();
+        let right = RightSibling(right_node);
+
+        let x_coord = 16;
+        let left_node = single_leaf(x_coord, height).to_node();
+        let left = LeftSibling(left_node);
+
+        let pair = MatchedPair {left, right};
+        let parent = pair.merge();
+
+        assert_eq!(
+            parent.coord.y, 1,
+            "Parent's y-coord should be 1 more than child's"
+        );
+        assert_eq!(
+            parent.coord.x, 8,
+            "Parent's x-coord should be half the child's"
+        );
+    }
+}
