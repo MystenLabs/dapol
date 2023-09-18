@@ -37,8 +37,8 @@ use std::sync::Arc;
 use std::thread;
 
 use super::super::{
-    num_bottom_layer_nodes, Coordinate, ErrOnSome, ErrUnlessTrue, LeftSibling, MatchedPair,
-    Mergeable, Node, NodeOrientation, RightSibling, Sibling,
+    num_bottom_layer_nodes, Coordinate, ErrOnSome, ErrUnlessTrue, MatchedPair, Mergeable, Node,
+    Sibling,
 };
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
@@ -185,70 +185,17 @@ enum NumNodes {
     SomeNodes(usize),
 }
 
-/// Each node (except the root node) has a sibling. This is guaranteed by
-/// the fact that we use a *full* binary tree. Each node is either a
-/// left or a right sibling.
-impl<C: Clone> LeftSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
+impl<C: Clone> Node<C> {
+    /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> RightSibling<C>
+    fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.0.get_sibling_coord();
+        let coord = self.get_sibling_coord();
         let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        RightSibling(node)
-    }
-
-    /// Create a new left sibling.
-    ///
-    /// Panic if the given node is not a left sibling node.
-    /// Since this code is only used internally for tree construction, and this
-    /// state is unrecoverable, panicking is the best option. It is a sanity
-    /// check and should never actually happen unless code is changed.
-    fn from_node(node: Node<C>) -> Self {
-        // TODO change the name of this function: remove 'node'
-        match node.orientation() {
-            NodeOrientation::Right => panic!(
-                "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
-            ),
-            NodeOrientation::Left => Self(node),
-        }
-    }
-}
-
-/// Each node (except the root node) has a sibling. This is guaranteed by
-/// the fact that we use a *full* binary tree. Each node is either a
-/// left or a right sibling.
-impl<C: Clone> RightSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
-    /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
-    fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> LeftSibling<C>
-    where
-        F: Fn(&Coordinate) -> C,
-    {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        LeftSibling(node)
-    }
-
-    /// Create a new right sibling.
-    ///
-    /// Panic if the given node is not a right sibling node.
-    /// Since this code is only used internally for tree construction, and this
-    /// state is unrecoverable, panicking is the best option. It is a sanity
-    /// check and should never actually happen unless code is changed.
-    fn from_node(node: Node<C>) -> Self {
-        match node.orientation() {
-            NodeOrientation::Left => panic!(
-                "[bug in multi-threaded node builder] Given node was expected to be a left sibling"
-            ),
-            NodeOrientation::Right => Self(node),
-        }
+        Node { coord, content }
     }
 }
 
@@ -274,6 +221,19 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
                 right,
             },
         }
+    }
+
+    /// Create a new pair from 2 sibling nodes.
+    ///
+    /// Panic if the given nodes are not a siblings.
+    /// Since this code is only used internally for tree construction, and this
+    /// state is unrecoverable, panicking is the best option. It is a sanity
+    /// check and should never actually happen unless code is changed.
+    fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
+        if !left.is_left_sibling_of(&right) {
+            panic!("[bug in multi-threaded node builder] Given nodes were expected to be siblings")
+        }
+        MatchedPair { left, right }
     }
 }
 
@@ -410,9 +370,7 @@ where
     // There are either 2 or 1 leaves left (which is checked above).
     if params.y == 1 {
         let pair = if leaves.len() == 2 {
-            let left = LeftSibling::from_node(leaves.remove(0));
-            let right = RightSibling::from_node(leaves.remove(0));
-            MatchedPair { left, right }
+            MatchedPair::from_siblings(leaves.remove(0), leaves.remove(0))
         } else {
             MatchedPair::from_node(leaves.remove(0), new_padding_node_content)
         };
@@ -431,22 +389,21 @@ where
             // a certain height otherwise we are at risk of spawning too many threads.
             if params.y > params.max_thread_spawn_height {
                 let params_clone = params.clone();
-                let right_handler = thread::spawn(move || -> RightSibling<C> {
+                let right_handler = thread::spawn(move || -> Node<C> {
                     // TODO get rid of this after testing
                     println!("thread spawned");
-                    let node = build_node(
+                    build_node(
                         params_clone.into_right_child(),
                         right_leaves,
                         new_padding_node_content_ref,
-                    );
-                    RightSibling::from_node(node)
+                    )
                 });
 
-                let left = LeftSibling::from_node(build_node(
+                let left = build_node(
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
-                ));
+                );
 
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
@@ -456,38 +413,38 @@ where
 
                 MatchedPair { left, right }
             } else {
-                let right = RightSibling::from_node(build_node(
+                let right = build_node(
                     params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
-                ));
+                );
 
-                let left = LeftSibling::from_node(build_node(
+                let left = build_node(
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
-                ));
+                );
 
                 MatchedPair { left, right }
             }
         }
         NumNodes::AllNodes => {
             // Go down left child only (there are no leaves living on the right side).
-            let left = LeftSibling::from_node(build_node(
+            let left = build_node(
                 params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
-            ));
+            );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
         NumNodes::NoNodes => {
             // Go down right child only (there are no leaves living on the left side).
-            let right = RightSibling::from_node(build_node(
+            let right = build_node(
                 params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
-            ));
+            );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
@@ -501,41 +458,40 @@ where
 
 // TODO check all leaf nodes are in the store for each of single/multi
 
-
 // TODO for multi: check certain number of leaf nodes are in the tree
 // TODO for single: check certain number of leaf nodes are in the tree
 
 // #[test]
-    // fn duplicate_leaves_gives_err() {
-    //     let height = 4u8;
+// fn duplicate_leaves_gives_err() {
+//     let height = 4u8;
 
-    //     let leaf_0 = InputLeafNode::<TestContent> {
-    //         x_coord: 7,
-    //         content: TestContent {
-    //             hash: H256::default(),
-    //             value: 1,
-    //         },
-    //     };
-    //     let leaf_1 = InputLeafNode::<TestContent> {
-    //         x_coord: 1,
-    //         content: TestContent {
-    //             hash: H256::default(),
-    //             value: 2,
-    //         },
-    //     };
-    //     let leaf_2 = InputLeafNode::<TestContent> {
-    //         x_coord: 7,
-    //         content: TestContent {
-    //             hash: H256::default(),
-    //             value: 3,
-    //         },
-    //     };
+//     let leaf_0 = InputLeafNode::<TestContent> {
+//         x_coord: 7,
+//         content: TestContent {
+//             hash: H256::default(),
+//             value: 1,
+//         },
+//     };
+//     let leaf_1 = InputLeafNode::<TestContent> {
+//         x_coord: 1,
+//         content: TestContent {
+//             hash: H256::default(),
+//             value: 2,
+//         },
+//     };
+//     let leaf_2 = InputLeafNode::<TestContent> {
+//         x_coord: 7,
+//         content: TestContent {
+//             hash: H256::default(),
+//             value: 3,
+//         },
+//     };
 
-    //     let tree = BinaryTree::new(
-    //         vec![leaf_0, leaf_1, leaf_2],
-    //         height,
-    //         &get_padding_function(),
-    //     );
+//     let tree = BinaryTree::new(
+//         vec![leaf_0, leaf_1, leaf_2],
+//         height,
+//         &get_padding_function(),
+//     );
 
-    //     assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
-    // }
+//     assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
+// }

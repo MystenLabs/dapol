@@ -231,20 +231,14 @@ enum NodeOrientation {
 /// Used to orient nodes inside a sibling pair so that the compiler can
 /// guarantee a left node is actually a left node.
 enum Sibling<C: Clone> {
-    Left(LeftSibling<C>),
-    Right(RightSibling<C>),
+    Left(Node<C>),
+    Right(Node<C>),
 }
-
-/// Simply holds a Node under the designated 'LeftSibling' name.
-struct LeftSibling<C: Clone>(Node<C>);
-
-/// Simply holds a Node under the designated 'RightSibling' name.
-struct RightSibling<C: Clone>(Node<C>);
 
 /// A pair of sibling nodes.
 struct MatchedPair<C: Mergeable + Clone> {
-    left: LeftSibling<C>,
-    right: RightSibling<C>,
+    left: Node<C>,
+    right: Node<C>,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -254,8 +248,8 @@ impl<C: Clone> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {
         match node.orientation() {
-            NodeOrientation::Left => Sibling::Left(LeftSibling(node)),
-            NodeOrientation::Right => Sibling::Right(RightSibling(node)),
+            NodeOrientation::Left => Sibling::Left(node),
+            NodeOrientation::Right => Sibling::Right(node),
         }
     }
 }
@@ -264,8 +258,8 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {
-            coord: self.left.0.get_parent_coord(),
-            content: C::merge(&self.left.0.content, &self.right.0.content),
+            coord: self.left.get_parent_coord(),
+            content: C::merge(&self.left.content, &self.right.content),
         }
     }
 }
@@ -276,9 +270,7 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
-    };
+    use crate::binary_tree::utils::test_utils::single_leaf;
 
     #[test]
     fn coord_byte_conversion_correct() {
@@ -441,17 +433,15 @@ mod tests {
 
     #[test]
     fn matched_pair_merge_works() {
-            let height = 8;
+        let height = 8;
 
         let x_coord = 17;
-        let right_node = single_leaf(x_coord, height).to_node();
-        let right = RightSibling(right_node);
+        let right = single_leaf(x_coord, height).to_node();
 
         let x_coord = 16;
-        let left_node = single_leaf(x_coord, height).to_node();
-        let left = LeftSibling(left_node);
+        let left = single_leaf(x_coord, height).to_node();
 
-        let pair = MatchedPair {left, right};
+        let pair = MatchedPair { left, right };
         let parent = pair.merge();
 
         assert_eq!(

@@ -1,4 +1,4 @@
-//! Binary tree builder that does not utilize parallelization.
+//! Sequential binary tree builder.
 //!
 //! It is recommended to rather use [super][multi_threaded] for better
 //! performance.
@@ -11,8 +11,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use super::super::{
-    BinaryTree, Coordinate, ErrOnSome, ErrUnlessTrue, LeftSibling, MatchedPair, Mergeable, Node,
-    RightSibling, Sibling,
+    BinaryTree, Coordinate, ErrOnSome, ErrUnlessTrue, MatchedPair, Mergeable, Node, Sibling,
 };
 use super::{TreeBuildError, TreeBuilder};
 
@@ -57,6 +56,9 @@ where
         if input_leaf_nodes.len() as u64 > max_leaf_nodes {
             return Err(TreeBuildError::TooManyLeaves);
         }
+        if input_leaf_nodes.len() == 0 {
+            return Err(TreeBuildError::EmptyLeaves);
+        }
 
         let leaf_nodes = {
             // Translate InputLeafNode to Node.
@@ -65,10 +67,10 @@ where
                 .map(|leaf| leaf.to_node())
                 .collect();
 
-            // Sort by x_coord ascending.
+            // Sort by x-coord ascending.
             leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
 
-            // Make sure all x_coord < max.
+            // Make sure all x-coord < max.
             leaf_nodes
                 .last()
                 .map(|node| node.coord.x < max_leaf_nodes)
@@ -121,41 +123,48 @@ where
 }
 
 // -------------------------------------------------------------------------------------------------
-// Supporting structs.
+// Supporting structs & methods.
 
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
-    left: Option<LeftSibling<C>>,
-    right: Option<RightSibling<C>>,
+    left: Option<Node<C>>,
+    right: Option<Node<C>>,
 }
 
-impl<C: Clone> LeftSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
-    /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
+impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
+    fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        RightSibling(node)
+        match (self.left, self.right) {
+            (Some(left), Some(right)) => MatchedPair { left, right },
+            (Some(left), None) => MatchedPair {
+                right: left.new_sibling_padding_node(&new_padding_node_content),
+                left,
+            },
+            (None, Some(right)) => MatchedPair {
+                left: right.new_sibling_padding_node(&new_padding_node_content),
+                right,
+            },
+            // If this case is reached then there is a bug in the above fold.
+            (None, None) => {
+                panic!("[Bug in tree constructor] Invalid pair (None, None) found")
+            }
+        }
     }
 }
 
-impl<C: Clone> RightSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because
+impl<C: Clone> Node<C> {
+    /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.0.get_sibling_coord();
+        let coord = self.get_sibling_coord();
         let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        LeftSibling(node)
+        Node { coord, content }
     }
 }
 
@@ -203,7 +212,7 @@ where
                             .last_mut()
                             .map(|pair| (&pair.left).as_ref())
                             .flatten()
-                            .is_some_and(|left| right_sibling.0.is_right_sibling_of(&left.0));
+                            .is_some_and(|left| right_sibling.is_right_sibling_of(&left));
 
                         if is_right_sibling_of_prev_node {
                             pairs
@@ -224,26 +233,12 @@ where
             })
             .into_iter()
             // Add padding nodes to unmatched pairs.
-            .map(|pair| match (pair.left, pair.right) {
-                (Some(left), Some(right)) => MatchedPair { left, right },
-                (Some(left), None) => MatchedPair {
-                    right: left.new_sibling_padding_node(&new_padding_node_content),
-                    left,
-                },
-                (None, Some(right)) => MatchedPair {
-                    left: right.new_sibling_padding_node(&new_padding_node_content),
-                    right,
-                },
-                // If this case is reached then there is a bug in the above fold.
-                (None, None) => {
-                    panic!("[Bug in tree constructor] Invalid pair (None, None) found")
-                }
-            })
+            .map(|pair| pair.to_matched_pair(&new_padding_node_content))
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
-                store.insert(pair.left.0.coord.clone(), pair.left.0);
-                store.insert(pair.right.0.coord.clone(), pair.right.0);
+                store.insert(pair.left.coord.clone(), pair.left);
+                store.insert(pair.right.coord.clone(), pair.right);
                 parent
             })
             .collect();
@@ -263,3 +258,13 @@ where
 
     (store, root)
 }
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+// TODO new - err when no height or leaves given, or leaves empty, or leaves greater than max
+// TODO new - err for duplicates
+// TODO new - input nodes in different order result in tree builder with same ordering leaf node field (sorting works)
+// TODO new - err when x-coord greater than max
+// TODO build - no padding gen func gives err
+// TODO inner build - input leaves are all present in the resulting tree
