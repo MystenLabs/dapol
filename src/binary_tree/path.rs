@@ -247,10 +247,11 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_utils::{
-        full_tree, tree_with_single_leaf, tree_with_sparse_leaves, TestContent,
-    };
+    use super::super::*;
     use super::*;
+    use crate::binary_tree::utils::test_utils::{
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+    };
 
     fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
         assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
@@ -258,45 +259,90 @@ mod tests {
 
     #[test]
     fn tree_works_for_full_base_layer() {
-        let (tree, _height) = full_tree();
+        let height = 8u8;
 
-        let proof = tree
+        let leaf_nodes = full_bottom_layer(height);
+        let new_padding_node_content = get_padding_function();
+
+        // TODO compare to multi
+        let tree_single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes.clone())
+            .unwrap()
+            .with_single_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(new_padding_node_content)
+            .build()
+            .unwrap();
+
+        let proof = tree_single_threaded
             .build_path_for(0)
             .expect("Path generation should have been successful");
-        check_path_siblings(&tree, &proof);
+        check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree.get_root())
+            .verify(tree_single_threaded.get_root())
             .expect("Path verification should have been successful");
     }
 
     #[test]
     fn proofs_work_for_sparse_leaves() {
-        let (tree, _height) = tree_with_sparse_leaves();
+        let height = 8u8;
 
-        let proof = tree
+        let leaf_nodes = sparse_leaves(height);
+        let new_padding_node_content = get_padding_function();
+
+        // TODO compare to multi
+        let tree_single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes.clone())
+            .unwrap()
+            .with_single_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(new_padding_node_content)
+            .build()
+            .unwrap();
+
+        let proof = tree_single_threaded
             .build_path_for(6)
             .expect("Path generation should have been successful");
-        check_path_siblings(&tree, &proof);
+        check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree.get_root())
+            .verify(tree_single_threaded.get_root())
             .expect("Path verification should have been successful");
     }
 
     #[test]
     fn proofs_work_for_single_leaf() {
-        let height = 4u8;
+        let height = 8u8;
 
-        for i in 0..2usize.pow(height as u32 - 1) {
-            let tree = tree_with_single_leaf(i as u64, height);
-            let proof = tree
+        for i in 0..num_bottom_layer_nodes(height) {
+            let leaf_node = vec![single_leaf(i as u64, height)];
+
+            let new_padding_node_content = get_padding_function();
+
+            let tree_single_threaded = TreeBuilder::new()
+                .with_height(height)
+                .unwrap()
+                .with_leaf_nodes(leaf_node.clone())
+                .unwrap()
+                .with_single_threaded_build_algorithm()
+                .unwrap()
+                .with_padding_node_generator(new_padding_node_content)
+                .build()
+                .unwrap();
+
+            let proof = tree_single_threaded
                 .build_path_for(i as u64)
                 .expect("Path generation should have been successful");
-            check_path_siblings(&tree, &proof);
+
+            check_path_siblings(&tree_single_threaded, &proof);
 
             proof
-                .verify(tree.get_root())
+                .verify(tree_single_threaded.get_root())
                 .expect("Path verification should have been successful");
         }
     }

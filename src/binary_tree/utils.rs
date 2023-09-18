@@ -9,8 +9,7 @@ pub trait ErrOnSome {
 
 /// Return an error if `Some(_)`, otherwise do nothing.
 impl<T> ErrOnSome for Option<T> {
-    fn err_on_some<E>(&self, err: E) -> Result<(), E>
-    {
+    fn err_on_some<E>(&self, err: E) -> Result<(), E> {
         match self {
             None => Ok(()),
             Some(_) => Err(err),
@@ -24,8 +23,7 @@ pub trait ErrUnlessTrue {
 
 /// Return an error if `None` or `Some(false)`, otherwise do nothing.
 impl ErrUnlessTrue for Option<bool> {
-    fn err_unless_true<E>(&self, err: E) -> Result<(), E>
-    {
+    fn err_unless_true<E>(&self, err: E) -> Result<(), E> {
         match self {
             None => Err(err),
             Some(false) => Err(err),
@@ -48,11 +46,11 @@ pub fn num_bottom_layer_nodes(height: u8) -> u64 {
 // Test utils for sub-modules.
 
 #[cfg(test)]
-mod test_utils {
+pub mod test_utils {
     use super::super::*;
     use primitive_types::H256;
 
-    #[derive(Default, Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     pub struct TestContent {
         pub value: u32,
         pub hash: H256,
@@ -100,13 +98,14 @@ mod test_utils {
         }
     }
 
-    // tree has a full bottom layer, and, subsequently, all other layers
-    pub fn full_tree() -> (BinaryTree<TestContent>, u8) {
-        let height = 4u8;
-        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
+    // If the tree has a full bottom layer then all other layers will also be
+    // full (if construction is correct).
+    pub fn full_bottom_layer(height: u8) -> Vec<InputLeafNode<TestContent>> {
+        let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();
 
+        // note we don't use the helper function num_bottom_layer_nodes
         for i in 0..2usize.pow(height as u32 - 1) {
-            leaves.push(InputLeafNode::<TestContent> {
+            leaf_nodes.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {
                     hash: H256::default(),
@@ -115,14 +114,10 @@ mod test_utils {
             });
         }
 
-        let tree = BinaryTree::new(leaves, height, &get_padding_function())
-            .expect("Tree construction should not have produced an error");
-
-        (tree, height)
+        leaf_nodes
     }
 
-    // only 1 bottom-layer leaf node is present in the whole tree
-    pub fn tree_with_single_leaf(x_coord_of_leaf: u64, height: u8) -> BinaryTree<TestContent> {
+    pub fn single_leaf(x_coord_of_leaf: u64, height: u8) -> InputLeafNode<TestContent> {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
@@ -130,19 +125,16 @@ mod test_utils {
                 value: 1,
             },
         };
-
-        let tree = BinaryTree::new(vec![leaf], height, &get_padding_function())
-            .expect("Tree construction should not have produced an error");
-
-        tree
+        leaf
     }
 
-    // a selection of leaves dispersed sparsely along the bottom layer
-    pub fn tree_with_sparse_leaves() -> (BinaryTree<TestContent>, u8) {
-        let height = 5u8;
+    // A selection of leaves dispersed sparsely along the bottom layer.
+    pub fn sparse_leaves(height: u8) -> Vec<InputLeafNode<TestContent>> {
+        // Otherwise we will go over the max x-coord value.
+        assert!(height >= 4u8);
 
-        // note the nodes are not in order here (wrt x-coord) so this test also somewhat
-        // covers the sorting code in the constructor
+        // Note the nodes are not in order here (wrt x-coord) so this test also
+        // somewhat covers the sorting code in the constructor.
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 6,
             content: TestContent {
@@ -172,14 +164,6 @@ mod test_utils {
             },
         };
 
-        let tree = BinaryTree::new(
-            vec![leaf_0, leaf_1, leaf_2, leaf_3],
-            height,
-            &get_padding_function(),
-        )
-        .expect("Tree construction should not have produced an error");
-
-        (tree, height)
+        vec![leaf_0, leaf_1, leaf_2, leaf_3]
     }
 }
-

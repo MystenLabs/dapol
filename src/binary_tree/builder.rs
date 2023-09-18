@@ -8,7 +8,7 @@
 
 use std::fmt::Debug;
 
-use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
+use super::{num_bottom_layer_nodes, BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
 mod multi_threaded;
 use multi_threaded::MultiThreadedBuilder;
@@ -19,6 +19,7 @@ use single_threaded::SingleThreadedBuilder;
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
+#[derive(Debug)]
 pub struct TreeBuilder<C> {
     height: Option<u8>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
@@ -26,7 +27,7 @@ pub struct TreeBuilder<C> {
 
 /// A simpler version of the [Node] struct that is used as input to instantiate
 /// the tree builder.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InputLeafNode<C> {
     pub content: C,
     pub x_coord: u64,
@@ -58,9 +59,16 @@ where
     /// Set the height of the tree.
     /// Will return an error if `height` is <= the min allowed height.
     pub fn with_height(mut self, height: u8) -> Result<Self, TreeBuildError> {
+        if let Some(leaf_nodes) = &self.leaf_nodes {
+            if leaf_nodes.len() > num_bottom_layer_nodes(height) as usize {
+                return Err(TreeBuildError::TooManyLeaves);
+            }
+        }
+
         if height < MIN_HEIGHT {
             return Err(TreeBuildError::HeightTooSmall);
         }
+
         self.height = Some(height);
         Ok(self)
     }
@@ -74,15 +82,24 @@ where
         mut self,
         leaf_nodes: Vec<InputLeafNode<C>>,
     ) -> Result<Self, TreeBuildError> {
+        if let Some(height) = self.height {
+            if leaf_nodes.len() > num_bottom_layer_nodes(height) as usize {
+                return Err(TreeBuildError::TooManyLeaves);
+            }
+        }
+
         if leaf_nodes.len() < 1 {
             return Err(TreeBuildError::EmptyLeaves);
         }
+
         self.leaf_nodes = Some(leaf_nodes);
         Ok(self)
     }
 
     /// High performance build algorithm utilizing parallelization.
-    pub fn with_multi_threaded_build_algorithm<F>(self) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
+    pub fn with_multi_threaded_build_algorithm<F>(
+        self,
+    ) -> Result<MultiThreadedBuilder<C, F>, TreeBuildError>
     where
         C: Debug + Send + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
@@ -91,7 +108,9 @@ where
     }
 
     /// Regular build algorithm.
-    pub fn with_single_threaded_build_algorithm<F>(self) -> Result<SingleThreadedBuilder<C, F>, TreeBuildError>
+    pub fn with_single_threaded_build_algorithm<F>(
+        self,
+    ) -> Result<SingleThreadedBuilder<C, F>, TreeBuildError>
     where
         C: Debug,
         F: Fn(&Coordinate) -> C,
@@ -99,6 +118,9 @@ where
         SingleThreadedBuilder::new(self)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Errors.
 
 use thiserror::Error;
 
@@ -128,138 +150,180 @@ pub enum TreeBuildError {
 #[cfg(test)]
 mod tests {
     // TODO test all edge cases where the first and last 2 nodes are either all
-    // present or all not or partially present TODO write a test that checks the
-    // total number of nodes in the tree is correct
+    // present or all not or partially present
 
-    use super::super::test_utils::{
-        full_tree, get_padding_function, tree_with_single_leaf, tree_with_sparse_leaves,
-        TestContent,
-    };
+    use super::super::*;
     use super::*;
+    use crate::binary_tree::utils::test_utils::{
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+    };
+
     use crate::testing_utils::assert_err;
 
     use primitive_types::H256;
 
-    fn check_tree(tree: &BinaryTree<TestContent>, height: u8) {
-        assert_eq!(tree.height, height);
+    // =========================================================================
+    // Happy cases for both single- and multi-threaded builders.
+    // All tests here compare the trees from the 2 build algorithms, which gives
+    // a fair amount of confidence in their correctness.
+
+    #[test]
+    fn multi_and_single_give_same_root_sparse_leaves() {
+        let height = 8u8;
+
+        let leaf_nodes = sparse_leaves(height);
+
+        let single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes.clone())
+            .unwrap()
+            .with_single_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let multi_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes)
+            .unwrap()
+            .with_multi_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        assert_eq!(single_threaded.root, multi_threaded.root);
+        assert_eq!(single_threaded.height, multi_threaded.height);
+        assert_eq!(single_threaded.height, height);
     }
 
     #[test]
-    fn tree_works_for_full_base_layer() {
-        let (tree, height) = full_tree();
-        check_tree(&tree, height);
+    fn multi_and_single_give_same_root_full_tree() {
+        let height = 8u8;
+
+        let leaf_nodes = full_bottom_layer(height);
+
+        let single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes.clone())
+            .unwrap()
+            .with_single_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let multi_threaded = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes)
+            .unwrap()
+            .with_multi_threaded_build_algorithm()
+            .unwrap()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        assert_eq!(single_threaded.root, multi_threaded.root);
+        assert_eq!(single_threaded.height, multi_threaded.height);
+        assert_eq!(single_threaded.height, height);
     }
 
     #[test]
-    fn tree_works_for_single_leaf() {
-        let height = 4u8;
+    fn multi_and_single_give_same_root_single_leaf() {
+        let height = 8u8;
 
         for i in 0..num_bottom_layer_nodes(height) {
-            let tree = tree_with_single_leaf(i as u64, height);
-            check_tree(&tree, height);
+            let leaf_node = vec![single_leaf(i as u64, height)];
+
+            let single_threaded = TreeBuilder::new()
+                .with_height(height)
+                .unwrap()
+                .with_leaf_nodes(leaf_node.clone())
+                .unwrap()
+                .with_single_threaded_build_algorithm()
+                .unwrap()
+                .with_padding_node_generator(get_padding_function())
+                .build()
+                .unwrap();
+
+            let multi_threaded = TreeBuilder::new()
+                .with_height(height)
+                .unwrap()
+                .with_leaf_nodes(leaf_node)
+                .unwrap()
+                .with_multi_threaded_build_algorithm()
+                .unwrap()
+                .with_padding_node_generator(get_padding_function())
+                .build()
+                .unwrap();
+
+            assert_eq!(single_threaded.root, multi_threaded.root);
+            assert_eq!(single_threaded.height, multi_threaded.height);
+            assert_eq!(single_threaded.height, height);
         }
     }
 
+    // =========================================================================
+    // Error cases.
+
     #[test]
-    fn tree_works_for_sparse_leaves() {
-        let (tree, height) = tree_with_sparse_leaves();
-        check_tree(&tree, height);
+    fn err_for_empty_leaves() {
+        let res = TreeBuilder::<TestContent>::new().with_leaf_nodes(Vec::new());
+        assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
 
     #[test]
-    fn too_many_leaf_nodes_gives_err() {
-        let height = 4u8;
-
-        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
-
-        for i in 0..(num_bottom_layer_nodes(height) + 1) {
-            leaves.push(InputLeafNode::<TestContent> {
-                x_coord: i as u64,
-                content: TestContent {
-                    hash: H256::default(),
-                    value: i as u32,
-                },
-            });
-        }
-
-        let tree = BinaryTree::new(leaves, height, &get_padding_function());
-        assert_err!(tree, Err(BinaryTreeError::TooManyLeaves));
+    fn err_when_height_too_small() {
+        assert!(MIN_HEIGHT > 0, "Invalid min height {}", MIN_HEIGHT);
+        let height = MIN_HEIGHT - 1;
+        let res = TreeBuilder::<TestContent>::new().with_height(height);
+        assert_err!(res, Err(TreeBuildError::HeightTooSmall));
     }
 
     #[test]
-    fn duplicate_leaves_gives_err() {
-        let height = 4u8;
+    fn err_for_too_many_leaves_with_height_first() {
+        let height = 8u8;
+        let mut leaf_nodes = full_bottom_layer(height);
 
-        let leaf_0 = InputLeafNode::<TestContent> {
-            x_coord: 7,
+        leaf_nodes.push(InputLeafNode::<TestContent> {
+            x_coord: num_bottom_layer_nodes(height) + 1,
             content: TestContent {
                 hash: H256::default(),
                 value: 1,
             },
-        };
-        let leaf_1 = InputLeafNode::<TestContent> {
-            x_coord: 1,
-            content: TestContent {
-                hash: H256::default(),
-                value: 2,
-            },
-        };
-        let leaf_2 = InputLeafNode::<TestContent> {
-            x_coord: 7,
-            content: TestContent {
-                hash: H256::default(),
-                value: 3,
-            },
-        };
+        });
 
-        let tree = BinaryTree::new(
-            vec![leaf_0, leaf_1, leaf_2],
-            height,
-            &get_padding_function(),
-        );
+        let res = TreeBuilder::new()
+            .with_height(height)
+            .unwrap()
+            .with_leaf_nodes(leaf_nodes);
 
-        assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
+        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }
 
     #[test]
-    fn small_height_gives_err() {
-        let height = 1u8;
+    fn err_for_too_many_leaves_with_height_second() {
+        let height = 8u8;
+        let mut leaf_nodes = full_bottom_layer(height);
 
-        let leaf_0 = InputLeafNode::<TestContent> {
-            x_coord: 0,
+        leaf_nodes.push(InputLeafNode::<TestContent> {
+            x_coord: num_bottom_layer_nodes(height) + 1,
             content: TestContent {
                 hash: H256::default(),
                 value: 1,
             },
-        };
+        });
 
-        let tree = BinaryTree::new(vec![leaf_0], height, &get_padding_function());
+        let res = TreeBuilder::new()
+            .with_leaf_nodes(leaf_nodes)
+            .unwrap()
+            .with_height(height);
 
-        assert_err!(tree, Err(BinaryTreeError::HeightTooSmall));
-    }
-
-    #[test]
-    fn concurrent_tree() {
-        let height = 4u8;
-        let mut leaves = Vec::<InputLeafNode<TestContent>>::new();
-
-        for i in 0..(num_bottom_layer_nodes(height)) {
-            if i < 4 {
-                leaves.push(InputLeafNode::<TestContent> {
-                    x_coord: i as u64,
-                    content: TestContent {
-                        hash: H256::default(),
-                        value: i as u32,
-                    },
-                });
-            }
-        }
-
-        dive(
-            0,
-            2u64.pow(height as u32 - 1) - 1,
-            leaves,
-            Arc::new(get_padding_function()),
-        );
+        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }
 }

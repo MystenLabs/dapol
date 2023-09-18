@@ -26,6 +26,8 @@
 //! the sub-tree (no more and no less). The first iteration will have all the
 //! input leaf nodes, and will split the vector between the left & right
 //! recursive calls, each of which will split the vector to their children, etc.
+//!
+//! TODO talk about store and why some nodes are not stored
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -497,4 +499,43 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO
+// TODO check all leaf nodes are in the store for each of single/multi
+
+
+// TODO for multi: check certain number of leaf nodes are in the tree
+// TODO for single: check certain number of leaf nodes are in the tree
+
+// #[test]
+    // fn duplicate_leaves_gives_err() {
+    //     let height = 4u8;
+
+    //     let leaf_0 = InputLeafNode::<TestContent> {
+    //         x_coord: 7,
+    //         content: TestContent {
+    //             hash: H256::default(),
+    //             value: 1,
+    //         },
+    //     };
+    //     let leaf_1 = InputLeafNode::<TestContent> {
+    //         x_coord: 1,
+    //         content: TestContent {
+    //             hash: H256::default(),
+    //             value: 2,
+    //         },
+    //     };
+    //     let leaf_2 = InputLeafNode::<TestContent> {
+    //         x_coord: 7,
+    //         content: TestContent {
+    //             hash: H256::default(),
+    //             value: 3,
+    //         },
+    //     };
+
+    //     let tree = BinaryTree::new(
+    //         vec![leaf_0, leaf_1, leaf_2],
+    //         height,
+    //         &get_padding_function(),
+    //     );
+
+    //     assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
+    // }

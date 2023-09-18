@@ -268,3 +268,8 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
         }
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+// TODO test the functions in Node & Coordinate impls
