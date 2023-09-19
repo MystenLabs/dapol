@@ -12,7 +12,7 @@ pub struct User {
 const USER_ID_MAX_LENGTH: usize = 256;
 
 /// Abstract representation of a user ID.
-#[derive(PartialEq, Eq, Hash, Clone)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct UserId([u8; 32]);
 
 impl FromStr for UserId {

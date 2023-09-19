@@ -1,21 +1,22 @@
 //! Data structures and methods related to paths in a binary tree.
 //!
-//! A path in a binary tree goes from a leaf node to the root node. For each node (starting from
-//! the leaf node) one follows the path by moving to the parent node; since the root node has
-//! no parent this is the end of the path.
+//! A path in a binary tree goes from a leaf node to the root node. For each
+//! node (starting from the leaf node) one follows the path by moving to the
+//! parent node; since the root node has no parent this is the end of the path.
 //!
-//! A path is uniquely determined by the leaf node and only the leaf node. It can thus be referred
-//! to as the leaf node's path.
+//! A path is uniquely determined by the leaf node and only the leaf node. It
+//! can thus be referred to as the leaf node's path.
 
-use super::sparse_binary_tree::{Coordinate, Mergeable, Node, SparseBinaryTree, MIN_HEIGHT};
 use super::NodeOrientation;
-use ::std::fmt::Debug;
+use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_HEIGHT};
+
+use std::fmt::Debug;
 use thiserror::Error;
 
 /// All the sibling nodes for the nodes in a leaf node's path.
-/// The nodes are ordered from bottom layer (first) to root node (last, not included).
-/// The leaf node + the siblings can be used to reconstruct the actual nodes in the path as well
-/// as the root node.
+/// The nodes are ordered from bottom layer (first) to root node (last, not
+/// included). The leaf node + the siblings can be used to reconstruct the
+/// actual nodes in the path as well as the root node.
 #[derive(Debug)]
 pub struct Path<C: Clone> {
     pub leaf: Node<C>,
@@ -25,10 +26,11 @@ pub struct Path<C: Clone> {
 // -------------------------------------------------------------------------------------------------
 // Constructor
 
-impl<C: Mergeable + Clone> SparseBinaryTree<C> {
-    /// Construct the path up the tree from the leaf node at the given x-coord on the bottom layer
-    /// to the root node. Put all the sibling nodes for the path into a vector and use this vector
-    /// to create a [Path] struct and return it. The vector is ordered from bottom layer (first)
+impl<C: Mergeable + Clone> BinaryTree<C> {
+    /// Construct the path up the tree from the leaf node at the given x-coord
+    /// on the bottom layer to the root node. Put all the sibling nodes for
+    /// the path into a vector and use this vector to create a [Path] struct
+    /// and return it. The vector is ordered from bottom layer (first)
     /// to root node (last, not included).
     pub fn build_path_for(&self, leaf_x_coord: u64) -> Result<Path<C>, PathError> {
         let coord = Coordinate {
@@ -42,9 +44,9 @@ impl<C: Mergeable + Clone> SparseBinaryTree<C> {
         let mut siblings = Vec::with_capacity(self.get_height() as usize);
 
         for y in 0..self.get_height() - 1 {
-            let x_coord = match current_node.node_orientation() {
-                NodeOrientation::Left => current_node.get_x_coord() + 1,
-                NodeOrientation::Right => current_node.get_x_coord() - 1,
+            let x_coord = match current_node.orientation() {
+                NodeOrientation::Left => current_node.coord.x + 1,
+                NodeOrientation::Right => current_node.coord.x - 1,
             };
 
             let sibling_coord = Coordinate { x: x_coord, y };
@@ -92,21 +94,22 @@ fn build_pair<'a, C: Mergeable + Clone>(
         })
     } else {
         Err(PathError::InvalidSibling {
-            node_that_needs_sibling: parent.get_coord().clone(),
-            sibling_given: node.get_coord().clone(),
+            node_that_needs_sibling: parent.coord.clone(),
+            sibling_given: node.coord.clone(),
         })
     }
 }
 
 impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
-    /// Verify that the given list of sibling nodes + the base leaf node matches the given root node.
+    /// Verify that the given list of sibling nodes + the base leaf node matches
+    /// the given root node.
     ///
-    /// This is done by reconstructing each node in the path, from bottom layer to the root, using
-    /// the given leaf and sibling nodes, and then comparing the resulting root node to the given
-    /// root node.
+    /// This is done by reconstructing each node in the path, from bottom layer
+    /// to the root, using the given leaf and sibling nodes, and then
+    /// comparing the resulting root node to the given root node.
     ///
-    /// An error is returned if the number of siblings is less than the min amount, or the
-    /// constructed root node does not match the given one.
+    /// An error is returned if the number of siblings is less than the min
+    /// amount, or the constructed root node does not match the given one.
     pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
         let mut parent = self.leaf.clone();
 
@@ -128,9 +131,9 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 
     /// Return a vector containing only the nodes the tree path.
     ///
-    /// The path nodes have to be constructed using the leaf & sibling nodes in [Path] because
-    /// they are not stored explicitly. The order of the returned path nodes is bottom first (leaf)
-    /// and top last (root).
+    /// The path nodes have to be constructed using the leaf & sibling nodes in
+    /// [Path] because they are not stored explicitly. The order of the
+    /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [Path] data is invalid.
     pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathError> {
@@ -197,25 +200,28 @@ pub enum PathError {
 
 /// A reference to a left sibling node.
 ///
-/// It is like [super][sparse_binary_tree][LeftSibling] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][LeftSibling]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][LeftSibling] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
 
 /// A reference to a right sibling node.
 ///
-/// It is like [super][sparse_binary_tree][RightSibling] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][RightSibling]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][RightSibling] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
 ///
-/// It is like [super][sparse_binary_tree][MatchedPair] but does not own the underlying node.
-/// The purpose of this type is for efficiency gains over [super][sparse_binary_tree][MatchedPair]
-/// when ownership of the Node type is not needed.
+/// It is like [super][sparse_binary_tree][MatchedPair] but does not own the
+/// underlying node. The purpose of this type is for efficiency gains over
+/// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
+/// not needed.
 #[allow(dead_code)]
 struct MatchedPairRef<'a, C: Mergeable + Clone> {
     left: LeftSiblingRef<'a, C>,
@@ -228,10 +234,10 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
     fn merge(&self) -> Node<C> {
         Node {
             coord: Coordinate {
-                x: self.left.0.get_x_coord() / 2,
-                y: self.left.0.get_y_coord() + 1,
+                x: self.left.0.coord.x / 2,
+                y: self.left.0.coord.y + 1,
             },
-            content: C::merge(self.left.0.get_content(), self.right.0.get_content()),
+            content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
 }
@@ -241,56 +247,93 @@ impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::test_utils::{
-        full_tree, tree_with_single_leaf, tree_with_sparse_leaves, TestContent,
-    };
+    use super::super::*;
     use super::*;
+    use crate::binary_tree::utils::test_utils::{
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+    };
 
-    fn check_path_siblings(tree: &SparseBinaryTree<TestContent>, proof: &Path<TestContent>) {
+    fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
         assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
     }
 
     #[test]
     fn tree_works_for_full_base_layer() {
-        let (tree, _height) = full_tree();
+        let height = 8u8;
 
-        let proof = tree
+        let leaf_nodes = full_bottom_layer(height);
+        let new_padding_node_content = get_padding_function();
+
+        // TODO compare to multi
+        let tree_single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(new_padding_node_content)
+            .build()
+            .unwrap();
+
+        let proof = tree_single_threaded
             .build_path_for(0)
             .expect("Path generation should have been successful");
-        check_path_siblings(&tree, &proof);
+        check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree.get_root())
+            .verify(tree_single_threaded.get_root())
             .expect("Path verification should have been successful");
     }
 
     #[test]
     fn proofs_work_for_sparse_leaves() {
-        let (tree, _height) = tree_with_sparse_leaves();
+        let height = 8u8;
 
-        let proof = tree
+        let leaf_nodes = sparse_leaves(height);
+        let new_padding_node_content = get_padding_function();
+
+        // TODO compare to multi
+        let tree_single_threaded = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(new_padding_node_content)
+            .build()
+            .unwrap();
+
+        let proof = tree_single_threaded
             .build_path_for(6)
             .expect("Path generation should have been successful");
-        check_path_siblings(&tree, &proof);
+        check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree.get_root())
+            .verify(tree_single_threaded.get_root())
             .expect("Path verification should have been successful");
     }
 
     #[test]
     fn proofs_work_for_single_leaf() {
-        let height = 4u8;
+        let height = 8u8;
 
-        for i in 0..2usize.pow(height as u32 - 1) {
-            let tree = tree_with_single_leaf(i as u64, height);
-            let proof = tree
+        for i in 0..num_bottom_layer_nodes(height) {
+            let leaf_node = vec![single_leaf(i as u64, height)];
+
+            let new_padding_node_content = get_padding_function();
+
+            let tree_single_threaded = TreeBuilder::new()
+                .with_height(height)
+                .with_leaf_nodes(leaf_node.clone())
+                .with_single_threaded_build_algorithm()
+                .with_padding_node_generator(new_padding_node_content)
+                .build()
+                .unwrap();
+
+            let proof = tree_single_threaded
                 .build_path_for(i as u64)
                 .expect("Path generation should have been successful");
-            check_path_siblings(&tree, &proof);
+
+            check_path_siblings(&tree_single_threaded, &proof);
 
             proof
-                .verify(tree.get_root())
+                .verify(tree_single_threaded.get_root())
                 .expect("Path verification should have been successful");
         }
     }
