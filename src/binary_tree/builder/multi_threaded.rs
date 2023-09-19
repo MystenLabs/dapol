@@ -315,7 +315,7 @@ where
         assert_ne!(
             leaves.len(),
             0,
-            "[bug in multi-threaded node builder] Leaf node length cannot be 0"
+            "[bug in multi-threaded node builder] Number of leaf nodes cannot be 0"
         );
 
         assert!(
@@ -426,10 +426,13 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO check all leaf nodes are in the store for each of single/multi
-
-// TODO for multi: check certain number of leaf nodes are in the tree
-// TODO for single: check certain number of leaf nodes are in the tree
+// TODO check all leaf nodes are in the store
+// TODO check certain number of leaf nodes are in the tree
+// TODO recursive function err - num leaf nodes exceeds max
+// TODO recursive function err - empty leaf nodes
+// TODO recursive function err - NOT x-coord min multiple of 2 or 0
+// TODO recursive function err - NOT x-coord max multiple of 2
+// TODO recursive function err - max - min must be power of 2
 
 #[cfg(test)]
 mod tests {

@@ -176,9 +176,6 @@ pub enum TreeBuildError {
 
 #[cfg(test)]
 mod tests {
-    // TODO test all edge cases where the first and last 2 nodes are either all
-    // present or all not or partially present
-
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
@@ -194,6 +191,11 @@ mod tests {
     // Happy cases for both single- and multi-threaded builders.
     // All tests here compare the trees from the 2 build algorithms, which gives
     // a fair amount of confidence in their correctness.
+
+    // TODO test all edge cases where the first and last 2 nodes are either all
+    // present or all not or partially present
+
+    // TODO test more leaf node configurations?
 
     #[test]
     fn multi_and_single_give_same_root_sparse_leaves() {

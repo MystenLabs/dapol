@@ -227,6 +227,7 @@ where
 // Unit tests.
 
 // TODO perform manual calculation of a tree and check that it equals the one generated here
+// TODO check certain number of leaf nodes are in the tree
 
 #[cfg(test)]
 mod tests {
