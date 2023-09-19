@@ -165,9 +165,9 @@ impl NdmSmt {
         println!("  ndm start single threaded build {:?}", start);
 
         let tree_2 = TreeBuilder::new()
-            .with_height(height)?
-            .with_leaf_nodes(leaf_nodes.clone())?
-            .with_single_threaded_build_algorithm()?
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_single_threaded_build_algorithm()
             .with_padding_node_generator(new_padding_node_content)
             .build()?;
 
@@ -180,9 +180,9 @@ impl NdmSmt {
         println!("  ndm start multi threaded build {:?}", start);
 
         let tree = TreeBuilder::new()
-            .with_height(height)?
-            .with_leaf_nodes(leaf_nodes)?
-            .with_multi_threaded_build_algorithm()?
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes)
+            .with_multi_threaded_build_algorithm()
             .with_padding_node_generator(new_padding_node_content)
             .build()?;
 

@@ -267,11 +267,8 @@ mod tests {
         // TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes.clone())
-            .unwrap()
             .with_single_threaded_build_algorithm()
-            .unwrap()
             .with_padding_node_generator(new_padding_node_content)
             .build()
             .unwrap();
@@ -296,11 +293,8 @@ mod tests {
         // TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes.clone())
-            .unwrap()
             .with_single_threaded_build_algorithm()
-            .unwrap()
             .with_padding_node_generator(new_padding_node_content)
             .build()
             .unwrap();
@@ -326,11 +320,8 @@ mod tests {
 
             let tree_single_threaded = TreeBuilder::new()
                 .with_height(height)
-                .unwrap()
                 .with_leaf_nodes(leaf_node.clone())
-                .unwrap()
                 .with_single_threaded_build_algorithm()
-                .unwrap()
                 .with_padding_node_generator(new_padding_node_content)
                 .build()
                 .unwrap();

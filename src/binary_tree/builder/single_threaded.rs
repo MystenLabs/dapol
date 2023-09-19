@@ -10,9 +10,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::super::{
-    BinaryTree, Coordinate, ErrOnSome, ErrUnlessTrue, MatchedPair, Mergeable, Node, Sibling,
-};
+use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling};
 use super::{TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -23,8 +21,7 @@ pub struct SingleThreadedBuilder<C, F>
 where
     C: Clone,
 {
-    height: u8,
-    leaf_nodes: Vec<Node<C>>,
+    parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
 
@@ -42,53 +39,11 @@ where
     C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
-    pub fn new(parent_builder: TreeBuilder<C>) -> Result<Self, TreeBuildError> {
-        use super::super::num_bottom_layer_nodes;
-
-        // require certain fields to be set
-        let input_leaf_nodes = parent_builder
-            .leaf_nodes
-            .ok_or(TreeBuildError::NoLeafNodesProvided)?;
-        let height = parent_builder
-            .height
-            .ok_or(TreeBuildError::NoHeightProvided)?;
-
-        let leaf_nodes = {
-            // Translate InputLeafNode to Node.
-            let mut leaf_nodes: Vec<Node<C>> = input_leaf_nodes
-                .into_iter()
-                .map(|leaf| leaf.to_node())
-                .collect();
-
-            // Sort by x-coord ascending.
-            leaf_nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
-
-            // Make sure all x-coord < max.
-            let max_leaf_nodes = num_bottom_layer_nodes(height);
-            leaf_nodes
-                .last()
-                .map(|node| node.coord.x < max_leaf_nodes)
-                .err_unless_true(TreeBuildError::InvalidXCoord)?;
-
-            // Ensure no duplicates.
-            let i = leaf_nodes.iter();
-            let i_plus_1 = {
-                let mut i = leaf_nodes.iter();
-                i.next();
-                i
-            };
-            i.zip(i_plus_1)
-                .find(|(prev, curr)| prev.coord.x == curr.coord.x)
-                .err_on_some(TreeBuildError::DuplicateLeaves)?;
-
-            leaf_nodes
-        };
-
-        Ok(SingleThreadedBuilder {
-            height,
-            leaf_nodes,
+    pub fn new(parent_builder: TreeBuilder<C>) -> Self {
+        SingleThreadedBuilder {
+            parent_builder,
             padding_node_generator: None,
-        })
+        }
     }
 
     /// New padding nodes are given by a closure. Why a closure? Because
@@ -100,12 +55,27 @@ where
     }
 
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
+        use super::verify_no_duplicate_leaves;
+
+        let (mut input_leaf_nodes, height) = self.parent_builder.verify_and_return_fields()?;
+
+        let leaf_nodes = {
+            // Sort by x-coord ascending.
+            input_leaf_nodes.sort_by(|a, b| a.x_coord.cmp(&b.x_coord));
+
+            verify_no_duplicate_leaves(&input_leaf_nodes)?;
+
+            // Translate InputLeafNode to Node.
+            input_leaf_nodes
+                .into_iter()
+                .map(|leaf| leaf.to_node())
+                .collect::<Vec<Node<C>>>()
+        };
+
         let padding_node_generator = self
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        let height = self.height;
-        let leaf_nodes = self.leaf_nodes;
         let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);
 
         Ok(BinaryTree {
@@ -260,24 +230,15 @@ where
 
 #[cfg(test)]
 mod tests {
+    use super::super::super::num_bottom_layer_nodes;
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent
     };
-    use crate::testing_utils::assert_err;
+    use crate::testing_utils::{assert_err_simple, assert_err};
 
-    /// Check 2 errors are the same.
-    /// Same as [crate][testing_utils][assert_err] but without needing debug
-    /// trait on the error type.
-    /// https://stackoverflow.com/a/65618681
-    macro_rules! assert_err_simple {
-        ($expression:expr, $($pattern:tt)+) => {
-            match $expression {
-                $($pattern)+ => (),
-                _ => panic!("expected a specific error but did not get it"),
-            }
-        }
-    }
+    use primitive_types::H256;
+    use rand::{thread_rng, Rng};
 
     type Func = Box<dyn Fn(&Coordinate) -> TestContent>;
 
@@ -287,8 +248,9 @@ mod tests {
         let leaf_nodes = full_bottom_layer(height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
-            .unwrap()
-            .with_single_threaded_build_algorithm::<Func>();
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -299,11 +261,62 @@ mod tests {
         let height = 4;
         let res = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
-            .with_single_threaded_build_algorithm::<Func>();
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
+    }
+
+    #[test]
+    fn err_for_empty_leaves() {
+        let height = 5;
+        let res = TreeBuilder::<TestContent>::new()
+            .with_height(height)
+            .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
+
+        assert_err!(res, Err(TreeBuildError::EmptyLeaves));
+    }
+
+    #[test]
+    fn err_when_height_too_small() {
+        assert!(MIN_HEIGHT > 0, "Invalid min height {}", MIN_HEIGHT);
+        let height = MIN_HEIGHT - 1;
+        let res = TreeBuilder::<TestContent>::new()
+            .with_height(height)
+            .with_leaf_nodes(vec![single_leaf(1, height)])
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
+
+        assert_err!(res, Err(TreeBuildError::HeightTooSmall));
+    }
+
+    #[test]
+    fn err_for_too_many_leaves_with_height_first() {
+        let height = 8u8;
+        let mut leaf_nodes = full_bottom_layer(height);
+
+        leaf_nodes.push(InputLeafNode::<TestContent> {
+            x_coord: num_bottom_layer_nodes(height) + 1,
+            content: TestContent {
+                hash: H256::random(),
+                value: thread_rng().gen(),
+            },
+        });
+
+        let res = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes)
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
+
+        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }
 
     #[test]
@@ -314,10 +327,10 @@ mod tests {
 
         let res = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes)
-            .unwrap()
-            .with_single_threaded_build_algorithm::<Func>();
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::DuplicateLeaves));
@@ -330,10 +343,10 @@ mod tests {
 
         let res = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(vec![leaf_node])
-            .unwrap()
-            .with_single_threaded_build_algorithm::<Func>();
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::InvalidXCoord));
@@ -346,11 +359,8 @@ mod tests {
 
         let res = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes)
-            .unwrap()
             .with_single_threaded_build_algorithm::<Func>()
-            .unwrap()
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -368,11 +378,8 @@ mod tests {
 
         let tree = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes.clone())
-            .unwrap()
             .with_single_threaded_build_algorithm()
-            .unwrap()
             .with_padding_node_generator(&get_padding_function())
             .build()
             .unwrap();
@@ -382,11 +389,8 @@ mod tests {
 
         let tree = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes)
-            .unwrap()
             .with_single_threaded_build_algorithm()
-            .unwrap()
             .with_padding_node_generator(&get_padding_function())
             .build()
             .unwrap();
@@ -401,11 +405,8 @@ mod tests {
 
         let tree = TreeBuilder::new()
             .with_height(height)
-            .unwrap()
             .with_leaf_nodes(leaf_nodes.clone())
-            .unwrap()
             .with_single_threaded_build_algorithm()
-            .unwrap()
             .with_padding_node_generator(&get_padding_function())
             .build()
             .unwrap();
