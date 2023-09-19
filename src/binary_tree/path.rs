@@ -18,7 +18,7 @@ use thiserror::Error;
 /// included). The leaf node + the siblings can be used to reconstruct the
 /// actual nodes in the path as well as the root node.
 #[derive(Debug)]
-pub struct Path<C: Clone> {
+pub struct Path<C> {
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
 }
@@ -26,7 +26,7 @@ pub struct Path<C: Clone> {
 // -------------------------------------------------------------------------------------------------
 // Constructor
 
-impl<C: Mergeable + Clone> BinaryTree<C> {
+impl<C: Clone> BinaryTree<C> {
     /// Construct the path up the tree from the leaf node at the given x-coord
     /// on the bottom layer to the root node. Put all the sibling nodes for
     /// the path into a vector and use this vector to create a [Path] struct
@@ -78,7 +78,7 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
 
 /// Construct a [MatchedPairRef] using the 2 given nodes.
 /// Only build the pair if the 2 nodes are siblings, otherwise return an error.
-fn build_pair<'a, C: Mergeable + Clone>(
+fn build_pair<'a, C: Clone>(
     node: &'a Node<C>,
     parent: &'a Node<C>,
 ) -> Result<MatchedPairRef<'a, C>, PathError> {
@@ -158,11 +158,11 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Conversion
 
-impl<C: Clone> Path<C> {
+impl<C> Path<C> {
     /// Convert `Path<C>` to `Path<D>`.
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
-    pub fn convert<B: Clone + From<C>>(self) -> Path<B> {
+    pub fn convert<B: From<C>>(self) -> Path<B> {
         Path {
             siblings: self
                 .siblings
@@ -205,7 +205,7 @@ pub enum PathError {
 /// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
 /// not needed.
 #[allow(dead_code)]
-struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
+struct LeftSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a right sibling node.
 ///
@@ -214,7 +214,7 @@ struct LeftSiblingRef<'a, C: Clone>(&'a Node<C>);
 /// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
 /// not needed.
 #[allow(dead_code)]
-struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
+struct RightSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
 ///
@@ -223,12 +223,12 @@ struct RightSiblingRef<'a, C: Clone>(&'a Node<C>);
 /// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
 /// not needed.
 #[allow(dead_code)]
-struct MatchedPairRef<'a, C: Mergeable + Clone> {
+struct MatchedPairRef<'a, C> {
     left: LeftSiblingRef<'a, C>,
     right: RightSiblingRef<'a, C>,
 }
 
-impl<'a, C: Mergeable + Clone> MatchedPairRef<'a, C> {
+impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     #[allow(dead_code)]
     fn merge(&self) -> Node<C> {

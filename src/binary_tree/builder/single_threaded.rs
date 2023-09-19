@@ -17,10 +17,7 @@ use super::{TreeBuildError, TreeBuilder};
 // Main struct.
 
 #[derive(Debug)]
-pub struct SingleThreadedBuilder<C, F>
-where
-    C: Clone,
-{
+pub struct SingleThreadedBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -90,12 +87,12 @@ where
 // Supporting structs & methods.
 
 /// A pair of sibling nodes, but one might be absent.
-struct MaybeUnmatchedPair<C: Mergeable + Clone> {
+struct MaybeUnmatchedPair<C> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
-impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
+impl<C> MaybeUnmatchedPair<C> {
     fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -118,7 +115,7 @@ impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
     }
 }
 
-impl<C: Clone> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -135,6 +132,7 @@ impl<C: Clone> Node<C> {
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
+// TODO this store type will conflict with the store trait I think
 type Store<C> = HashMap<Coordinate, Node<C>>;
 type RootNode<C> = Node<C>;
 
@@ -234,9 +232,9 @@ mod tests {
     use super::super::super::num_bottom_layer_nodes;
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};

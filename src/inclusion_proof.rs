@@ -67,7 +67,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         // Is this cast safe? Yes because the tree height (which is the same as the
         // length of the input) is also stored as a u8, and so there would never
         // be more siblings than max(u8). TODO might be worth using a bounded
-        // vector for siblings. If the tree height changes   type for some
+        // vector for siblings. If the tree height changes type for some
         // reason then this code would fail silently.
         let tree_height = path.siblings.len() as u8 + 1;
         let aggregation_index = aggregation_factor.apply_to(tree_height);

@@ -36,19 +36,13 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::thread;
 
-use super::super::{
-    num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node,
-    Sibling,
-};
+use super::super::{num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling};
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
-pub struct MultiThreadedBuilder<C, F>
-where
-    C: Clone,
-{
+pub struct MultiThreadedBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -138,7 +132,7 @@ where
 /// If all nodes satisfy `node.coord.x <= mid` then `AllNodes` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `NoNodes` is returned.
 // TODO can be optimized using a binary search
-fn get_num_nodes_left_of<C: Clone>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -157,7 +151,7 @@ enum NumNodes {
     SomeNodes(usize),
 }
 
-impl<C: Clone> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -171,7 +165,7 @@ impl<C: Clone> Node<C> {
     }
 }
 
-impl<C: Mergeable + Clone> MatchedPair<C> {
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
@@ -227,7 +221,6 @@ struct RecursionParams {
     pub x_coord_mid: u64,
     pub x_coord_max: u64,
     pub y: u8,
-    pub height: u8,
     pub max_thread_spawn_height: u8,
 }
 
@@ -247,7 +240,6 @@ impl RecursionParams {
             x_coord_mid,
             x_coord_max,
             y,
-            height,
             max_thread_spawn_height,
         }
     }
@@ -441,7 +433,7 @@ mod tests {
     use crate::binary_tree::utils::test_utils::{
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};

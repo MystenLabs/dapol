@@ -58,7 +58,7 @@ pub static MIN_HEIGHT: u8 = 2;
 /// leaf nodes that were originally fed into the tree builder are guaranteed
 /// to be stored.
 #[derive(Debug)]
-pub struct BinaryTree<C: Clone> {
+pub struct BinaryTree<C> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
     height: u8,
@@ -68,7 +68,7 @@ pub struct BinaryTree<C: Clone> {
 /// The data contained in the node is completely generic, requiring only to have
 /// an associated merge function.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Node<C: Clone> {
+pub struct Node<C> {
     pub coord: Coordinate,
     pub content: C,
 }
@@ -138,7 +138,7 @@ impl Coordinate {
     }
 }
 
-impl<C: Clone> Node<C> {
+impl<C> Node<C> {
     /// Returns left if this node is a left sibling and vice versa for right.
     /// Since we are working with a binary tree we can tell if the node is a
     /// left sibling of the above layer by checking the x_coord modulus 2.
@@ -197,7 +197,7 @@ impl<C: Clone> Node<C> {
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
-    fn convert<B: Clone + From<C>>(self) -> Node<B> {
+    fn convert<B: From<C>>(self) -> Node<B> {
         Node {
             content: self.content.into(),
             coord: self.coord,
@@ -205,7 +205,7 @@ impl<C: Clone> Node<C> {
     }
 }
 
-impl<C: Clone> InputLeafNode<C> {
+impl<C> InputLeafNode<C> {
     /// Convert the simpler node type to the actual Node type.
     fn to_node(self) -> Node<C> {
         Node {
@@ -230,13 +230,13 @@ enum NodeOrientation {
 
 /// Used to orient nodes inside a sibling pair so that the compiler can
 /// guarantee a left node is actually a left node.
-enum Sibling<C: Clone> {
+enum Sibling<C> {
     Left(Node<C>),
     Right(Node<C>),
 }
 
 /// A pair of sibling nodes.
-struct MatchedPair<C: Mergeable + Clone> {
+struct MatchedPair<C> {
     left: Node<C>,
     right: Node<C>,
 }
@@ -244,7 +244,7 @@ struct MatchedPair<C: Mergeable + Clone> {
 // -------------------------------------------------------------------------------------------------
 // Supporting struct implementations.
 
-impl<C: Clone> Sibling<C> {
+impl<C> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {
         match node.orientation() {
@@ -254,7 +254,7 @@ impl<C: Clone> Sibling<C> {
     }
 }
 
-impl<C: Mergeable + Clone> MatchedPair<C> {
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {

@@ -142,7 +142,6 @@ fn verify_no_duplicate_leaves<C>(leaf_nodes: &Vec<InputLeafNode<C>>) -> Result<(
         .find(|(prev, curr)| prev.x_coord == curr.x_coord)
         .err_on_some(TreeBuildError::DuplicateLeaves)?;
 
-    println!("BAD=====================");
     Ok(())
 }
 
