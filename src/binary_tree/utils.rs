@@ -108,7 +108,7 @@ pub mod test_utils {
             leaf_nodes.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {
-                    hash: H256::default(),
+                    hash: H256::random(),
                     value: i as u32,
                 },
             });
@@ -121,8 +121,8 @@ pub mod test_utils {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
-                hash: H256::default(),
-                value: 1,
+                hash: H256::random(),
+                value: 100000000,
             },
         };
         leaf
@@ -138,28 +138,28 @@ pub mod test_utils {
         let leaf_0 = InputLeafNode::<TestContent> {
             x_coord: 6,
             content: TestContent {
-                hash: H256::default(),
+                hash: H256::random(),
                 value: 1,
             },
         };
         let leaf_1 = InputLeafNode::<TestContent> {
             x_coord: 1,
             content: TestContent {
-                hash: H256::default(),
+                hash: H256::random(),
                 value: 2,
             },
         };
         let leaf_2 = InputLeafNode::<TestContent> {
             x_coord: 0,
             content: TestContent {
-                hash: H256::default(),
+                hash: H256::random(),
                 value: 3,
             },
         };
         let leaf_3 = InputLeafNode::<TestContent> {
             x_coord: 5,
             content: TestContent {
-                hash: H256::default(),
+                hash: H256::random(),
                 value: 4,
             },
         };

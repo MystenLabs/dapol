@@ -163,6 +163,7 @@ mod tests {
     use crate::testing_utils::assert_err;
 
     use primitive_types::H256;
+    use rand::{thread_rng, Rng};
 
     // =========================================================================
     // Happy cases for both single- and multi-threaded builders.
@@ -295,8 +296,8 @@ mod tests {
         leaf_nodes.push(InputLeafNode::<TestContent> {
             x_coord: num_bottom_layer_nodes(height) + 1,
             content: TestContent {
-                hash: H256::default(),
-                value: 1,
+                hash: H256::random(),
+                value: thread_rng().gen(),
             },
         });
 
@@ -316,8 +317,8 @@ mod tests {
         leaf_nodes.push(InputLeafNode::<TestContent> {
             x_coord: num_bottom_layer_nodes(height) + 1,
             content: TestContent {
-                hash: H256::default(),
-                value: 1,
+                hash: H256::random(),
+                value: thread_rng().gen(),
             },
         });
 
