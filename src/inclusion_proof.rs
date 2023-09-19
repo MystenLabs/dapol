@@ -1,18 +1,19 @@
 //! Inclusion proof struct and methods.
 //!
-//! The inclusion proof is very closely related to the node content type, and so the struct was not
-//! made generic in the type of node content. If other node contents are to be supported then new
-//! inclusion proof structs and methods will need to be written.
+//! The inclusion proof is very closely related to the node content type, and so
+//! the struct was not made generic in the type of node content. If other node
+//! contents are to be supported then new inclusion proof structs and methods
+//! will need to be written.
 
 use crate::binary_tree::{Coordinate, Node, Path, PathError};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::primitives::H256Finalizable;
 
-use ::std::fmt::Debug;
 use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
 use primitive_types::H256;
+use std::fmt::Debug;
 use thiserror::Error;
 
 mod individual_range_proof;
@@ -27,13 +28,13 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// - the path in the tree
 /// - the range proof for the Pedersen commitments
 ///
-/// The tree path is taken to be of a compressed node content type because sharing a full node
-/// content type with users would leak secret information such as other user's liabilities and the
-/// total sum of liabilities.
+/// The tree path is taken to be of a compressed node content type because
+/// sharing a full node content type with users would leak secret information
+/// such as other user's liabilities and the total sum of liabilities.
 ///
-/// The Bulletproofs protocol allows aggregating multiple range proofs into 1 proof, which is more
-/// efficient to produce & verify than doing them individually. Both aggregated and individual range
-/// proofs are supported.
+/// The Bulletproofs protocol allows aggregating multiple range proofs into 1
+/// proof, which is more efficient to produce & verify than doing them
+/// individually. Both aggregated and individual range proofs are supported.
 #[derive(Debug)]
 pub struct InclusionProof<H: Clone> {
     path: Path<HiddenNodeContent<H>>,
@@ -46,24 +47,28 @@ pub struct InclusionProof<H: Clone> {
 impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs are aggregated.
-    /// Those that do not form part of the aggregated proof are just proved individually. The
-    /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// are aggregated. Those that do not form part of the aggregated proof
+    /// are just proved individually. The aggregation is a feature of the
+    /// Bulletproofs protocol that improves efficiency.
     ///
-    /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
-    /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
-    /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
-    /// because we are not expected to require bounds higher than $2^256$. Note that if the value
-    /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
+    /// `upper_bound_bit_length` is used to determine the upper bound for the
+    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
+    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
+    /// some liability. The type is set to `u8` because we are not expected
+    /// to require bounds higher than $2^256$. Note that if the value is set
+    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
+    /// an Err.
     pub fn generate(
         path: Path<FullNodeContent<H>>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
-        // Is this cast safe? Yes because the tree height (which is the same as the length of the
-        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
-        // TODO might be worth using a bounded vector for siblings. If the tree height changes
-        //   type for some reason then this code would fail silently.
+        // Is this cast safe? Yes because the tree height (which is the same as the
+        // length of the input) is also stored as a u8, and so there would never
+        // be more siblings than max(u8). TODO might be worth using a bounded
+        // vector for siblings. If the tree height changes   type for some
+        // reason then this code would fail silently.
         let tree_height = path.siblings.len() as u8 + 1;
         let aggregation_index = aggregation_factor.apply_to(tree_height);
 
@@ -114,8 +119,9 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
     pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
         use curve25519_dalek_ng::ristretto::CompressedRistretto;
 
-        // Is this cast safe? Yes because the tree height (which is the same as the length of the
-        // input) is also stored as a u8, and so there would never be more siblings than max(u8).
+        // Is this cast safe? Yes because the tree height (which is the same as the
+        // length of the input) is also stored as a u8, and so there would never
+        // be more siblings than max(u8).
         let tree_height = self.path.siblings.len() as u8 + 1;
 
         {
@@ -177,22 +183,27 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
 // -------------------------------------------------------------------------------------------------
 // Aggregation factor
 
-/// Method used to determine how many of the range proofs are aggregated. Those that do not
-/// form part of the aggregated proof are just proved individually.
+/// Method used to determine how many of the range proofs are aggregated. Those
+/// that do not form part of the aggregated proof are just proved individually.
 ///
-/// Divisor: divide the number of nodes by this number to get the ratio of the nodes to be used in
-/// the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height / divisor` (any
-/// decimals are truncated, not rounded). Note:
+/// Divisor: divide the number of nodes by this number to get the ratio of the
+/// nodes to be used in the aggregated proof i.e.
+/// `number_of_ranges_for_aggregation = tree_height / divisor` (any decimals are
+/// truncated, not rounded). Note:
 /// - if this number is 0 it means that none of the proofs should be aggregated
 /// - if this number is 1 it means that all of the proofs should be aggregated
-/// - if this number is `tree_height` it means that only the leaf node should be aggregated
-/// - if this number is `> tree_height` it means that none of the proofs should be aggregated
+/// - if this number is `tree_height` it means that only the leaf node should be
+///   aggregated
+/// - if this number is `> tree_height` it means that none of the proofs should
+///   be aggregated
 ///
-/// Percent: multiply the `tree_height` by this percentage to get the number of nodes to be used
-/// in the aggregated proof i.e. `number_of_ranges_for_aggregation = tree_height * percentage`.
+/// Percent: multiply the `tree_height` by this percentage to get the number of
+/// nodes to be used in the aggregated proof i.e.
+/// `number_of_ranges_for_aggregation = tree_height * percentage`.
 ///
-/// Number: the exact number of nodes to be used in the aggregated proof. Note that if this number
-/// is `> tree_height` it is treated as if it was equal to `tree_height`.
+/// Number: the exact number of nodes to be used in the aggregated proof. Note
+/// that if this number is `> tree_height` it is treated as if it was equal to
+/// `tree_height`.
 pub enum AggregationFactor {
     Divisor(u8),
     Percent(PercentageInteger),
@@ -201,7 +212,8 @@ pub enum AggregationFactor {
 
 use std::fmt;
 
-/// We cannot derive this because [percent][PercentageInteger] does not implement Debug.
+/// We cannot derive this because [percent][PercentageInteger] does not
+/// implement Debug.
 impl fmt::Debug for AggregationFactor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -213,8 +225,8 @@ impl fmt::Debug for AggregationFactor {
 }
 
 impl AggregationFactor {
-    /// Transform the aggregation factor into a u8, representing the number of ranges that should
-    /// aggregated together into a single Bulletproof.
+    /// Transform the aggregation factor into a u8, representing the number of
+    /// ranges that should aggregated together into a single Bulletproof.
     fn apply_to(&self, tree_height: u8) -> u8 {
         match self {
             Self::Divisor(div) => {
@@ -441,11 +453,14 @@ mod tests {
         proof.verify(root_hash).unwrap();
     }
 
-    // TODO test correct error translation from lower layers (probably should mock the error responses rather than triggering them from the code in the lower layers)
+    // TODO test correct error translation from lower layers (probably should
+    // mock the error responses rather than triggering them from the code in the
+    // lower layers)
 }
 
 // -------------------------------------------------------------------------------------------------
-// This was an attempt at making this struct more generic but it's actually just over-complicating the code for no reason
+// This was an attempt at making this struct more generic but it's actually just
+// over-complicating the code for no reason
 
 // impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
 //     pub fn generate<B, F, G>(
@@ -463,9 +478,10 @@ mod tests {
 
 //         let nodes = path.get_nodes()?;
 //         let secrets: Vec<u64> = nodes.iter().map(secret_extractor).collect();
-//         let blindings: Vec<Scalar> = nodes.iter().map(blinding_extractor).collect();
-//         let range_proof =
-//             RangeProofPadding::generate_proof(&secrets, &blindings, aggregation_factor);
+//         let blindings: Vec<Scalar> =
+// nodes.iter().map(blinding_extractor).collect();         let range_proof =
+//             RangeProofPadding::generate_proof(&secrets, &blindings,
+// aggregation_factor);
 
 //         Ok(InclusionProof {
 //             path: path.convert::<C>(),
