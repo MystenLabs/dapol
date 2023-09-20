@@ -195,7 +195,7 @@ where
         }
 
         assert!(
-            store_depth > 1,
+            store_depth >= 1,
             "{} Store depth cannot be less than 1 since the root node is always stored",
             BUG
         );
@@ -477,6 +477,80 @@ mod tests {
                 "Leaf node at x-coord {} is not present in the store",
                 leaf.x_coord
             ));
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(&get_padding_function())
+            .build()
+            .unwrap();
+
+        let middle_layer = height / 2;
+        let layer_below_root = height - 1;
+
+        // These nodes should be in the store.
+        for y in middle_layer..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                tree.store
+                    .get(&coord)
+                    .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+            }
+        }
+
+        // These nodes should not be in the store.
+        // Why 1 and not 0? Because leaf nodes are checked in another test.
+        for y in 1..middle_layer {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+        let store_depth = 1;
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(store_depth)
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_generator(&get_padding_function())
+            .build()
+            .unwrap();
+
+        let layer_below_root = height - 1;
+
+        // Only the leaf nodes should be in the store.
+        for x in 0..2u64.pow((height - 1) as u32) {
+            let coord = Coordinate { x, y: 0 };
+            tree.store
+                .get(&coord)
+                .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+        }
+
+        // All internal nodes should not be in the store.
+        for y in 1..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
         }
     }
 }
