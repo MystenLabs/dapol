@@ -16,6 +16,10 @@ use multi_threaded::MultiThreadedBuilder;
 mod single_threaded;
 use single_threaded::SingleThreadedBuilder;
 
+/// This equates to half of the layers being stored.
+/// `height / DEFAULT_STORE_DEPTH_RATIO`
+static DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
+
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
@@ -107,16 +111,28 @@ where
         SingleThreadedBuilder::new(self)
     }
 
-    /// Called by children builders to check the bounds of the `leaf_nodes` and
-    /// `height` fields.
-    fn verify_and_return_fields(self) -> Result<(Vec<InputLeafNode<C>>, u8), TreeBuildError> {
-        use super::{num_bottom_layer_nodes, ErrUnlessTrue};
+    /// Use the height of the tree to determine store depth by dividing it by the
+    /// default ratio.
+    fn get_or_default_store_depth(&self, height: u8) -> u8 {
+        self.store_depth
+            .unwrap_or(height / DEFAULT_STORE_DEPTH_RATIO)
+    }
 
+    /// Called by children builders to check the bounds of the `height` field.
+    fn get_and_verify_height(&self) -> Result<u8, TreeBuildError> {
         let height = self.height.ok_or(TreeBuildError::NoHeightProvided)?;
-
         if height < MIN_HEIGHT {
             return Err(TreeBuildError::HeightTooSmall);
         }
+        Ok(height)
+    }
+
+    /// Called by children builders to check the bounds of the `leaf_nodes` field.
+    fn get_and_verify_leaf_nodes(
+        self,
+        height: u8,
+    ) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
+        use super::{num_bottom_layer_nodes, ErrUnlessTrue};
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
 
@@ -136,7 +152,7 @@ where
             .map(|node| node.x_coord < max_leaf_nodes)
             .err_unless_true(TreeBuildError::InvalidXCoord)?;
 
-        Ok((leaf_nodes, height))
+        Ok(leaf_nodes)
     }
 }
 
@@ -301,7 +317,7 @@ mod tests {
         let leaf_nodes = full_bottom_layer(height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
-            .verify_and_return_fields();
+            .get_and_verify_height();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -312,7 +328,7 @@ mod tests {
         let height = 4;
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
-            .verify_and_return_fields();
+            .get_and_verify_leaf_nodes(height);
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
@@ -324,7 +340,7 @@ mod tests {
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::new())
-            .verify_and_return_fields();
+            .get_and_verify_leaf_nodes(height);
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
 
@@ -334,12 +350,12 @@ mod tests {
         let height = MIN_HEIGHT - 1;
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
-            .verify_and_return_fields();
+            .get_and_verify_height();
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
     }
 
     #[test]
-    fn err_for_too_many_leaves_with_height_first() {
+    fn err_for_too_many_leaves() {
         let height = 8u8;
         let mut leaf_nodes = full_bottom_layer(height);
 
@@ -354,7 +370,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .verify_and_return_fields();
+            .get_and_verify_leaf_nodes(height);
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }

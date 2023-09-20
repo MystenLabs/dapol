@@ -87,7 +87,8 @@ where
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
-        let (mut input_leaf_nodes, height) = self.parent_builder.verify_and_return_fields()?;
+        let height = self.parent_builder.get_and_verify_height()?;
+        let mut input_leaf_nodes = self.parent_builder.get_and_verify_leaf_nodes(height)?;
 
         let leaf_nodes = {
             // Sort by x-coord ascending.
