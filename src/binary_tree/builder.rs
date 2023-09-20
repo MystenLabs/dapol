@@ -23,6 +23,7 @@ use single_threaded::SingleThreadedBuilder;
 pub struct TreeBuilder<C> {
     height: Option<u8>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
+    store_depth: Option<u8>,
 }
 
 /// A simpler version of the [Node] struct that is used as input to
@@ -55,6 +56,7 @@ where
         TreeBuilder {
             height: None,
             leaf_nodes: None,
+            store_depth: None,
         }
     }
 
@@ -72,6 +74,18 @@ where
     /// Will return an error if `leaf_nodes` is empty.
     pub fn with_leaf_nodes(mut self, leaf_nodes: Vec<InputLeafNode<C>>) -> Self {
         self.leaf_nodes = Some(leaf_nodes);
+        self
+    }
+
+    /// `store_depth` determines how many layers are placed in the store. If
+    /// `store_depth == 1` then only the root node is stored and if
+    /// `store_depth == 2` then the root node and the next layer down are stored.
+    ///
+    /// The fewer nodes that are place in the store the smaller the serialized
+    /// tree file will be, but the more time it will take to generate inclusion
+    /// proofs since more nodes may have to be built from scratch.
+    pub fn with_store_depth(mut self, store_depth: u8) -> Self {
+        self.store_depth = Some(store_depth);
         self
     }
 
@@ -318,7 +332,9 @@ mod tests {
     fn err_when_height_too_small() {
         assert!(MIN_HEIGHT > 0, "Invalid min height {}", MIN_HEIGHT);
         let height = MIN_HEIGHT - 1;
-        let res = TreeBuilder::<TestContent>::new().with_height(height).verify_and_return_fields();
+        let res = TreeBuilder::<TestContent>::new()
+            .with_height(height)
+            .verify_and_return_fields();
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
     }
 

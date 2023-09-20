@@ -54,6 +54,8 @@ where
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
+        let store_depth = self.parent_builder.store_depth.unwrap_or(2);
+
         let (mut input_leaf_nodes, height) = self.parent_builder.verify_and_return_fields()?;
 
         let leaf_nodes = {
@@ -73,7 +75,7 @@ where
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);
+        let (store, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
 
         Ok(BinaryTree {
             root,
@@ -109,7 +111,7 @@ impl<C> MaybeUnmatchedPair<C> {
             },
             // If this case is reached then there is a bug in the above fold.
             (None, None) => {
-                panic!("[Bug in tree constructor] Invalid pair (None, None) found")
+                panic!("{} Invalid pair (None, None) found", BUG)
             }
         }
     }
@@ -129,6 +131,8 @@ impl<C> Node<C> {
     }
 }
 
+static BUG: &'static str = "[Bug in single-threaded builder]";
+
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
@@ -138,23 +142,76 @@ type RootNode<C> = Node<C>;
 
 /// Construct a new binary tree.
 ///
+/// If `leaf_nodes` is empty or has length greater than what the tree height
+/// allows then there will be panic. The builder is expected to
+/// handle this case gracefully and this function is not public so a panic
+/// is acceptable here.
+/// Every element of `leaf_nodes` is assumed to have y-coord of 0; there is
+/// only a naive check for this (only first node is checked).
+///
 /// The nodes are stored in a hashmap, which is returned along with the root node
 /// (which is also stored in the hashmap).
+///
+/// `store_depth` determines how many layers are placed in the store. If
+/// `store_depth == 1` then only the root node is stored and if
+/// `store_depth == 2` then the root node and the next layer down are stored.
+///
+/// Note that the root node is not actually put in the hashmap because it is
+/// returned along with the hashmap, but it is considered to be stored so
+/// `store_depth` must at least be 1.
+/// Also note that all bottom layer nodes are stored, both the inputted leaf
+/// nodes and their accompanying padding nodes.
+///
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
 fn build_tree<C, F>(
-    mut nodes: Vec<Node<C>>,
+    leaf_nodes: Vec<Node<C>>,
     height: u8,
+    store_depth: u8,
     new_padding_node_content: F,
 ) -> (Store<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
-    let mut store = HashMap::new();
+    {
+        // Some simple parameter checks.
 
-    // Repeat for each layer of the tree.
-    for _i in 0..height - 1 {
+        use super::super::num_bottom_layer_nodes;
+        assert!(
+            leaf_nodes.len() <= num_bottom_layer_nodes(height) as usize,
+            "{} Too many leaf nodes",
+            BUG
+        );
+
+        if let Some(node) = leaf_nodes.first() {
+            assert_eq!(
+                node.coord.y, 0,
+                "{} Node expected to have y-coord of 0 but was {}",
+                BUG, node.coord.y
+            );
+        } else {
+            panic!("{} Empty leaf nodes", BUG);
+        }
+
+        assert!(
+            store_depth > 1,
+            "{} Store depth cannot be less than 1 since the root node is always stored",
+            BUG
+        );
+        assert!(
+            store_depth <= height,
+            "{} Store depth cannot exceed the height of the tree",
+            BUG
+        );
+    }
+
+    let mut store = HashMap::new();
+    let mut nodes = leaf_nodes;
+
+    // Repeat for each layer of the tree, except the root node layer.
+    let layer_below_root = height - 1;
+    for i in 0..layer_below_root {
         // Create the next layer up of nodes from the current layer of nodes.
         nodes = nodes
             .into_iter()
@@ -181,7 +238,7 @@ where
                                 .last_mut()
                                 // This case should never be reached because of the way
                                 // is_right_sibling_of_prev_node is built.
-                                .expect("[Bug in tree constructor] Previous node not found")
+                                .unwrap_or_else(|| panic!("{} Previous node not found", BUG))
                                 .right = Option::Some(right_sibling);
                         } else {
                             pairs.push(MaybeUnmatchedPair {
@@ -199,8 +256,14 @@ where
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
-                store.insert(pair.left.coord.clone(), pair.left);
-                store.insert(pair.right.coord.clone(), pair.right);
+                // TODO may be able to further optimize by leaving out the padding leaf nodes from the store
+                // Only insert nodes in the store if
+                // a) node is a bottom layer leaf node (including padding nodes)
+                // b) node is in one of the top X layers where X = store_depth
+                if i == 0 || i >= layer_below_root - (store_depth - 1) {
+                    store.insert(pair.left.coord.clone(), pair.left);
+                    store.insert(pair.right.coord.clone(), pair.right);
+                }
                 parent
             })
             .collect();
@@ -209,14 +272,13 @@ where
     // If the root node is not present then there is a bug in the above code.
     let root = nodes
         .pop()
-        .expect("[Bug in tree constructor] Unable to find root node");
+        .unwrap_or_else(|| panic!("{} Unable to find root node", BUG));
 
     assert!(
         nodes.len() == 0,
-        "[Bug in tree constructor] Should be no nodes left to process"
+        "{} Should be no nodes left to process",
+        BUG
     );
-
-    store.insert(root.coord.clone(), root.clone());
 
     (store, root)
 }
