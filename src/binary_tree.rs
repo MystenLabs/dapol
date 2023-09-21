@@ -61,7 +61,7 @@ pub static MIN_HEIGHT: u8 = 2;
 // TODO say something about node_generator
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: DashMap<Coordinate, Node<C>>,
+    store: Store<C>,
     height: u8,
 }
 
@@ -85,6 +85,14 @@ pub struct Coordinate {
     // other bits of the code, and make it easy to upgrade this max to something larger in the
     // future
     pub x: u64, // from 0 to 2^y
+}
+
+type Map<C> = DashMap<Coordinate, Node<C>>;
+
+#[derive(Debug)]
+struct Store<C> {
+    node_map: Map<C>,
+    // leaves_bit_map: u64,
 }
 
 /// The generic content type of a [Node] must implement this trait to allow 2
@@ -113,7 +121,7 @@ impl<C: Clone> BinaryTree<C> {
     // TODO this won't work if the store is partially full, we need to call
     // build some of the nodes from scratch in the half-full case
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
-        self.store.get(coord).map(|node| (*node).clone())
+        self.store.node_map.get(coord).map(|node| (*node).clone())
     }
 
     /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the

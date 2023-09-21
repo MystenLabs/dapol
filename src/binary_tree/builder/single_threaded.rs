@@ -10,7 +10,7 @@
 use dashmap::DashMap;
 use std::fmt::Debug;
 
-use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling};
+use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store, Map};
 use super::{TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -75,11 +75,11 @@ where
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        let (store, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
+        let (map, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
 
         Ok(BinaryTree {
             root,
-            store,
+            store: Store { node_map: map },
             height,
         })
     }
@@ -136,8 +136,6 @@ static BUG: &'static str = "[Bug in single-threaded builder]";
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
-// TODO this store type will conflict with the store trait I think
-type Store<C> = DashMap<Coordinate, Node<C>>;
 type RootNode<C> = Node<C>;
 
 /// Construct a new binary tree.
@@ -169,7 +167,7 @@ fn build_tree<C, F>(
     height: u8,
     store_depth: u8,
     new_padding_node_content: F,
-) -> (Store<C>, RootNode<C>)
+) -> (Map<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
@@ -501,6 +499,7 @@ mod tests {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 tree.store
+                    .node_map
                     .get(&coord)
                     .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
             }
@@ -511,7 +510,7 @@ mod tests {
         for y in 1..middle_layer {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
-                if tree.store.get(&coord).is_some() {
+                if tree.store.node_map.get(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
                 }
             }
@@ -539,6 +538,7 @@ mod tests {
         for x in 0..2u64.pow((height - 1) as u32) {
             let coord = Coordinate { x, y: 0 };
             tree.store
+                .node_map
                 .get(&coord)
                 .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
         }
@@ -547,7 +547,7 @@ mod tests {
         for y in 1..layer_below_root {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
-                if tree.store.get(&coord).is_some() {
+                if tree.store.node_map.get(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
                 }
             }
