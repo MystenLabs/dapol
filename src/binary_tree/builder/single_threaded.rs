@@ -7,7 +7,7 @@
 //! padding nodes where required, and then constructs the next layer by merging
 //! pairs of sibling nodes together.
 
-use std::collections::HashMap;
+use dashmap::DashMap;
 use std::fmt::Debug;
 
 use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling};
@@ -125,7 +125,7 @@ impl<C> Node<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.get_sibling_coord();
+        let coord = self.sibling_coord();
         let content = new_padding_node_content(&coord);
         Node { coord, content }
     }
@@ -137,7 +137,7 @@ static BUG: &'static str = "[Bug in single-threaded builder]";
 // Build algorithm.
 
 // TODO this store type will conflict with the store trait I think
-type Store<C> = HashMap<Coordinate, Node<C>>;
+type Store<C> = DashMap<Coordinate, Node<C>>;
 type RootNode<C> = Node<C>;
 
 /// Construct a new binary tree.
@@ -206,7 +206,7 @@ where
         );
     }
 
-    let mut store = HashMap::new();
+    let mut store = DashMap::new();
     let mut nodes = leaf_nodes;
 
     // Repeat for each layer of the tree, except the root node layer.

@@ -32,7 +32,8 @@
 //! `max(y)+1`. The inputted leaves used to construct the tree must contain the
 //! `x` coordinate (their `y` coordinate will be 0).
 
-use std::collections::HashMap;
+use std::fmt;
+use dashmap::DashMap;
 
 mod builder;
 pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
@@ -57,10 +58,10 @@ pub static MIN_HEIGHT: u8 = 2;
 /// space optimization there may be some nodes that are left out, but the
 /// leaf nodes that were originally fed into the tree builder are guaranteed
 /// to be stored.
-#[derive(Debug)]
+// TODO say something about node_generator
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: HashMap<Coordinate, Node<C>>,
+    store: DashMap<Coordinate, Node<C>>,
     height: u8,
 }
 
@@ -103,13 +104,21 @@ impl<C: Clone> BinaryTree<C> {
     pub fn get_root(&self) -> &Node<C> {
         &self.root
     }
-    /// Attempt to find a Node via it's coordinate in the underlying store.
-    pub fn get_node(&self, coord: &Coordinate) -> Option<&Node<C>> {
-        self.store.get(coord)
+
+    /// Attempt to find a node in the store via it's coordinate.
+    /// This function clones the data in the node so it's not advised to call
+    /// this if efficiency is required. A reference to the node cannot be
+    /// returned because the store uses a custom reference type and we do not
+    /// want to expose that custom type to the outside calling code.
+    // TODO this won't work if the store is partially full, we need to call
+    // build some of the nodes from scratch in the half-full case
+    pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        self.store.get(coord).map(|node| (*node).clone())
     }
+
     /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
     /// underlying store.
-    pub fn get_leaf_node(&self, x_coord: u64) -> Option<&Node<C>> {
+    pub fn get_leaf_node(&self, x_coord: u64) -> Option<Node<C>> {
         let coord = Coordinate { x: x_coord, y: 0 };
         self.get_node(&coord)
     }
@@ -136,6 +145,41 @@ impl Coordinate {
         mid.copy_from_slice(&self.x.to_le_bytes());
         c
     }
+
+    /// Returns left if a node with this coord is a left sibling and vice versa
+    /// for right.
+    /// Since we are working with a binary tree we can tell if the node is a
+    /// left sibling of the above layer by checking the x-coord modulus 2.
+    /// Since x-coord starts from 0 we check if the modulus is equal to 0.
+    fn orientation(&self) -> NodeOrientation {
+        if self.x % 2 == 0 {
+            NodeOrientation::Left
+        } else {
+            NodeOrientation::Right
+        }
+    }
+
+    /// Return the coordinates of the node that would be a sibling to the node
+    /// with coordinates equal to `self`, whether that be a right or a left
+    /// sibling.
+    fn sibling_coord(&self) -> Coordinate {
+        let x = match self.orientation() {
+            NodeOrientation::Left => self.x + 1,
+            NodeOrientation::Right => self.x - 1,
+        };
+        Coordinate { y: self.y, x }
+    }
+
+    /// Return the coordinates of the parent to the node that has this coordinate.
+    /// The x-coord divide-by-2 works for both left _and_ right siblings because
+    /// of truncation. Note that this function can be misused if tree height
+    /// is not used to bound the y-coord from above.
+    fn parent_coord(&self) -> Coordinate {
+        Coordinate {
+            y: self.y + 1,
+            x: self.x / 2,
+        }
+    }
 }
 
 impl<C> Node<C> {
@@ -144,11 +188,7 @@ impl<C> Node<C> {
     /// left sibling of the above layer by checking the x_coord modulus 2.
     /// Since x_coord starts from 0 we check if the modulus is equal to 0.
     fn orientation(&self) -> NodeOrientation {
-        if self.coord.x % 2 == 0 {
-            NodeOrientation::Left
-        } else {
-            NodeOrientation::Right
-        }
+        self.coord.orientation()
     }
 
     /// Return true if self is a) a left sibling and b) lives just to the left
@@ -177,23 +217,16 @@ impl<C> Node<C> {
 
     /// Return the coordinates of this node's sibling, whether that be a right
     /// or a left sibling.
-    fn get_sibling_coord(&self) -> Coordinate {
-        let x = match self.orientation() {
-            NodeOrientation::Left => self.coord.x + 1,
-            NodeOrientation::Right => self.coord.x - 1,
-        };
-        Coordinate { y: self.coord.y, x }
+    fn sibling_coord(&self) -> Coordinate {
+        self.coord.sibling_coord()
     }
 
     /// Return the coordinates of this node's parent.
     /// The x-coord divide-by-2 works for both left _and_ right siblings because
     /// of truncation. Note that this function can be misused if tree height
     /// is not used to bound the y-coord from above.
-    fn get_parent_coord(&self) -> Coordinate {
-        Coordinate {
-            y: self.coord.y + 1,
-            x: self.coord.x / 2,
-        }
+    fn parent_coord(&self) -> Coordinate {
+        self.coord.parent_coord()
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
@@ -215,6 +248,12 @@ impl<C> InputLeafNode<C> {
                 y: 0,
             },
         }
+    }
+}
+
+impl<C: fmt::Debug> fmt::Debug for BinaryTree<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "root: {:?}, store: {:?}, height: {:?}", self.root, self.store, self.height)
     }
 }
 
@@ -258,7 +297,7 @@ impl<C: Mergeable> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {
-            coord: self.left.get_parent_coord(),
+            coord: self.left.parent_coord(),
             content: C::merge(&self.left.content, &self.right.content),
         }
     }
@@ -348,7 +387,7 @@ mod tests {
         let height = 8;
         let x_coord = 5;
         let right_node = single_leaf(x_coord, height).to_node();
-        let sibling_coord = right_node.get_sibling_coord();
+        let sibling_coord = right_node.sibling_coord();
         assert_eq!(
             sibling_coord.y, 0,
             "Sibling should be on the bottom layer (y-coord == 0)"
@@ -357,7 +396,7 @@ mod tests {
 
         let x_coord = 0;
         let left_node = single_leaf(x_coord, height).to_node();
-        let sibling_coord = left_node.get_sibling_coord();
+        let sibling_coord = left_node.sibling_coord();
         assert_eq!(
             sibling_coord.y, 0,
             "Sibling should be on the bottom layer (y-coord == 0)"
@@ -371,11 +410,11 @@ mod tests {
 
         let x_coord = 5;
         let right_node = single_leaf(x_coord, height).to_node();
-        let right_parent_coord = right_node.get_parent_coord();
+        let right_parent_coord = right_node.parent_coord();
 
         let x_coord = 4;
         let left_node = single_leaf(x_coord, height).to_node();
-        let left_parent_coord = left_node.get_parent_coord();
+        let left_parent_coord = left_node.parent_coord();
 
         assert_eq!(
             right_parent_coord, left_parent_coord,

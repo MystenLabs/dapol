@@ -96,7 +96,7 @@ where
     /// High performance build algorithm utilizing parallelization.
     pub fn with_multi_threaded_build_algorithm<F>(self) -> MultiThreadedBuilder<C, F>
     where
-        C: Debug + Send + 'static,
+        C: Debug + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         MultiThreadedBuilder::new(self)
@@ -198,6 +198,9 @@ pub enum TreeBuildError {
     HeightTooSmall,
     #[error("Not allowed to have more than 1 leaf with the same x-coord")]
     DuplicateLeaves,
+
+    #[error("Could not get ownership of the store in the multi-threaded builder")]
+    StoreOwnershipFailure,
 }
 
 // -------------------------------------------------------------------------------------------------

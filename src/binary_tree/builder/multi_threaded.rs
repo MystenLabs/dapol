@@ -29,10 +29,10 @@
 //!
 //! TODO talk about store and why some nodes are not stored
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 
 use rayon::prelude::*;
+use dashmap::DashMap;
 use std::sync::Arc;
 use std::thread;
 
@@ -59,7 +59,7 @@ pub struct MultiThreadedBuilder<C, F> {
 /// The type traits on `C` & `F` are required for thread spawning.
 impl<C, F> MultiThreadedBuilder<C, F>
 where
-    C: Debug + Clone + Mergeable + Send + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
@@ -88,6 +88,7 @@ where
         use super::verify_no_duplicate_leaves;
 
         let height = self.parent_builder.get_and_verify_height()?;
+        let store_depth = self.parent_builder.get_or_default_store_depth(height);
         let mut input_leaf_nodes = self.parent_builder.get_and_verify_leaf_nodes(height)?;
 
         let leaf_nodes = {
@@ -107,18 +108,18 @@ where
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
+        let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
+
         let root = build_node(
             RecursionParams::new(height),
             leaf_nodes,
             Arc::new(padding_node_generator),
+            Arc::clone(&store),
         );
-
-        // TODO put some nodes in the store
-        let store = HashMap::new();
 
         Ok(BinaryTree {
             root,
-            store,
+            store: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
             height,
         })
     }
@@ -160,7 +161,7 @@ impl<C> Node<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.get_sibling_coord();
+        let coord = self.sibling_coord();
         let content = new_padding_node_content(&coord);
         Node { coord, content }
     }
@@ -291,9 +292,10 @@ fn build_node<C, F>(
     params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
+    store: Arc<DashMap<Coordinate, Node<C>>>,
 ) -> Node<C>
 where
-    C: Debug + Clone + Mergeable + Send + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {
@@ -349,6 +351,7 @@ where
             let left_leaves = leaves;
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
+            let store_ref = Arc::clone(&store);
 
             // Split off a thread to build the right child, but only do this if we are above
             // a certain height otherwise we are at risk of spawning too many threads.
@@ -359,6 +362,7 @@ where
                         params_clone.into_right_child(),
                         right_leaves,
                         new_padding_node_content_ref,
+                        store_ref,
                     )
                 });
 
@@ -366,6 +370,7 @@ where
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
+                    store,
                 );
 
                 // If there is a problem joining onto the thread then there is no way to recover
@@ -380,12 +385,14 @@ where
                     params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
+                    store_ref,
                 );
 
                 let left = build_node(
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
+                    store,
                 );
 
                 MatchedPair { left, right }
@@ -397,6 +404,7 @@ where
                 params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
+                store,
             );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
@@ -407,6 +415,7 @@ where
                 params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
+                        store,
             );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }

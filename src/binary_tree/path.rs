@@ -38,32 +38,24 @@ impl<C: Clone> BinaryTree<C> {
             y: 0,
         };
 
-        let leaf = self.get_node(&coord).ok_or(PathError::LeafNotFound)?;
+        let leaf = self
+            .get_leaf_node(leaf_x_coord)
+            .ok_or_else(|| PathError::NodeNotFound {
+                coord: coord.clone(),
+            })?;
 
-        let mut current_node = leaf;
+        let mut current_coord = coord;
         let mut siblings = Vec::with_capacity(self.get_height() as usize);
 
-        for y in 0..self.get_height() - 1 {
-            let x_coord = match current_node.orientation() {
-                NodeOrientation::Left => current_node.coord.x + 1,
-                NodeOrientation::Right => current_node.coord.x - 1,
-            };
-
-            let sibling_coord = Coordinate { x: x_coord, y };
+        for _y in 0..self.get_height() - 1 {
+            let sibling_coord = current_coord.sibling_coord();
             siblings.push(
                 self.get_node(&sibling_coord)
                     .ok_or(PathError::NodeNotFound {
                         coord: sibling_coord,
-                    })?
-                    .clone(),
+                    })?,
             );
-
-            let parent_coord = current_node.get_parent_coord();
-            current_node = self
-                .get_node(&parent_coord)
-                .ok_or(PathError::NodeNotFound {
-                    coord: parent_coord,
-                })?;
+            current_coord = current_coord.parent_coord();
         }
 
         Ok(Path {
@@ -268,6 +260,7 @@ mod tests {
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(height)
             .with_single_threaded_build_algorithm()
             .with_padding_node_generator(new_padding_node_content)
             .build()
@@ -294,6 +287,7 @@ mod tests {
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(height)
             .with_single_threaded_build_algorithm()
             .with_padding_node_generator(new_padding_node_content)
             .build()
@@ -321,6 +315,7 @@ mod tests {
             let tree_single_threaded = TreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
+                .with_store_depth(height)
                 .with_single_threaded_build_algorithm()
                 .with_padding_node_generator(new_padding_node_content)
                 .build()
