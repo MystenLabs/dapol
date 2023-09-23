@@ -75,7 +75,9 @@ impl<C: Mergeable + Clone> TreeBuilder<C> {
 
         let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
 
-        for _i in 0..self.height - 1 {
+        let mut i = 0;
+
+        while i < self.height - 1 {
             for node in &self.nodes {
                 pairs = MaybeUnmatchedPair::build_pairs(node);
             }
@@ -123,6 +125,8 @@ impl<C: Mergeable + Clone> TreeBuilder<C> {
             );
 
             parent_nodes.push(parent);
+
+            i += 1;
         }
 
         (parent_nodes, store)
