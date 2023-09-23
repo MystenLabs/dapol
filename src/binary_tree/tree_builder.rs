@@ -1,10 +1,7 @@
-use super::test_utils::TestContent;
-use super::test_utils::H256;
 use super::Mergeable;
 use super::MIN_HEIGHT;
 use super::{
-    Coordinate, InputLeafNode, LeftSibling, MatchedPair, MaybeUnmatchedPair, Node, RightSibling,
-    Sibling, SparseBinaryTreeError,
+    Coordinate, InputLeafNode, MatchedPair, MaybeUnmatchedPair, Node, SparseBinaryTreeError,
 };
 
 use std::collections::HashMap;
