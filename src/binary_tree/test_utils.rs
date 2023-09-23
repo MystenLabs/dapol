@@ -12,7 +12,7 @@ trait H256Convertible {
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
-pub struct H256([u8; 32]);
+pub struct H256(pub [u8; 32]);
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct TestContent {
