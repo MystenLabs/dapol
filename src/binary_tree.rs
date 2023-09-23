@@ -14,7 +14,7 @@ use thiserror::Error;
 // Constants
 
 /// Minimum tree height supported.
-pub static MIN_HEIGHT: u8 = 2;
+pub const MIN_HEIGHT: u8 = 2;
 
 // ===========================================
 // Errors
