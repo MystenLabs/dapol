@@ -221,8 +221,6 @@ impl<C: Clone + Mergeable> BinaryTree<C> {
             })
             .collect();
 
-        // let mut nodes = tree_builder.to_parent_nodes(&new_padding_node_content);
-
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         // let mut nodes = {
         //     let max_leaves = 2u64.pow(height as u32 - 1);
@@ -346,7 +344,6 @@ impl<C: Clone + Mergeable> BinaryTree<C> {
             "[Bug in tree constructor] Should be no nodes left to process"
         );
 
-        // store.insert(root.coord.clone(), root.clone());
         store.insert(root.coord.clone(), root.clone());
 
         Ok(BinaryTree {
