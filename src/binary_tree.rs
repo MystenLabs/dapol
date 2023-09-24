@@ -140,11 +140,37 @@ impl<C: Mergeable + Clone> Node<C> {
         }
     }
 
-    fn convert<B: Clone + From<C>>(self) -> Node<B> {
-        Node {
-            content: self.content.into(),
-            coord: self.coord,
+    fn to_pairs(&self) -> Vec<MaybeUnmatchedPair<C>> {
+        let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
+
+        let sibling = Sibling::from_node(self.clone());
+        match sibling {
+            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                left: Some(left_sibling.clone()),
+                right: Option::None,
+            }),
+            Sibling::Right(right_sibling) => {
+                let is_right_sibling_of_prev_node = pairs
+                    .last_mut()
+                    .map(|pair| (&pair.left).as_ref())
+                    .flatten()
+                    .is_some_and(|left| right_sibling.clone().is_right_sibling_of(&left));
+                if is_right_sibling_of_prev_node {
+                    pairs
+                        .last_mut()
+                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                        .expect("[Bug in tree constructor] Previous node not found")
+                        .right = Option::Some(right_sibling.clone());
+                } else {
+                    pairs.push(MaybeUnmatchedPair {
+                        left: Option::None,
+                        right: Some(right_sibling.clone()),
+                    });
+                }
+            }
         }
+
+        pairs
     }
 
     // ===========================================
@@ -215,20 +241,6 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
         let mut store = HashMap::new();
 
         // let mut nodes = get_nodes(leaves, height)?;
-        // let pairs = get_pairs(&nodes);
-
-        // for _i in 0..height - 1 {
-        //     nodes = pairs
-        //         .iter()
-        //         .map(|pair| pair.to_matched_pair(&new_padding_node_content))
-        //         .map(|matched_pair| {
-        //             let parent = matched_pair.merge();
-        //             store.insert(matched_pair.left.coord.clone(), matched_pair.left);
-        //             store.insert(matched_pair.right.coord.clone(), matched_pair.right);
-        //             parent
-        //         })
-        //         .collect();
-        // }
 
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         let mut nodes = {
@@ -343,7 +355,6 @@ impl<C: Mergeable + Clone> BinaryTree<C> {
 
         // if the root node is not present then there is a bug in the above code
         let root = nodes
-            .clone()
             .pop()
             .expect("[Bug in tree constructor] Unable to find root node");
 
@@ -515,41 +526,6 @@ fn get_nodes<C: Clone>(
     }
 
     Ok(nodes)
-}
-
-fn get_pairs<C: Mergeable + Clone>(nodes: &Vec<Node<C>>) -> Vec<MaybeUnmatchedPair<C>> {
-    let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
-
-    for node in nodes {
-        let sibling = Sibling::from_node(node.clone());
-        match sibling {
-            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                left: Some(left_sibling.clone()),
-                right: Option::None,
-            }),
-            Sibling::Right(right_sibling) => {
-                let is_right_sibling_of_prev_node = pairs
-                    .last_mut()
-                    .map(|pair| (&pair.left).as_ref())
-                    .flatten()
-                    .is_some_and(|left| right_sibling.clone().is_right_sibling_of(&left));
-                if is_right_sibling_of_prev_node {
-                    pairs
-                        .last_mut()
-                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                        .expect("[Bug in tree constructor] Previous node not found")
-                        .right = Option::Some(right_sibling.clone());
-                } else {
-                    pairs.push(MaybeUnmatchedPair {
-                        left: Option::None,
-                        right: Some(right_sibling.clone()),
-                    });
-                }
-            }
-        }
-    }
-
-    pairs
 }
 
 // ===========================================
