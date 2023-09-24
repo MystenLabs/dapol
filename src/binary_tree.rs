@@ -92,14 +92,6 @@ enum Sibling<C: Clone> {
     Right(Node<C>),
 }
 
-// #[derive(Clone)]
-// /// Simply holds a Node under the designated 'LeftSibling' name.
-// struct LeftSibling<C: Clone>(Node<C>);
-
-// #[derive(Clone)]
-// /// Simply holds a Node under the designated 'RightSibling' name.
-// struct RightSibling<C: Clone>(Node<C>);
-
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
     left: Option<Node<C>>,
