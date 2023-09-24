@@ -79,12 +79,23 @@ impl<C: Mergeable + Clone> TreeBuilder<C> {
 
         while i < self.height - 1 {
             for node in &self.nodes {
-                pairs = MaybeUnmatchedPair::build_pairs(node);
+                pairs = MaybeUnmatchedPair::build_pairs(node.clone());
             }
 
+            // temp values:
+            let left_coord = Coordinate { y: 0, x: 0 };
+            let right_coord = Coordinate { y: 0, x: 1 };
+            let left_node = Node {
+                coord: left_coord.clone(),
+                content: new_padding_node_content(&left_coord),
+            };
+            let right_node = Node {
+                coord: right_coord.clone(),
+                content: new_padding_node_content(&right_coord),
+            };
             let mut matched_pair: MatchedPair<C> = MatchedPair {
-                left: None,
-                right: None,
+                left: left_node,
+                right: right_node,
             };
 
             for pair in &pairs {
@@ -93,36 +104,8 @@ impl<C: Mergeable + Clone> TreeBuilder<C> {
 
             let parent = matched_pair.merge();
 
-            store.insert(
-                matched_pair
-                    .left
-                    .as_ref()
-                    .expect("No left sibling found")
-                    .0
-                    .coord
-                    .clone(),
-                matched_pair
-                    .left
-                    .as_ref()
-                    .expect("No left sibling found")
-                    .0
-                    .clone(),
-            );
-            store.insert(
-                matched_pair
-                    .right
-                    .as_ref()
-                    .expect("No right sibling found")
-                    .0
-                    .coord
-                    .clone(),
-                matched_pair
-                    .right
-                    .as_ref()
-                    .expect("No right sibling found")
-                    .0
-                    .clone(),
-            );
+            store.insert(matched_pair.left.clone().coord, matched_pair.left);
+            store.insert(matched_pair.right.clone().coord, matched_pair.right);
 
             parent_nodes.push(parent);
 

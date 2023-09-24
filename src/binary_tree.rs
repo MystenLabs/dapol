@@ -89,34 +89,44 @@ enum NodeOrientation {
 }
 
 /// Used to orient nodes inside a sibling pair so that the compiler can guarantee a left node is actually a left node.
-enum Sibling<'a, C: Clone> {
-    Left(&'a Node<C>),
-    Right(&'a Node<C>),
+enum Sibling<C: Clone> {
+    Left(Node<C>),
+    Right(Node<C>),
 }
 
-#[derive(Clone)]
-/// Simply holds a Node under the designated 'LeftSibling' name.
-struct LeftSibling<C: Clone>(Node<C>);
+// #[derive(Clone)]
+// /// Simply holds a Node under the designated 'LeftSibling' name.
+// struct LeftSibling<C: Clone>(Node<C>);
 
-#[derive(Clone)]
-/// Simply holds a Node under the designated 'RightSibling' name.
-struct RightSibling<C: Clone>(Node<C>);
+// #[derive(Clone)]
+// /// Simply holds a Node under the designated 'RightSibling' name.
+// struct RightSibling<C: Clone>(Node<C>);
 
 /// A pair of sibling nodes, but one might be absent.
 struct MaybeUnmatchedPair<C: Mergeable + Clone> {
-    left: Option<LeftSibling<C>>,
-    right: Option<RightSibling<C>>,
+    left: Option<Node<C>>,
+    right: Option<Node<C>>,
 }
 /// A pair of sibling nodes where both are present.
 struct MatchedPair<C: Mergeable + Clone> {
-    left: Option<LeftSibling<C>>,
-    right: Option<RightSibling<C>>,
+    left: Node<C>,
+    right: Node<C>,
 }
 
 // ===========================================
 // Implementations
 
 impl<C: Clone> Node<C> {
+    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Node<C>
+    where
+        F: Fn(&Coordinate) -> C,
+    {
+        let coord = self.get_sibling_coord();
+        let content = new_padding_node_content(&coord);
+        Node { coord, content }
+    }
+
     /// Return true if self is a) a left sibling and b) lives just to the left of the other node.
     #[allow(dead_code)]
     fn is_left_sibling_of(&self, other: &Node<C>) -> bool {
@@ -400,9 +410,9 @@ impl<C: Clone + Mergeable> SparseBinaryTree<C> {
     }
 }
 
-impl<'a, C: Clone> Sibling<'a, C> {
+impl<C: Clone> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
-    fn from_node(node: &'a Node<C>) -> Self {
+    fn from_node(node: Node<C>) -> Self {
         match node.node_orientation() {
             NodeOrientation::Left => Sibling::Left(node),
             NodeOrientation::Right => Sibling::Right(node),
@@ -410,40 +420,14 @@ impl<'a, C: Clone> Sibling<'a, C> {
     }
 }
 
-impl<C: Clone> LeftSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> RightSibling<C>
-    where
-        F: Fn(&Coordinate) -> C,
-    {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        RightSibling(node)
-    }
-}
-
-impl<C: Clone> RightSibling<C> {
-    /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> LeftSibling<C>
-    where
-        F: Fn(&Coordinate) -> C,
-    {
-        let coord = self.0.get_sibling_coord();
-        let content = new_padding_node_content(&coord);
-        let node = Node { coord, content };
-        LeftSibling(node)
-    }
-}
-
 impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
-    pub fn build_pairs(node: &Node<C>) -> Vec<MaybeUnmatchedPair<C>> {
+    pub fn build_pairs(node: Node<C>) -> Vec<MaybeUnmatchedPair<C>> {
         let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
-        let sibling = Sibling::from_node(&node);
+        let sibling = Sibling::from_node(node);
 
         match sibling {
             Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                left: Some(LeftSibling(left_sibling.clone())),
+                left: Some(left_sibling),
                 right: Option::None,
             }),
             Sibling::Right(right_sibling) => {
@@ -451,21 +435,18 @@ impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
                     .last_mut()
                     .map(|pair| (&pair.left).as_ref())
                     .flatten()
-                    .is_some_and(|left| {
-                        RightSibling(right_sibling.clone())
-                            .0
-                            .is_right_sibling_of(&left.0)
-                    });
+                    .is_some_and(|left| right_sibling.is_right_sibling_of(&left));
+
                 if is_right_sibling_of_prev_node {
                     pairs
                         .last_mut()
                         // this case should never be reached because of the way is_right_sibling_of_prev_node is built
                         .expect("[Bug in tree constructor] Previous node not found")
-                        .right = Option::Some(RightSibling(right_sibling.clone()));
+                        .right = Option::Some(right_sibling);
                 } else {
                     pairs.push(MaybeUnmatchedPair {
                         left: Option::None,
-                        right: Some(RightSibling(right_sibling.clone())),
+                        right: Some(right_sibling),
                     });
                 }
             }
@@ -480,16 +461,16 @@ impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
     {
         match (&self.left, &self.right) {
             (Some(left), Some(right)) => MatchedPair {
-                left: Some(left.clone()),
-                right: Some(right.clone()),
+                left: left.clone(),
+                right: right.clone(),
             },
             (Some(left), None) => MatchedPair {
-                right: Some(left.new_sibling_padding_node(new_padding_node_content)),
-                left: Some(left.clone()),
+                right: left.new_sibling_padding_node(new_padding_node_content),
+                left: left.clone(),
             },
             (None, Some(right)) => MatchedPair {
-                left: Some(right.new_sibling_padding_node(new_padding_node_content)),
-                right: Some(right.clone()),
+                left: right.new_sibling_padding_node(new_padding_node_content),
+                right: right.clone(),
             },
             // if this case is reached then there is a bug in the above fold
             (None, None) => {
@@ -504,18 +485,10 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     fn merge(&self) -> Node<C> {
         Node {
             coord: Coordinate {
-                y: self.left.as_ref().expect("No left sibling found").0.coord.y + 1,
-                x: self.left.as_ref().expect("No left sibling found").0.coord.x / 2,
+                y: self.left.coord.y + 1,
+                x: self.left.coord.x / 2,
             },
-            content: C::merge(
-                &self.left.as_ref().expect("No left sibling found").0.content,
-                &self
-                    .right
-                    .as_ref()
-                    .expect("No right sibling found")
-                    .0
-                    .content,
-            ),
+            content: C::merge(&self.left.content, &self.right.content),
         }
     }
 }
