@@ -106,7 +106,7 @@ struct MatchedPair<C: Mergeable + Clone> {
 // ===========================================
 // Implementations
 
-impl<C: Clone> Node<C> {
+impl<C: Mergeable + Clone> Node<C> {
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Node<C>
     where
@@ -137,6 +137,13 @@ impl<C: Clone> Node<C> {
                     && self.coord.y == other.coord.y
                     && self.coord.x - 1 == other.coord.x
             }
+        }
+    }
+
+    fn convert<B: Clone + From<C>>(self) -> Node<B> {
+        Node {
+            content: self.content.into(),
+            coord: self.coord,
         }
     }
 
@@ -193,7 +200,7 @@ impl<C: Clone> InputLeafNode<C> {
     }
 }
 
-impl<C: Clone + Mergeable> BinaryTree<C> {
+impl<C: Mergeable + Clone> BinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     #[allow(dead_code)]
@@ -207,133 +214,136 @@ impl<C: Clone + Mergeable> BinaryTree<C> {
     {
         let mut store = HashMap::new();
 
-        // let mut nodes = get_nodes(leaves, height)?;
-        // let pairs = get_pairs(nodes);
+        let mut nodes = get_nodes(leaves, height)?;
+        let pairs = get_pairs(&nodes);
 
-        // nodes = pairs
-        //     .into_iter()
-        //     .map(|pair| pair.to_matched_pair(&new_padding_node_content))
-        //     .map(|matched_pair| {
-        //         let parent = matched_pair.merge();
-        //         store.insert(matched_pair.left.coord.clone(), matched_pair.left);
-        //         store.insert(matched_pair.right.coord.clone(), matched_pair.right);
-        //         parent
-        //     })
-        //     .collect();
-
-        // construct a sorted vector of leaf nodes and perform parameter correctness checks
-        let mut nodes = {
-            let max_leaves = 2u64.pow(height as u32 - 1);
-            if leaves.len() as u64 > max_leaves {
-                return Err(BinaryTreeError::TooManyLeaves);
-            }
-
-            if leaves.len() < 1 {
-                return Err(BinaryTreeError::EmptyInput);
-            }
-
-            if height < MIN_HEIGHT {
-                return Err(BinaryTreeError::HeightTooSmall);
-            }
-
-            // translate InputLeafNode to Node
-            let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
-
-            // sort by x_coord ascending
-            nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
-
-            // make sure all x_coord < max
-            if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
-                return Err(BinaryTreeError::InvalidXCoord);
-            }
-
-            // ensure no duplicates
-            let duplicate_found = nodes
-                .iter()
-                .fold(
-                    (max_leaves, false),
-                    |(prev_x_coord, duplicate_found), node| {
-                        if duplicate_found || node.coord.x == prev_x_coord {
-                            (0, true)
-                        } else {
-                            (node.coord.x, false)
-                        }
-                    },
-                )
-                .1;
-            if duplicate_found {
-                return Err(BinaryTreeError::DuplicateLeaves);
-            }
-
-            nodes
-        };
-
-        // repeat for each layer of the tree
         for _i in 0..height - 1 {
-            // create the next layer up of nodes from the current layer of nodes
-            nodes = nodes
-                .into_iter()
-                // sort nodes into pairs (left & right siblings)
-                .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
-                    let sibling = Sibling::from_node(node);
-                    match sibling {
-                        Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                            left: Some(left_sibling.clone()),
-                            right: Option::None,
-                        }),
-                        Sibling::Right(right_sibling) => {
-                            let is_right_sibling_of_prev_node = pairs
-                                .last_mut()
-                                .map(|pair| (&pair.left).as_ref())
-                                .flatten()
-                                .is_some_and(|left| {
-                                    right_sibling.clone().is_right_sibling_of(&left)
-                                });
-                            if is_right_sibling_of_prev_node {
-                                pairs
-                                    .last_mut()
-                                    // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                                    .expect("[Bug in tree constructor] Previous node not found")
-                                    .right = Option::Some(right_sibling.clone());
-                            } else {
-                                pairs.push(MaybeUnmatchedPair {
-                                    left: Option::None,
-                                    right: Some(right_sibling.clone()),
-                                });
-                            }
-                        }
-                    }
-                    pairs
-                })
-                .into_iter()
-                // add padding nodes to unmatched pairs
-                .map(|pair| match (pair.left, pair.right) {
-                    (Some(left), Some(right)) => MatchedPair { left, right },
-                    (Some(left), None) => MatchedPair {
-                        right: left.new_sibling_padding_node(&new_padding_node_content),
-                        left,
-                    },
-                    (None, Some(right)) => MatchedPair {
-                        left: right.new_sibling_padding_node(&new_padding_node_content),
-                        right,
-                    },
-                    // if this case is reached then there is a bug in the above fold
-                    (None, None) => {
-                        panic!("[Bug in tree constructor] Invalid pair (None, None) found")
-                    }
-                })
-                // create parents for the next loop iteration, and add the pairs to the tree store
-                .map(|pair| {
-                    let parent = pair.merge();
-                    store.insert(pair.left.coord.clone(), pair.left);
-                    store.insert(pair.right.coord.clone(), pair.right);
+            nodes = pairs
+                .iter()
+                .map(|pair| pair.to_matched_pair(&new_padding_node_content))
+                .map(|matched_pair| {
+                    let parent = matched_pair.merge();
+                    store.insert(matched_pair.left.coord.clone(), matched_pair.left);
+                    store.insert(matched_pair.right.coord.clone(), matched_pair.right);
                     parent
                 })
                 .collect();
         }
 
+        // // construct a sorted vector of leaf nodes and perform parameter correctness checks
+        // let mut nodes = {
+        //     let max_leaves = 2u64.pow(height as u32 - 1);
+        //     if leaves.len() as u64 > max_leaves {
+        //         return Err(BinaryTreeError::TooManyLeaves);
+        //     }
+
+        //     if leaves.len() < 1 {
+        //         return Err(BinaryTreeError::EmptyInput);
+        //     }
+
+        //     if height < MIN_HEIGHT {
+        //         return Err(BinaryTreeError::HeightTooSmall);
+        //     }
+
+        //     // translate InputLeafNode to Node
+        //     let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+
+        //     // sort by x_coord ascending
+        //     nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+        //     // make sure all x_coord < max
+        //     if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+        //         return Err(BinaryTreeError::InvalidXCoord);
+        //     }
+
+        //     // ensure no duplicates
+        //     let duplicate_found = nodes
+        //         .iter()
+        //         .fold(
+        //             (max_leaves, false),
+        //             |(prev_x_coord, duplicate_found), node| {
+        //                 if duplicate_found || node.coord.x == prev_x_coord {
+        //                     (0, true)
+        //                 } else {
+        //                     (node.coord.x, false)
+        //                 }
+        //             },
+        //         )
+        //         .1;
+        //     if duplicate_found {
+        //         return Err(BinaryTreeError::DuplicateLeaves);
+        //     }
+
+        //     nodes
+        // };
+
+        // // repeat for each layer of the tree
+        // for _i in 0..height - 1 {
+        //     // create the next layer up of nodes from the current layer of nodes
+        //     nodes = nodes
+        //         .into_iter()
+        //         // sort nodes into pairs (left & right siblings)
+        //         .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
+        //             let sibling = Sibling::from_node(node);
+        //             match sibling {
+        //                 Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+        //                     left: Some(left_sibling.clone()),
+        //                     right: Option::None,
+        //                 }),
+        //                 Sibling::Right(right_sibling) => {
+        //                     let is_right_sibling_of_prev_node = pairs
+        //                         .last_mut()
+        //                         .map(|pair| (&pair.left).as_ref())
+        //                         .flatten()
+        //                         .is_some_and(|left| {
+        //                             right_sibling.clone().is_right_sibling_of(&left)
+        //                         });
+        //                     if is_right_sibling_of_prev_node {
+        //                         pairs
+        //                             .last_mut()
+        //                             // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+        //                             .expect("[Bug in tree constructor] Previous node not found")
+        //                             .right = Option::Some(right_sibling.clone());
+        //                     } else {
+        //                         pairs.push(MaybeUnmatchedPair {
+        //                             left: Option::None,
+        //                             right: Some(right_sibling.clone()),
+        //                         });
+        //                     }
+        //                 }
+        //             }
+        //             pairs
+        //         })
+        //         .into_iter()
+        //         // add padding nodes to unmatched pairs
+        //         .map(|pair| match (pair.left, pair.right) {
+        //             (Some(left), Some(right)) => MatchedPair { left, right },
+        //             (Some(left), None) => MatchedPair {
+        //                 right: left.new_sibling_padding_node(&new_padding_node_content),
+        //                 left,
+        //             },
+        //             (None, Some(right)) => MatchedPair {
+        //                 left: right.new_sibling_padding_node(&new_padding_node_content),
+        //                 right,
+        //             },
+        //             // if this case is reached then there is a bug in the above fold
+        //             (None, None) => {
+        //                 panic!("[Bug in tree constructor] Invalid pair (None, None) found")
+        //             }
+        //         })
+        //         // create parents for the next loop iteration, and add the pairs to the tree store
+        //         .map(|pair| {
+        //             let parent = pair.merge();
+        //             store.insert(pair.left.coord.clone(), pair.left);
+        //             store.insert(pair.right.coord.clone(), pair.right);
+        //             parent
+        //         })
+        //         .collect();
+        // }
+
         // if the root node is not present then there is a bug in the above code
         let root = nodes
+            .clone()
             .pop()
             .expect("[Bug in tree constructor] Unable to find root node");
 
@@ -407,7 +417,7 @@ impl<C: Clone + Mergeable> BinaryTree<C> {
     }
 }
 
-impl<C: Clone> Sibling<C> {
+impl<C: Mergeable + Clone> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {
         match node.node_orientation() {
@@ -507,11 +517,11 @@ fn get_nodes<C: Clone>(
     Ok(nodes)
 }
 
-fn get_pairs<C: Mergeable + Clone>(nodes: Vec<Node<C>>) -> Vec<MaybeUnmatchedPair<C>> {
+fn get_pairs<C: Mergeable + Clone>(nodes: &Vec<Node<C>>) -> Vec<MaybeUnmatchedPair<C>> {
     let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
 
     for node in nodes {
-        let sibling = Sibling::from_node(node);
+        let sibling = Sibling::from_node(node.clone());
         match sibling {
             Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
                 left: Some(left_sibling.clone()),
