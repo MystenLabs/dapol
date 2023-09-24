@@ -4,10 +4,8 @@
 mod binary_tree_path;
 mod dapol_node;
 mod test_utils;
-mod tree_builder;
 
 use self::binary_tree_path::{PathSiblings, PathSiblingsError};
-use self::tree_builder::TreeBuilder;
 
 use std::collections::HashMap;
 use thiserror::Error;
@@ -23,7 +21,7 @@ pub const MIN_HEIGHT: u8 = 2;
 
 #[derive(Error, Debug)]
 #[allow(dead_code)]
-pub enum SparseBinaryTreeError {
+pub enum BinaryTreeError {
     #[error("Too many leaves for the given height")]
     TooManyLeaves,
     #[error("Must provide at least 1 leaf")]
@@ -73,7 +71,7 @@ pub struct Coordinate {
 /// All nodes are stored in a hash map, their index in the tree being the key.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct SparseBinaryTree<C: Clone> {
+pub struct BinaryTree<C: Clone> {
     root: Node<C>,
     store: HashMap<Coordinate, Node<C>>,
     pub height: u8,
@@ -203,7 +201,7 @@ impl<C: Clone> InputLeafNode<C> {
     }
 }
 
-impl<C: Clone + Mergeable> SparseBinaryTree<C> {
+impl<C: Clone + Mergeable> BinaryTree<C> {
     /// Create a new tree given the leaves, height and the padding node creation function.
     /// New padding nodes are given by a closure. Why a closure? Because creating a padding node may require context outside of this scope, where type C is defined, for example.
     #[allow(dead_code)]
@@ -211,14 +209,27 @@ impl<C: Clone + Mergeable> SparseBinaryTree<C> {
         leaves: Vec<InputLeafNode<C>>,
         height: u8,
         new_padding_node_content: F,
-    ) -> Result<SparseBinaryTree<C>, SparseBinaryTreeError>
+    ) -> Result<BinaryTree<C>, BinaryTreeError>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let tree_builder = TreeBuilder::from_input_leaf_nodes(leaves, height)?;
+        let mut store = HashMap::new();
 
-        let mut nodes = tree_builder.to_parent_nodes(&new_padding_node_content);
-        // let mut store = HashMap::new();
+        let mut nodes = get_nodes(leaves, height)?;
+        let pairs = get_pairs(nodes);
+
+        nodes = pairs
+            .into_iter()
+            .map(|pair| pair.to_matched_pair(&new_padding_node_content))
+            .map(|matched_pair| {
+                let parent = matched_pair.merge();
+                store.insert(matched_pair.left.coord.clone(), matched_pair.left);
+                store.insert(matched_pair.right.coord.clone(), matched_pair.right);
+                parent
+            })
+            .collect();
+
+        // let mut nodes = tree_builder.to_parent_nodes(&new_padding_node_content);
 
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
         // let mut nodes = {
@@ -335,21 +346,20 @@ impl<C: Clone + Mergeable> SparseBinaryTree<C> {
 
         // if the root node is not present then there is a bug in the above code
         let root = nodes
-            .0
             .pop()
             .expect("[Bug in tree constructor] Unable to find root node");
 
         assert!(
-            nodes.0.len() == 0,
+            nodes.len() == 0,
             "[Bug in tree constructor] Should be no nodes left to process"
         );
 
         // store.insert(root.coord.clone(), root.clone());
-        nodes.1.insert(root.coord.clone(), root.clone());
+        store.insert(root.coord.clone(), root.clone());
 
-        Ok(SparseBinaryTree {
+        Ok(BinaryTree {
             root,
-            store: nodes.1,
+            store,
             height,
         })
     }
@@ -421,40 +431,6 @@ impl<C: Clone> Sibling<C> {
 }
 
 impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
-    pub fn build_pairs(node: Node<C>) -> Vec<MaybeUnmatchedPair<C>> {
-        let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
-        let sibling = Sibling::from_node(node);
-
-        match sibling {
-            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
-                left: Some(left_sibling),
-                right: Option::None,
-            }),
-            Sibling::Right(right_sibling) => {
-                let is_right_sibling_of_prev_node = pairs
-                    .last_mut()
-                    .map(|pair| (&pair.left).as_ref())
-                    .flatten()
-                    .is_some_and(|left| right_sibling.is_right_sibling_of(&left));
-
-                if is_right_sibling_of_prev_node {
-                    pairs
-                        .last_mut()
-                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
-                        .expect("[Bug in tree constructor] Previous node not found")
-                        .right = Option::Some(right_sibling);
-                } else {
-                    pairs.push(MaybeUnmatchedPair {
-                        left: Option::None,
-                        right: Some(right_sibling),
-                    });
-                }
-            }
-        }
-
-        pairs
-    }
-
     pub fn to_matched_pair<F>(&self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -491,6 +467,92 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
             content: C::merge(&self.left.content, &self.right.content),
         }
     }
+}
+
+// Helpers
+
+fn get_nodes<C: Clone>(
+    leaves: Vec<InputLeafNode<C>>,
+    height: u8,
+) -> Result<Vec<Node<C>>, BinaryTreeError> {
+    let max_leaves = 2u64.pow(height as u32 - 1);
+    if leaves.len() as u64 > max_leaves {
+        return Err(BinaryTreeError::TooManyLeaves);
+    }
+
+    if leaves.len() < 1 {
+        return Err(BinaryTreeError::EmptyInput);
+    }
+
+    if height < MIN_HEIGHT {
+        return Err(BinaryTreeError::HeightTooSmall);
+    }
+
+    // translate InputLeafNode to Node
+    let mut nodes: Vec<Node<C>> = leaves.into_iter().map(|leaf| leaf.to_node()).collect();
+
+    // sort by x_coord ascending
+    nodes.sort_by(|a, b| a.coord.x.cmp(&b.coord.x));
+
+    // make sure all x_coord < max
+    if nodes.last().is_some_and(|node| node.coord.x >= max_leaves) {
+        return Err(BinaryTreeError::InvalidXCoord);
+    }
+
+    // ensure no duplicates
+    let duplicate_found = nodes
+        .iter()
+        .fold(
+            (max_leaves, false),
+            |(prev_x_coord, duplicate_found), node| {
+                if duplicate_found || node.coord.x == prev_x_coord {
+                    (0, true)
+                } else {
+                    (node.coord.x, false)
+                }
+            },
+        )
+        .1;
+    if duplicate_found {
+        return Err(BinaryTreeError::DuplicateLeaves);
+    }
+
+    Ok(nodes)
+}
+
+fn get_pairs<C: Mergeable + Clone>(nodes: Vec<Node<C>>) -> Vec<MaybeUnmatchedPair<C>> {
+    let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
+
+    for node in nodes {
+        let sibling = Sibling::from_node(node);
+        match sibling {
+            Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
+                left: Some(left_sibling.clone()),
+                right: Option::None,
+            }),
+            Sibling::Right(right_sibling) => {
+                let is_right_sibling_of_prev_node = pairs
+                    .last_mut()
+                    .map(|pair| (&pair.left).as_ref())
+                    .flatten()
+                    .is_some_and(|left| right_sibling.clone().is_right_sibling_of(&left));
+                if is_right_sibling_of_prev_node {
+                    pairs
+                        .last_mut()
+                        // this case should never be reached because of the way is_right_sibling_of_prev_node is built
+                        .expect("[Bug in tree constructor] Previous node not found")
+                        .right = Option::Some(right_sibling.clone());
+                } else {
+                    pairs.push(MaybeUnmatchedPair {
+                        left: Option::None,
+                        right: Some(right_sibling.clone()),
+                    });
+                }
+            }
+        }
+    }
+
+    pairs
 }
 
 // ===========================================
@@ -543,8 +605,8 @@ mod tests {
             });
         }
 
-        let tree = SparseBinaryTree::build_tree(leaves, height, &get_padding_function());
-        assert_err!(tree, Err(SparseBinaryTreeError::TooManyLeaves));
+        let tree = BinaryTree::build_tree(leaves, height, &get_padding_function());
+        assert_err!(tree, Err(BinaryTreeError::TooManyLeaves));
     }
 
     #[test]
@@ -573,13 +635,13 @@ mod tests {
             },
         };
 
-        let tree = SparseBinaryTree::build_tree(
+        let tree = BinaryTree::build_tree(
             vec![leaf_0, leaf_1, leaf_2],
             height,
             &get_padding_function(),
         );
 
-        assert_err!(tree, Err(SparseBinaryTreeError::DuplicateLeaves));
+        assert_err!(tree, Err(BinaryTreeError::DuplicateLeaves));
     }
 
     #[test]
@@ -594,8 +656,8 @@ mod tests {
             },
         };
 
-        let tree = SparseBinaryTree::build_tree(vec![leaf_0], height, &get_padding_function());
+        let tree = BinaryTree::build_tree(vec![leaf_0], height, &get_padding_function());
 
-        assert_err!(tree, Err(SparseBinaryTreeError::HeightTooSmall));
+        assert_err!(tree, Err(BinaryTreeError::HeightTooSmall));
     }
 }

@@ -115,10 +115,10 @@ mod tests {
     use super::*;
 
     use crate::binary_tree::test_utils::*;
-    use crate::binary_tree::SparseBinaryTree;
+    use crate::binary_tree::BinaryTree;
 
     fn check_path_siblings(
-        tree: &SparseBinaryTree<TestContent>,
+        tree: &BinaryTree<TestContent>,
         proof: &PathSiblings<TestContent>,
     ) {
         assert_eq!(tree.root, proof.root);
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn tree_works_for_full_base_layer() {
         let leaves = full_tree();
-        let tree = SparseBinaryTree::build_tree(leaves, 4, &get_padding_function())
+        let tree = BinaryTree::build_tree(leaves, 4, &get_padding_function())
             .expect("unable to build tree");
 
         let proof = tree
@@ -146,7 +146,7 @@ mod tests {
     #[test]
     fn proofs_work_for_sparse_leaves() {
         let leaves = tree_with_sparse_leaves();
-        let tree = SparseBinaryTree::build_tree(leaves, 4, &get_padding_function())
+        let tree = BinaryTree::build_tree(leaves, 4, &get_padding_function())
             .expect("Unable to build tree");
 
         let proof = tree
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn proofs_work_for_single_leaf() {
         let leaves = vec![tree_with_single_leaf(0)];
-        let tree = SparseBinaryTree::build_tree(leaves, 4, &get_padding_function())
+        let tree = BinaryTree::build_tree(leaves, 4, &get_padding_function())
             .expect("Unable to build tree");
 
         let proof = tree
