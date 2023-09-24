@@ -1,13 +1,11 @@
 use super::Mergeable;
 use super::MIN_HEIGHT;
-use super::{
-    Coordinate, InputLeafNode, MatchedPair, MaybeUnmatchedPair, Node, SparseBinaryTreeError,
-};
+use super::{Coordinate, InputLeafNode, MaybeUnmatchedPair, Node, SparseBinaryTreeError};
 
 use std::collections::HashMap;
 
 pub struct TreeBuilder<C: Clone> {
-    nodes: Vec<Node<C>>,
+    pub nodes: Vec<Node<C>>,
     height: u8,
 }
 
@@ -70,46 +68,23 @@ impl<C: Mergeable + Clone> TreeBuilder<C> {
         F: Fn(&Coordinate) -> C,
     {
         let mut parent_nodes: Vec<Node<C>> = Vec::new();
-
         let mut store: HashMap<Coordinate, Node<C>> = HashMap::new();
 
-        let mut pairs: Vec<MaybeUnmatchedPair<C>> = Vec::new();
+        for _i in 0..self.height - 1 {
+            for node in self.nodes.clone() {
+                let pairs = MaybeUnmatchedPair::build_pairs(node.clone());
 
-        let mut i = 0;
+                for pair in pairs {
+                    let matched_pair = pair.to_matched_pair(new_padding_node_content);
 
-        while i < self.height - 1 {
-            for node in &self.nodes {
-                pairs = MaybeUnmatchedPair::build_pairs(node.clone());
+                    let parent = matched_pair.merge();
+
+                    store.insert(matched_pair.left.clone().coord, matched_pair.left);
+                    store.insert(matched_pair.right.clone().coord, matched_pair.right);
+
+                    parent_nodes.push(parent);
+                }
             }
-
-            // temp values:
-            let left_coord = Coordinate { y: 0, x: 0 };
-            let right_coord = Coordinate { y: 0, x: 1 };
-            let left_node = Node {
-                coord: left_coord.clone(),
-                content: new_padding_node_content(&left_coord),
-            };
-            let right_node = Node {
-                coord: right_coord.clone(),
-                content: new_padding_node_content(&right_coord),
-            };
-            let mut matched_pair: MatchedPair<C> = MatchedPair {
-                left: left_node,
-                right: right_node,
-            };
-
-            for pair in &pairs {
-                matched_pair = pair.to_matched_pair(&new_padding_node_content);
-            }
-
-            let parent = matched_pair.merge();
-
-            store.insert(matched_pair.left.clone().coord, matched_pair.left);
-            store.insert(matched_pair.right.clone().coord, matched_pair.right);
-
-            parent_nodes.push(parent);
-
-            i += 1;
         }
 
         (parent_nodes, store)

@@ -217,9 +217,7 @@ impl<C: Clone + Mergeable> SparseBinaryTree<C> {
     {
         let tree_builder = TreeBuilder::from_input_leaf_nodes(leaves, height)?;
 
-        let mut nodes = tree_builder.to_parent_nodes(&new_padding_node_content).0;
-        let mut store = tree_builder.to_parent_nodes(&new_padding_node_content).1;
-
+        let mut nodes = tree_builder.to_parent_nodes(&new_padding_node_content);
         // let mut store = HashMap::new();
 
         // construct a sorted vector of leaf nodes and perform parameter correctness checks
@@ -337,19 +335,21 @@ impl<C: Clone + Mergeable> SparseBinaryTree<C> {
 
         // if the root node is not present then there is a bug in the above code
         let root = nodes
+            .0
             .pop()
             .expect("[Bug in tree constructor] Unable to find root node");
 
         assert!(
-            nodes.len() == 0,
+            nodes.0.len() == 0,
             "[Bug in tree constructor] Should be no nodes left to process"
         );
 
-        store.insert(root.coord.clone(), root.clone());
+        // store.insert(root.coord.clone(), root.clone());
+        nodes.1.insert(root.coord.clone(), root.clone());
 
         Ok(SparseBinaryTree {
             root,
-            store,
+            store: nodes.1,
             height,
         })
     }
