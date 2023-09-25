@@ -76,10 +76,10 @@ fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<User> {
 
     let mut result = Vec::with_capacity(num_leaves);
     for i in 0..num_leaves {
-        result.push(User {
-            liability: i as u64,
-            id: UserId::from_str(i.to_string().as_str()).unwrap(),
-        })
+        result.push(
+            User::build(i as u64, UserId::from_str(i.to_string().as_str()).unwrap())
+                .expect("Unable to create user"),
+        );
     }
 
     let end = SystemTime::now();

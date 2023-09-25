@@ -105,9 +105,9 @@ impl NdmSmt {
 
                 InputLeafNode {
                     content: Content::new_leaf(
-                        user.liability,
+                        user.liability(),
                         blinding_factor.into(),
-                        user.id.clone(),
+                        user.id().clone(),
                         user_salt.into(),
                     ),
                     x_coord: *x_coord,
@@ -120,7 +120,7 @@ impl NdmSmt {
         let handle = thread::spawn(move || {
             let mut my_user_mapping = user_mapping_ref.lock().unwrap();
             tuples.into_iter().for_each(|(user, x_coord)| {
-                my_user_mapping.insert(user.id, x_coord);
+                my_user_mapping.insert(user.id(), x_coord);
             });
         });
         // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
@@ -367,10 +367,7 @@ mod tests {
             let salt_b: D256 = 2u64.into();
             let salt_s: D256 = 3u64.into();
             let height = 4u8;
-            let users = vec![User {
-                liability: 5u64,
-                id: UserId::from_str("some user").unwrap(),
-            }];
+            let users = vec![User::build(5u64, UserId::from_str("some user").unwrap()).expect("Unable to create user")];
 
             NdmSmt::new(master_secret, salt_b, salt_s, height, users).unwrap();
         }
