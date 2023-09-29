@@ -34,8 +34,8 @@
 
 use std::fmt;
 
-mod builder;
-pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
+mod tree_builder;
+pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder};
 
 mod path;
 pub use path::{Path, PathError};

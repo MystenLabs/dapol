@@ -43,7 +43,7 @@ pub fn num_bottom_layer_nodes(height: u8) -> u64 {
 }
 
 
-// TODO docs & better name
+// TODO is this needed anymore?
 pub fn x_coord_gen(x: u64, y: u8) -> u64 {
     2u64.pow(y as u32) * x
 }
