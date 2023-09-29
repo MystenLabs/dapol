@@ -54,7 +54,7 @@ pub struct InputLeafNode<C> {
 /// ```
 impl<C> TreeBuilder<C>
 where
-    C: Clone + Mergeable,
+    C: Clone + Mergeable + 'static, // TODO not sure about this static here, it's needed when the single threaded builder builds the boxed hashmap
 {
     pub fn new() -> Self {
         TreeBuilder {

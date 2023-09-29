@@ -36,7 +36,7 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::thread;
 
-use super::super::{num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store, Map};
+use super::super::{num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -117,20 +117,30 @@ where
             Arc::clone(&store),
         );
 
-        let store = Store {
-            node_map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
-        };
-
-        let node_generator = |coord: &Coordinate, store: &Store<C>| {
-                (*store.node_map.get(coord).unwrap()).clone()
-        };
+        let store = Box::new(DashMapStore {
+            map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
+        });
 
         Ok(BinaryTree {
             root,
             store,
-            node_generator: Box::new(node_generator),
             height,
         })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Store.
+
+type Map<C> = DashMap<Coordinate, Node<C>>;
+
+struct DashMapStore<C> {
+    map: Map<C>,
+}
+
+impl<C: Clone> Store<C> for DashMapStore<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        self.map.get(coord).map(|n| n.clone())
     }
 }
 

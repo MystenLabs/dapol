@@ -33,7 +33,6 @@
 //! `x` coordinate (their `y` coordinate will be 0).
 
 use std::fmt;
-use dashmap::DashMap;
 
 mod builder;
 pub use builder::{InputLeafNode, TreeBuildError, TreeBuilder};
@@ -60,10 +59,9 @@ pub static MIN_HEIGHT: u8 = 2;
 /// to be stored.
 ///
 /// The generic type `C` is for the content contained within each node.
-// TODO say something about node_generator
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: Store<C>,
+    store: Box<dyn Store<C>>, // TODO note the box & dyn pattern is needed so that the trait methods can be determined dynamically at runtime
     // TODO we need access to all the leaf nodes and having them in the hashmap is cumbersome,
     //  but the hashmap allows us O(1) read time if we only know the coord.
     //  I think all we need actually is a bitmap for the base nodes.
@@ -73,7 +71,6 @@ pub struct BinaryTree<C> {
     //  The node generator will need only the list of leaf nodes and the coord for the node to generate as input,
     //  the get_node function should do the checks to see if the node is in the store or needs to
     //  be generated
-    node_generator: Box<dyn Fn(&Coordinate, &Store<C>) -> Node<C>>,
     height: u8,
 }
 
@@ -99,12 +96,8 @@ pub struct Coordinate {
     pub x: u64, // from 0 to 2^y
 }
 
-type Map<C> = DashMap<Coordinate, Node<C>>;
-
-#[derive(Debug)]
-struct Store<C> {
-    node_map: Map<C>,
-    // leaves_bit_map: u64,
+trait Store<C: Clone> {
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>>;
 }
 
 /// The generic content type of a [Node] must implement this trait to allow 2
@@ -133,7 +126,7 @@ impl<C: Clone> BinaryTree<C> {
     // TODO this won't work if the store is partially full, we need to call
     // build some of the nodes from scratch in the half-full case
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
-        self.store.node_map.get(coord).map(|node| (*node).clone())
+        self.store.get_node(coord)
     }
 
     /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
@@ -273,7 +266,7 @@ impl<C> InputLeafNode<C> {
 
 impl<C: fmt::Debug> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "root: {:?}, store: {:?}, height: {:?}", self.root, self.store, self.height)
+        write!(f, "root: {:?}, height: {:?}", self.root, self.height)
     }
 }
 

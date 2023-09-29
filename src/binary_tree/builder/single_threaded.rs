@@ -7,11 +7,10 @@
 //! padding nodes where required, and then constructs the next layer by merging
 //! pairs of sibling nodes together.
 
-use dashmap::DashMap;
+use std::collections::HashMap;
 use std::fmt::Debug;
-use std::rc::Rc;
 
-use super::super::{BinaryTree, Coordinate, Map, MatchedPair, Mergeable, Node, Sibling, Store, x_coord_gen};
+use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -34,7 +33,7 @@ pub struct SingleThreadedBuilder<C, F> {
 /// ```
 impl<C, F> SingleThreadedBuilder<C, F>
 where
-    C: Debug + Clone + Mergeable,
+    C: Debug + Clone + Mergeable + 'static, // TODO not sure about this static here, it's needed for the boxed hashmap
     F: Fn(&Coordinate) -> C,
 {
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
@@ -72,58 +71,70 @@ where
                 .collect::<Vec<Node<C>>>()
         };
 
-        let padding_node_generator = Rc::new(
-            self.padding_node_generator
-                .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?,
-        );
-        // let padding_node_generator =
+        // let padding_node_generator = Rc::new(
         //     self.padding_node_generator
-        //         .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+        //         .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?,
+        // );
+        let padding_node_generator = self
+            .padding_node_generator
+            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        let node_generator = {
-            let height = height.clone();
-            let store_depth = 1;
-            let padding_node_generator = Rc::clone(&padding_node_generator);
+        // let node_generator = {
+        //     let height = height.clone();
+        //     let store_depth = 1;
+        //     let padding_node_generator = Rc::clone(&padding_node_generator);
 
-            move |coord: &Coordinate, store: &Store<C>| {
-                // 1. determine range of x-coords for bottom-layer leaf nodes
-                let x_coord_min = x_coord_gen(2 * coord.x, coord.y - 1);
-                let x_coord_max = x_coord_gen(2 * (coord.x + 1), coord.y - 1);
+        //     move |coord: &Coordinate, store: &Store<C>| {
+        //         // 1. determine range of x-coords for bottom-layer leaf nodes
+        //         let x_coord_min = x_coord_gen(2 * coord.x, coord.y - 1);
+        //         let x_coord_max = x_coord_gen(2 * (coord.x + 1), coord.y - 1);
 
-                // 2. search the store for these leaf nodes
-                let mut leaf_nodes: Vec<Node<C>> = Vec::new();
-                for x in x_coord_min..x_coord_max {
-                    let coord = Coordinate { x, y: 0 };
-                    store
-                        .node_map
-                        .get(&coord)
-                        .map(|node| leaf_nodes.push((*node).clone()));
-                }
+        //         // 2. search the store for these leaf nodes
+        //         let mut leaf_nodes: Vec<Node<C>> = Vec::new();
+        //         for x in x_coord_min..x_coord_max {
+        //             let coord = Coordinate { x, y: 0 };
+        //             store
+        //                 .node_map
+        //                 .get(&coord)
+        //                 .map(|node| leaf_nodes.push((*node).clone()));
+        //         }
 
-                if leaf_nodes.len() == 0 {
-                    // 3. if no nodes are there then create a padding node and return that
-                    // TODO need to change the name here to say "content" because it does not generate a node
-                    Node {
-                        content: padding_node_generator(&coord),
-                        coord: coord.clone(),
-                    }
-                } else {
-                    // 4. if there are nodes there then copy them from the store and send them to the build algo
-                    let (_, node) =
-                        build_tree(leaf_nodes, height, store_depth, Rc::clone(&padding_node_generator));
-                    node
-                }
-            }
-        };
+        //         if leaf_nodes.len() == 0 {
+        //             // 3. if no nodes are there then create a padding node and return that
+        //             // TODO need to change the name here to say "content" because it does not generate a node
+        //             Node {
+        //                 content: padding_node_generator(&coord),
+        //                 coord: coord.clone(),
+        //             }
+        //         } else {
+        //             // 4. if there are nodes there then copy them from the store and send them to the build algo
+        //             let (_, node) =
+        //                 build_tree(leaf_nodes, height, store_depth, Rc::clone(&padding_node_generator));
+        //             node
+        //         }
+        //     }
+        // };
 
         let (map, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
 
         Ok(BinaryTree {
             root,
-            store: Store { node_map: map },
-            node_generator: Box::new(node_generator),
+            store: Box::new(HashMapStore { map }),
             height,
         })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Store.
+
+struct HashMapStore<C> {
+    map: Map<C>,
+}
+
+impl<C: Clone> Store<C> for HashMapStore<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        self.map.get(coord).map(|n| (*n).clone())
     }
 }
 
@@ -137,7 +148,7 @@ struct MaybeUnmatchedPair<C> {
 }
 
 impl<C> MaybeUnmatchedPair<C> {
-    fn to_matched_pair<F>(self, new_padding_node_content: Rc<F>) -> MatchedPair<C>
+    fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -163,7 +174,7 @@ impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: Rc<F>) -> Node<C>
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -178,6 +189,7 @@ static BUG: &'static str = "[Bug in single-threaded builder]";
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
+type Map<C> = HashMap<Coordinate, Node<C>>;
 type RootNode<C> = Node<C>;
 
 /// Construct a new binary tree.
@@ -208,7 +220,7 @@ fn build_tree<C, F>(
     leaf_nodes: Vec<Node<C>>,
     height: u8,
     store_depth: u8,
-    new_padding_node_content: Rc<F>,
+    new_padding_node_content: F,
 ) -> (Map<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
@@ -246,7 +258,7 @@ where
         );
     }
 
-    let mut store = DashMap::new();
+    let mut map = HashMap::new();
     let mut nodes = leaf_nodes;
 
     // Repeat for each layer of the tree, except the root node layer.
@@ -292,7 +304,7 @@ where
             })
             .into_iter()
             // Add padding nodes to unmatched pairs.
-            .map(|pair| pair.to_matched_pair(new_padding_node_content))
+            .map(|pair| pair.to_matched_pair(&new_padding_node_content))
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
@@ -301,8 +313,8 @@ where
                 // a) node is a bottom layer leaf node (including padding nodes)
                 // b) node is in one of the top X layers where X = store_depth
                 if i == 0 || i >= layer_below_root - (store_depth - 1) {
-                    store.insert(pair.left.coord.clone(), pair.left);
-                    store.insert(pair.right.coord.clone(), pair.right);
+                    map.insert(pair.left.coord.clone(), pair.left);
+                    map.insert(pair.right.coord.clone(), pair.right);
                 }
                 parent
             })
@@ -320,7 +332,7 @@ where
         BUG
     );
 
-    (store, root)
+    (map, root)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -541,8 +553,7 @@ mod tests {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 tree.store
-                    .node_map
-                    .get(&coord)
+                    .get_node(&coord)
                     .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
             }
         }
@@ -552,7 +563,7 @@ mod tests {
         for y in 1..middle_layer {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
-                if tree.store.node_map.get(&coord).is_some() {
+                if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
                 }
             }
@@ -580,8 +591,7 @@ mod tests {
         for x in 0..2u64.pow((height - 1) as u32) {
             let coord = Coordinate { x, y: 0 };
             tree.store
-                .node_map
-                .get(&coord)
+                .get_node(&coord)
                 .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
         }
 
@@ -589,7 +599,7 @@ mod tests {
         for y in 1..layer_below_root {
             for x in 0..2u64.pow((height - y - 1) as u32) {
                 let coord = Coordinate { x, y };
-                if tree.store.node_map.get(&coord).is_some() {
+                if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
                 }
             }
