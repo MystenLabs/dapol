@@ -43,7 +43,7 @@ pub use path::{Path, PathError};
 
 mod utils;
 pub use utils::num_bottom_layer_nodes;
-use utils::{ErrOnSome, ErrUnlessTrue};
+use utils::{ErrOnSome, ErrUnlessTrue, x_coord_gen};
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
@@ -58,10 +58,22 @@ pub static MIN_HEIGHT: u8 = 2;
 /// space optimization there may be some nodes that are left out, but the
 /// leaf nodes that were originally fed into the tree builder are guaranteed
 /// to be stored.
+///
+/// The generic type `C` is for the content contained within each node.
 // TODO say something about node_generator
 pub struct BinaryTree<C> {
     root: Node<C>,
     store: Store<C>,
+    // TODO we need access to all the leaf nodes and having them in the hashmap is cumbersome,
+    //  but the hashmap allows us O(1) read time if we only know the coord.
+    //  I think all we need actually is a bitmap for the base nodes.
+    //  We can have a custom store type that keeps the bitmap and uses it to determine if a node
+    //  a) a node should be in the hashmap but it wasn't put there in order to save space
+    //  b) a node is not supposed to be in the hashmap
+    //  The node generator will need only the list of leaf nodes and the coord for the node to generate as input,
+    //  the get_node function should do the checks to see if the node is in the store or needs to
+    //  be generated
+    node_generator: Box<dyn Fn(&Coordinate, &Store<C>) -> Node<C>>,
     height: u8,
 }
 

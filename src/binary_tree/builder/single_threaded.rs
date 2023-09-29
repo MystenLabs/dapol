@@ -9,8 +9,9 @@
 
 use dashmap::DashMap;
 use std::fmt::Debug;
+use std::rc::Rc;
 
-use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store, Map};
+use super::super::{BinaryTree, Coordinate, Map, MatchedPair, Mergeable, Node, Sibling, Store, x_coord_gen};
 use super::{TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
@@ -71,15 +72,56 @@ where
                 .collect::<Vec<Node<C>>>()
         };
 
-        let padding_node_generator = self
-            .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+        let padding_node_generator = Rc::new(
+            self.padding_node_generator
+                .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?,
+        );
+        // let padding_node_generator =
+        //     self.padding_node_generator
+        //         .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+
+        let node_generator = {
+            let height = height.clone();
+            let store_depth = 1;
+            let padding_node_generator = Rc::clone(&padding_node_generator);
+
+            move |coord: &Coordinate, store: &Store<C>| {
+                // 1. determine range of x-coords for bottom-layer leaf nodes
+                let x_coord_min = x_coord_gen(2 * coord.x, coord.y - 1);
+                let x_coord_max = x_coord_gen(2 * (coord.x + 1), coord.y - 1);
+
+                // 2. search the store for these leaf nodes
+                let mut leaf_nodes: Vec<Node<C>> = Vec::new();
+                for x in x_coord_min..x_coord_max {
+                    let coord = Coordinate { x, y: 0 };
+                    store
+                        .node_map
+                        .get(&coord)
+                        .map(|node| leaf_nodes.push((*node).clone()));
+                }
+
+                if leaf_nodes.len() == 0 {
+                    // 3. if no nodes are there then create a padding node and return that
+                    // TODO need to change the name here to say "content" because it does not generate a node
+                    Node {
+                        content: padding_node_generator(&coord),
+                        coord: coord.clone(),
+                    }
+                } else {
+                    // 4. if there are nodes there then copy them from the store and send them to the build algo
+                    let (_, node) =
+                        build_tree(leaf_nodes, height, store_depth, Rc::clone(&padding_node_generator));
+                    node
+                }
+            }
+        };
 
         let (map, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
 
         Ok(BinaryTree {
             root,
             store: Store { node_map: map },
+            node_generator: Box::new(node_generator),
             height,
         })
     }
@@ -95,18 +137,18 @@ struct MaybeUnmatchedPair<C> {
 }
 
 impl<C> MaybeUnmatchedPair<C> {
-    fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
+    fn to_matched_pair<F>(self, new_padding_node_content: Rc<F>) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
     {
         match (self.left, self.right) {
             (Some(left), Some(right)) => MatchedPair { left, right },
             (Some(left), None) => MatchedPair {
-                right: left.new_sibling_padding_node(&new_padding_node_content),
+                right: left.new_sibling_padding_node(new_padding_node_content),
                 left,
             },
             (None, Some(right)) => MatchedPair {
-                left: right.new_sibling_padding_node(&new_padding_node_content),
+                left: right.new_sibling_padding_node(new_padding_node_content),
                 right,
             },
             // If this case is reached then there is a bug in the above fold.
@@ -121,7 +163,7 @@ impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    fn new_sibling_padding_node<F>(&self, new_padding_node_content: &F) -> Node<C>
+    fn new_sibling_padding_node<F>(&self, new_padding_node_content: Rc<F>) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -166,7 +208,7 @@ fn build_tree<C, F>(
     leaf_nodes: Vec<Node<C>>,
     height: u8,
     store_depth: u8,
-    new_padding_node_content: F,
+    new_padding_node_content: Rc<F>,
 ) -> (Map<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
@@ -250,7 +292,7 @@ where
             })
             .into_iter()
             // Add padding nodes to unmatched pairs.
-            .map(|pair| pair.to_matched_pair(&new_padding_node_content))
+            .map(|pair| pair.to_matched_pair(new_padding_node_content))
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();

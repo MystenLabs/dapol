@@ -121,9 +121,14 @@ where
             node_map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
         };
 
+        let node_generator = |coord: &Coordinate, store: &Store<C>| {
+                (*store.node_map.get(coord).unwrap()).clone()
+        };
+
         Ok(BinaryTree {
             root,
             store,
+            node_generator: Box::new(node_generator),
             height,
         })
     }
