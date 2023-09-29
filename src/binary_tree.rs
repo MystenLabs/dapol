@@ -37,8 +37,8 @@ use std::fmt;
 mod tree_builder;
 pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder};
 
-mod path;
-pub use path::{Path, PathError};
+mod path_builder;
+pub use path_builder::{Path, PathError};
 
 mod utils;
 pub use utils::num_bottom_layer_nodes;
