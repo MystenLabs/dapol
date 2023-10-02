@@ -471,7 +471,6 @@ where
                 {
                     *params.thread_count.lock().unwrap() += 1;
                 }
-                // STENT TODO is this clone going to do the correct clone on the thread count?
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 

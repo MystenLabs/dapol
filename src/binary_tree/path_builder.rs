@@ -110,8 +110,14 @@ impl<'a, C> PathBuilder<'a, C> {
                 });
             }
 
-            // STENT TODO if the above vector is empty then we know this node needs to be a
-            // padding node so make one of those instead of calling the build function
+            // If the above vector is empty then we know this node needs to be a
+            // padding node.
+            if leaf_nodes.len() == 0 {
+                return Node {
+                    coord: coord.clone(),
+                    content: new_padding_node_content(coord),
+                };
+            }
 
             build_node(
                 params,
@@ -134,7 +140,7 @@ impl<'a, C> PathBuilder<'a, C> {
     /// `new_padding_node_content` is needed to generate new nodes.
     pub fn build_using_single_threaded_algorithm<F>(
         self,
-        padding_node_generator: F,
+        new_padding_node_content: F,
     ) -> Result<Path<C>, PathBuildError>
     where
         C: Debug + Clone + Mergeable,
@@ -162,14 +168,20 @@ impl<'a, C> PathBuilder<'a, C> {
                     });
             }
 
-            // STENT TODO if the above vector is empty then we know this node needs to be a
-            // padding node so make one of those instead of calling the build function
+            // If the above vector is empty then we know this node needs to be a
+            // padding node.
+            if leaf_nodes.len() == 0 {
+                return Node {
+                    coord: coord.clone(),
+                    content: new_padding_node_content(coord),
+                };
+            }
 
             let (_, node) = build_tree(
                 leaf_nodes,
                 coord.to_height(),
                 store_depth,
-                &padding_node_generator,
+                &new_padding_node_content,
             );
 
             node
