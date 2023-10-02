@@ -27,7 +27,13 @@
 //! input leaf nodes, and will split the vector between the left & right
 //! recursive calls, each of which will split the vector to their children, etc.
 //!
-//! TODO talk about store and why some nodes are not stored
+//! Not all of the nodes in the tree are necessarily placed in the store. By
+//! default only the non-padding leaf nodes and the root node are placed in the
+//! store. This can be increased using the `store_depth` parameter. If
+//! `store_depth == 1` then only the root node is stored and if
+//! `store_depth == n` then the root node plus the next `n-1` layers from the
+//! root node down are stored. So if `store_depth == height` then all the nodes
+//! are stored.
 
 use std::fmt::Debug;
 use std::ops::Range;
@@ -42,6 +48,8 @@ use super::super::{
     MIN_STORE_DEPTH,
 };
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
+
+static BUG: &'static str = "[Bug in multi-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
@@ -223,7 +231,7 @@ impl<C: Mergeable> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
         if !left.is_left_sibling_of(&right) {
-            panic!("[bug in multi-threaded node builder] The given left node is not a left sibling of the given right node")
+            panic!("{} The given left node is not a left sibling of the given right node", BUG)
         }
         MatchedPair { left, right }
     }
@@ -388,7 +396,8 @@ where
         let max_nodes = max_bottom_layer_nodes(params.y_coord + 1);
         assert!(
             leaves.len() <= max_nodes as usize,
-            "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
+            "{} Leaf node count ({}) exceeds layer max node number ({})",
+            BUG,
             leaves.len(),
             max_nodes
         );
@@ -396,25 +405,29 @@ where
         assert_ne!(
             leaves.len(),
             0,
-            "[bug in multi-threaded node builder] Number of leaf nodes cannot be 0"
+            "{} Number of leaf nodes cannot be 0",
+            BUG
         );
 
         assert!(
             params.x_coord_min % 2 == 0,
-            "[bug in multi-threaded node builder] x_coord_min ({}) must be a multiple of 2 or 0",
+            "{} x_coord_min ({}) must be a multiple of 2 or 0",
+            BUG,
             params.x_coord_min
         );
 
         assert!(
             params.x_coord_max % 2 == 1,
-            "[bug in multi-threaded node builder] x_coord_max ({}) must not be a multiple of 2",
+            "{} x_coord_max ({}) must not be a multiple of 2",
+            BUG,
             params.x_coord_max
         );
 
         let v = params.x_coord_max - params.x_coord_min + 1;
         assert!(
             (v & (v - 1)) == 0,
-            "[bug in multi-threaded node builder] x_coord_max - x_coord_min + 1 ({}) must be a power of 2",
+            "{} x_coord_max - x_coord_min + 1 ({}) must be a power of 2",
+            BUG,
             v
         );
     }
@@ -480,10 +493,10 @@ where
 
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
-                let right = right_handler.join().expect(
-                    // STENT TODO do the same static bug string as single-threaded file
-                    "[bug in multi-threaded node builder] Couldn't join on the associated thread",
-                );
+                let right = right_handler.join().unwrap_or_else(|_| panic!(
+                    "{} Couldn't join on the associated thread",
+                    BUG
+                ));
 
                 MatchedPair { left, right }
             } else {

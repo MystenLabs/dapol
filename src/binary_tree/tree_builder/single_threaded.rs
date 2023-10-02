@@ -21,6 +21,8 @@ use std::fmt::Debug;
 use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{TreeBuildError, TreeBuilder};
 
+static BUG: &'static str = "[Bug in single-threaded builder]";
+
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
@@ -169,8 +171,6 @@ impl<C> Node<C> {
         Node { coord, content }
     }
 }
-
-static BUG: &'static str = "[Bug in single-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
