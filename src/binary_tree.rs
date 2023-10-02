@@ -41,7 +41,7 @@ mod path_builder;
 pub use path_builder::{Path, PathBuildError, PathError};
 
 mod utils;
-pub use utils::num_bottom_layer_nodes;
+pub use utils::max_bottom_layer_nodes;
 use utils::{ErrOnSome, ErrUnlessTrue};
 
 /// Minimum tree height supported.
@@ -424,7 +424,7 @@ mod tests {
         assert!(!left_node.is_right_sibling_of(&right_node));
 
         // check no other nodes trigger true for sibling check
-        for i in 0..num_bottom_layer_nodes(height) {
+        for i in 0..max_bottom_layer_nodes(height) {
             let node = single_leaf(i, height).to_node();
             if left_node.coord.x != i && right_node.coord.x != i {
                 assert!(!right_node.is_right_sibling_of(&node));

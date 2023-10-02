@@ -529,7 +529,7 @@ mod tests {
     fn proofs_work_for_single_leaf() {
         let height = 8u8;
 
-        for i in 0..num_bottom_layer_nodes(height) {
+        for i in 0..max_bottom_layer_nodes(height) {
             let leaf_node = vec![single_leaf(i as u64, height)];
 
             let tree_single_threaded = TreeBuilder::new()
