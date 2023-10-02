@@ -19,8 +19,7 @@ use super::{TreeBuildError, TreeBuilder};
 // Main struct.
 
 #[derive(Debug)]
-// STENT TODO change to SingleThreadedTreeBuilder
-pub struct SingleThreadedBuilder<C, F> {
+pub struct SingleThreadedTreeBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -34,13 +33,13 @@ pub struct SingleThreadedBuilder<C, F> {
 ///     .with_padding_node_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
-impl<C, F> SingleThreadedBuilder<C, F>
+impl<C, F> SingleThreadedTreeBuilder<C, F>
 where
     C: Debug + Clone + Mergeable + 'static, // This static is needed for the boxed hashmap.
     F: Fn(&Coordinate) -> C,
 {
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
-        SingleThreadedBuilder {
+        SingleThreadedTreeBuilder {
             parent_builder,
             padding_node_generator: None,
         }

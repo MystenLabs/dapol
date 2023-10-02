@@ -44,8 +44,7 @@ use super::{BinaryTree, TreeBuildError, TreeBuilder};
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
-// STENT TODO change name to MultiThreadedTreeBuilder
-pub struct MultiThreadedBuilder<C, F> {
+pub struct MultiThreadedTreeBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -60,14 +59,14 @@ pub struct MultiThreadedBuilder<C, F> {
 ///     .build()?;
 /// ```
 /// The type traits on `C` & `F` are required for thread spawning.
-impl<C, F> MultiThreadedBuilder<C, F>
+impl<C, F> MultiThreadedTreeBuilder<C, F>
 where
     C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
-        MultiThreadedBuilder {
+        MultiThreadedTreeBuilder {
             parent_builder,
             padding_node_generator: None,
         }

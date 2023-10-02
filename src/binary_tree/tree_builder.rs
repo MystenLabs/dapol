@@ -11,10 +11,10 @@ use std::fmt::Debug;
 use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
 pub mod multi_threaded;
-use multi_threaded::MultiThreadedBuilder;
+use multi_threaded::MultiThreadedTreeBuilder;
 
 pub mod single_threaded;
-use single_threaded::SingleThreadedBuilder;
+use single_threaded::SingleThreadedTreeBuilder;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
@@ -100,21 +100,21 @@ where
     }
 
     /// High performance build algorithm utilizing parallelization.
-    pub fn with_multi_threaded_build_algorithm<F>(self) -> MultiThreadedBuilder<C, F>
+    pub fn with_multi_threaded_build_algorithm<F>(self) -> MultiThreadedTreeBuilder<C, F>
     where
         C: Debug + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
-        MultiThreadedBuilder::new(self)
+        MultiThreadedTreeBuilder::new(self)
     }
 
     /// Regular build algorithm.
-    pub fn with_single_threaded_build_algorithm<F>(self) -> SingleThreadedBuilder<C, F>
+    pub fn with_single_threaded_build_algorithm<F>(self) -> SingleThreadedTreeBuilder<C, F>
     where
         C: Debug,
         F: Fn(&Coordinate) -> C,
     {
-        SingleThreadedBuilder::new(self)
+        SingleThreadedTreeBuilder::new(self)
     }
 
     /// Use the height of the tree to determine store depth by dividing it by the
