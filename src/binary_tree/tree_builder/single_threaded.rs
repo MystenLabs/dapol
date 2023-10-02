@@ -562,6 +562,7 @@ mod tests {
     fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
         let height = 8;
         let leaf_nodes = full_bottom_layer(height);
+        // TODO fuzz on this store depth
         let store_depth = 1;
 
         let tree = TreeBuilder::new()
@@ -593,4 +594,6 @@ mod tests {
             }
         }
     }
+
+    // TODO check padding nodes on bottom layer are not in the store unless store depth is the max
 }

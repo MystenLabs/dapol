@@ -77,8 +77,8 @@ where
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
-        self.padding_node_generator = Some(padding_node_generator);
+    pub fn with_padding_node_generator(mut self, new_padding_node_content: F) -> Self {
+        self.padding_node_generator = Some(new_padding_node_content);
         self
     }
 
@@ -292,10 +292,6 @@ impl RecursionParams {
         self.y_coord -= 1;
         self
     }
-
-    fn within_store_depth(&self) -> bool {
-        self.y_coord >= self.height - self.store_depth
-    }
 }
 
 /// Public functions available to [super][super][path_builder].
@@ -429,7 +425,7 @@ where
         return pair.merge();
     }
 
-    let within_store_depth = params.within_store_depth();
+    let within_store_depth_for_children = params.y_coord - 1 >= params.height - params.store_depth;
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::SomeNodes(index) => {
@@ -514,7 +510,7 @@ where
         }
     };
 
-    if within_store_depth {
+    if within_store_depth_for_children {
         map.insert(pair.left.coord.clone(), pair.left.clone());
         map.insert(pair.right.coord.clone(), pair.right.clone());
     }
@@ -545,7 +541,8 @@ mod tests {
     use primitive_types::H256;
     use rand::{thread_rng, Rng};
 
-    type Func = Box<dyn Fn(&Coordinate) -> TestContent>;
+    // type Func = Fn(&Coordinate) -> TestContent;
+    type ThreadSafeFunc = Box<dyn Fn(&Coordinate) -> TestContent + Send + Sync + 'static>;
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
@@ -665,7 +662,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_single_threaded_build_algorithm::<Func>()
+            .with_multi_threaded_build_algorithm::<ThreadSafeFunc>()
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -687,8 +684,8 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
             .build()
             .unwrap();
         let root = tree.get_root();
@@ -714,8 +711,8 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -724,6 +721,81 @@ mod tests {
                 "Leaf node at x-coord {} is not present in the store",
                 leaf.x_coord
             ));
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let middle_layer = height / 2;
+        let layer_below_root = height - 1;
+
+        // These nodes should be in the store.
+        for y in middle_layer..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                tree.store
+                    .get_node(&coord)
+                    .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+            }
+        }
+
+        // These nodes should not be in the store.
+        // Why 1 and not 0? Because leaf nodes are checked in another test.
+        for y in 1..middle_layer {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+        // TODO fuzz on this store depth
+        let store_depth = 1;
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(store_depth)
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let layer_below_root = height - 1;
+
+        // Only the leaf nodes should be in the store.
+        for x in 0..2u64.pow((height - 1) as u32) {
+            let coord = Coordinate { x, y: 0 };
+            tree.store
+                .get_node(&coord)
+                .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+        }
+
+        // All internal nodes should not be in the store.
+        for y in 1..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
         }
     }
 }
