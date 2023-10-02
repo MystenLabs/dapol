@@ -6,11 +6,17 @@
 //! The build algorithm starts with the inputted bottom-layer leaf nodes, adds
 //! padding nodes where required, and then constructs the next layer by merging
 //! pairs of sibling nodes together.
+//!
+//! Not all of the nodes in the tree are necessarily placed in the store. By
+//! default only the non-padding leaf nodes and the root node are placed in the
+//! store. This can be increased using the `store_depth` parameter. If
+//! `store_depth == 1` then only the root node is stored and if
+//! `store_depth == n` then the root node plus the next `n-1` layers from the
+//! root node down are stored. So if `store_depth == height` then all the nodes
+//! are stored.
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-
-use crate::binary_tree::MIN_STORE_DEPTH;
 
 use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{TreeBuildError, TreeBuilder};
@@ -48,11 +54,19 @@ where
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
+    // STENT TODO change name to new_padding_node_content
     pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
         self.padding_node_generator = Some(padding_node_generator);
         self
     }
 
+    /// Construct the tree using the provided parameters.
+    ///
+    /// An error is returned if the parameters were not configured correctly
+    /// (or at all).
+    ///
+    /// The leaf nodes are sorted by x-coord, checked for duplicates, and
+    /// converted to the right type.
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
@@ -73,11 +87,11 @@ where
                 .collect::<Vec<Node<C>>>()
         };
 
-        let padding_node_generator = self
+        let new_padding_node_content = self
             .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+            .ok_or(TreeBuildError::NoPaddingNodeContentGeneratorProvided)?;
 
-        let (map, root) = build_tree(leaf_nodes, height, store_depth, &padding_node_generator);
+        let (map, root) = build_tree(leaf_nodes, height, store_depth, &new_padding_node_content);
 
         Ok(BinaryTree {
             root,
@@ -104,12 +118,23 @@ impl<C: Clone> Store<C> for HashMapStore<C> {
 // Supporting structs & methods.
 
 /// A pair of sibling nodes, but one might be absent.
+///
+/// At least one of the fields is expected to be set. If this is not the case
+/// then it is assumed there is a bug in the code using this struct.
 struct MaybeUnmatchedPair<C> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
 impl<C> MaybeUnmatchedPair<C> {
+    /// Convert the partially matched pair into a matched pair.
+    ///
+    /// If both left and right nodes are not present then the function will
+    /// panic because this case indicates a bug in the calling code, which is
+    /// not a recoverable scenario.
+    ///
+    /// If only one of the nodes is not present then it is created as a padding
+    /// node.
     fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -124,7 +149,6 @@ impl<C> MaybeUnmatchedPair<C> {
                 left: right.new_sibling_padding_node(new_padding_node_content),
                 right,
             },
-            // If this case is reached then there is a bug in the above fold.
             (None, None) => {
                 panic!("{} Invalid pair (None, None) found", BUG)
             }
@@ -163,8 +187,8 @@ type RootNode<C> = Node<C>;
 /// Every element of `leaf_nodes` is assumed to have y-coord of 0; there is
 /// only a naive check for this (only first node is checked).
 ///
-/// The nodes are stored in a hashmap, which is returned along with the root node
-/// (which is also stored in the hashmap).
+/// The nodes are stored in a hashmap, which is returned along with the root
+/// node (which is also stored in the hashmap).
 ///
 /// `store_depth` determines how many layers are placed in the store. If
 /// `store_depth == 1` then only the root node is stored and if
@@ -175,7 +199,6 @@ type RootNode<C> = Node<C>;
 /// `store_depth` must at least be 1.
 /// Also note that all bottom layer nodes are stored, both the inputted leaf
 /// nodes and their accompanying padding nodes.
-///
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
 pub fn build_tree<C, F>(
@@ -208,6 +231,7 @@ where
             panic!("{} Empty leaf nodes", BUG);
         }
 
+        use crate::binary_tree::MIN_STORE_DEPTH;
         assert!(
             store_depth >= MIN_STORE_DEPTH,
             "{} Store depth cannot be less than {} since the root node is always stored",
@@ -226,7 +250,7 @@ where
 
     // Repeat for each layer of the tree, except the root node layer.
     let layer_below_root = height - 1;
-    for i in 0..layer_below_root {
+    for y in 0..layer_below_root {
         // Create the next layer up of nodes from the current layer of nodes.
         nodes = nodes
             .into_iter()
@@ -271,11 +295,12 @@ where
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
-                // TODO may be able to further optimize by leaving out the padding leaf nodes from the store
+                // TODO may be able to further optimize by leaving out the padding leaf nodes
+                // from the store.
                 // Only insert nodes in the store if
                 // a) node is a bottom layer leaf node (including padding nodes)
                 // b) node is in one of the top X layers where X = store_depth
-                if i == 0 || i >= layer_below_root - (store_depth - 1) {
+                if y == 0 || y >= height - store_depth {
                     map.insert(pair.left.coord.clone(), pair.left);
                     map.insert(pair.right.coord.clone(), pair.right);
                 }
@@ -301,8 +326,8 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO perform manual calculation of a tree and check that it equals the one generated here
-// TODO check certain number of leaf nodes are in the tree
+// TODO perform manual calculation of a tree and check that it equals the one
+// generated here TODO check certain number of leaf nodes are in the tree
 
 #[cfg(test)]
 mod tests {
@@ -440,7 +465,7 @@ mod tests {
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
-        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeGeneratorProvided));
+        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided));
     }
 
     // tests that the sorting functionality works

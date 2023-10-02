@@ -17,7 +17,7 @@
 //! [super][tree_builder][multi_threaded] and
 //! [super][tree_builder][single_threaded].
 
-use super::{BinaryTree, Coordinate, Mergeable, Node};
+use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
 
 use std::fmt::Debug;
 
@@ -95,7 +95,11 @@ impl<'a, C> PathBuilder<'a, C> {
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
         let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
-            let params = RecursionParams::from_coordinate(coord);
+            let params = RecursionParams::from_coordinate(coord)
+                // We don't want to store anything because the store already exists
+                // inside the binary tree struct.
+                .with_store_depth(MIN_STORE_DEPTH)
+                .with_tree_height(tree.height);
 
             // STENT TODO change the build_node function so we don't need to have this
             // copying of leaf nodes
@@ -137,7 +141,6 @@ impl<'a, C> PathBuilder<'a, C> {
         F: Fn(&Coordinate) -> C,
     {
         use super::tree_builder::single_threaded::build_tree;
-        use super::MIN_STORE_DEPTH;
 
         let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
             // We don't want to store anything because the store already exists
@@ -351,7 +354,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum PathBuildError {
     #[error("The builder must be given a padding node generator function before building")]
-    NoPaddingNodeGeneratorProvided,
+    NoPaddingNodeContentGeneratorProvided,
     #[error("The builder must be given a tree before building")]
     NoTreeProvided,
     #[error("The builder must be given the x-coord of a leaf node before building")]

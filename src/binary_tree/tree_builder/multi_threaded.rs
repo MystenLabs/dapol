@@ -39,6 +39,7 @@ use std::thread;
 
 use super::super::{
     num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store,
+    MIN_STORE_DEPTH,
 };
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
@@ -109,12 +110,13 @@ where
 
         let padding_node_generator = self
             .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+            .ok_or(TreeBuildError::NoPaddingNodeContentGeneratorProvided)?;
 
         let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
+        let params = RecursionParams::from_tree_height(height).with_store_depth(store_depth);
 
         let root = build_node(
-            RecursionParams::from_tree_height(height),
+            params,
             leaf_nodes,
             Arc::new(padding_node_generator),
             Arc::clone(&store),
@@ -221,7 +223,7 @@ impl<C: Mergeable> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
         if !left.is_left_sibling_of(&right) {
-            panic!("[bug in multi-threaded node builder] Given nodes were expected to be siblings")
+            panic!("[bug in multi-threaded node builder] The given left node is not a left sibling of the given right node")
         }
         MatchedPair { left, right }
     }
@@ -247,9 +249,12 @@ pub struct RecursionParams {
     y_coord: u8,
     thread_count: Arc<Mutex<u8>>,
     max_thread_count: u8,
+    store_depth: u8,
+    height: u8,
 }
 
 /// Private functions for use within this file only.
+// STENT TODO docs for all the methods
 impl RecursionParams {
     fn from_tree_height(height: u8) -> Self {
         // Start from the first node.
@@ -269,6 +274,8 @@ impl RecursionParams {
             thread_count: Arc::new(Mutex::new(1)),
             // TODO this should be set based on number of cores but not sure how best to do that
             max_thread_count: 1,
+            store_depth: MIN_STORE_DEPTH,
+            height,
         }
     }
 
@@ -285,11 +292,17 @@ impl RecursionParams {
         self.y_coord -= 1;
         self
     }
+
+    fn within_store_depth(&self) -> bool {
+        self.y_coord >= self.height - self.store_depth
+    }
 }
 
 /// Public functions available to [super][super][path_builder].
 impl RecursionParams {
     pub fn from_coordinate(coord: &Coordinate) -> Self {
+        use super::super::MAX_HEIGHT;
+
         let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
 
@@ -300,11 +313,23 @@ impl RecursionParams {
             y_coord: coord.y,
             thread_count: Arc::new(Mutex::new(0)),
             max_thread_count: 1,
+            store_depth: MIN_STORE_DEPTH,
+            height: MAX_HEIGHT,
         }
     }
 
     pub fn x_coord_range(&self) -> Range<u64> {
         self.x_coord_min..self.x_coord_max
+    }
+
+    pub fn with_store_depth(mut self, store_depth: u8) -> Self {
+        self.store_depth = store_depth;
+        self
+    }
+
+    pub fn with_tree_height(mut self, height: u8) -> Self {
+        self.height = height;
+        self
     }
 }
 
@@ -339,7 +364,6 @@ pub fn build_node<C, F>(
     params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
-    // STENT TODO this map is not actually used, we should add stuff to it
     map: Arc<Map<C>>,
 ) -> Node<C>
 where
@@ -385,13 +409,27 @@ where
     // There are either 2 or 1 leaves left (which is checked above).
     if params.y_coord == 1 {
         let pair = if leaves.len() == 2 {
-            MatchedPair::from_siblings(leaves.remove(0), leaves.remove(0))
+            let right = leaves.pop().unwrap();
+            let left = leaves.pop().unwrap();
+
+            map.insert(left.coord.clone(), left.clone());
+            map.insert(right.coord.clone(), right.clone());
+
+            MatchedPair::from_siblings(left, right)
         } else {
-            MatchedPair::from_node(leaves.remove(0), new_padding_node_content)
+            let node = leaves.pop().unwrap();
+
+            // Only the leaf node is placed in the store, it's sibling pad node
+            // is left out.
+            map.insert(node.coord.clone(), node.clone());
+
+            MatchedPair::from_node(node, new_padding_node_content)
         };
 
         return pair.merge();
     }
+
+    let within_store_depth = params.within_store_depth();
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::SomeNodes(index) => {
@@ -399,17 +437,17 @@ where
             let left_leaves = leaves;
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
-            let map_ref = Arc::clone(&map);
 
             // Split off a thread to build the right child, but only do this if the thread
             // count is less than the max allowed.
             if *params.thread_count.lock().unwrap() < params.max_thread_count {
-                // STENT TODO are the above & below locks going to work or will there be some panic?
                 {
                     *params.thread_count.lock().unwrap() += 1;
                 }
                 // STENT TODO is this clone going to do the correct clone on the thread count?
                 let params_clone = params.clone();
+                let map_ref = Arc::clone(&map);
+
                 let right_handler = thread::spawn(move || -> Node<C> {
                     build_node(
                         params_clone.into_right_child(),
@@ -423,7 +461,7 @@ where
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
-                    map,
+                    Arc::clone(&map),
                 );
 
                 // If there is a problem joining onto the thread then there is no way to recover
@@ -439,14 +477,14 @@ where
                     params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
-                    map_ref,
+                    Arc::clone(&map),
                 );
 
                 let left = build_node(
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
-                    map,
+                    Arc::clone(&map),
                 );
 
                 MatchedPair { left, right }
@@ -458,7 +496,7 @@ where
                 params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
-                map,
+                Arc::clone(&map),
             );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
@@ -469,12 +507,17 @@ where
                 params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
-                map,
+                Arc::clone(&map),
             );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
     };
+
+    if within_store_depth {
+        map.insert(pair.left.coord.clone(), pair.left.clone());
+        map.insert(pair.right.coord.clone(), pair.right.clone());
+    }
 
     pair.merge()
 }
@@ -482,7 +525,7 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO check all leaf nodes are in the store
+// TODO check all leaf nodes are in the store, and that the desired level of nodes is in the store
 // TODO check certain number of leaf nodes are in the tree
 // TODO recursive function err - num leaf nodes exceeds max
 // TODO recursive function err - empty leaf nodes
@@ -626,7 +669,10 @@ mod tests {
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
-        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeGeneratorProvided));
+        assert_err_simple!(
+            res,
+            Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided)
+        );
     }
 
     // tests that the sorting functionality works

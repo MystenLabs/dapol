@@ -194,7 +194,7 @@ pub enum TreeBuildError {
     #[error("The builder must be given a height before building")]
     NoHeightProvided,
     #[error("The builder must be given a padding node generator function before building")]
-    NoPaddingNodeGeneratorProvided,
+    NoPaddingNodeContentGeneratorProvided,
     #[error("Too many leaves for the given height")]
     TooManyLeaves,
     #[error("Leaf nodes cannot be empty")]

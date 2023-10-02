@@ -45,7 +45,14 @@ pub use utils::num_bottom_layer_nodes;
 use utils::{ErrOnSome, ErrUnlessTrue};
 
 /// Minimum tree height supported.
+/// It does not make any sense to have a tree of size 1 and the code may
+/// actually break with this input so 2 is a reasonable minimum.
 pub static MIN_HEIGHT: u8 = 2;
+
+/// Maximum tree height supported.
+/// This number does not have any programmatic/theoretic reason for being 64,
+/// it's just a soft limit that can be increased later if need be.
+pub static MAX_HEIGHT: u8 = 64;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
