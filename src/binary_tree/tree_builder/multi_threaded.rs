@@ -30,10 +30,11 @@
 //! TODO talk about store and why some nodes are not stored
 
 use std::fmt::Debug;
+use std::ops::Range;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::super::{
@@ -113,7 +114,7 @@ where
         let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
 
         let root = build_node(
-            RecursionParams::new(height),
+            RecursionParams::from_tree_height(height),
             leaf_nodes,
             Arc::new(padding_node_generator),
             Arc::clone(&store),
@@ -177,7 +178,7 @@ enum NumNodes {
 impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
+    /// type `C` is defined, for example.
     fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -235,53 +236,75 @@ impl<C: Mergeable> MatchedPair<C> {
 /// Nodes in the left vector have x-coord <= mid, and
 /// those in the right vector have x-coord > mid.
 ///
-/// `max_thread_spawn_height` is there to prevent more threads being spawned
+/// `max_thread_count` is there to prevent more threads being spawned
 /// than there are cores to execute them. If too many threads are spawned then
-/// the parallelization can actually be detrimental to the run-time.
+/// the parallelization can actually be detrimental to the run-time. Threads
 #[derive(Clone)]
 pub struct RecursionParams {
-    // STENT TODO do we need these to be pub?
-    pub x_coord_min: u64,
-    pub x_coord_mid: u64,
-    pub x_coord_max: u64,
-    pub y: u8,
-    pub max_thread_spawn_height: u8,
+    x_coord_min: u64,
+    x_coord_mid: u64,
+    x_coord_max: u64,
+    y_coord: u8,
+    thread_count: Arc<Mutex<u8>>,
+    max_thread_count: u8,
 }
 
+/// Private functions for use within this file only.
 impl RecursionParams {
-    pub fn new(height: u8) -> Self {
-        use std::cmp::min;
-
+    fn from_tree_height(height: u8) -> Self {
+        // Start from the first node.
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = num_bottom_layer_nodes(height) - 1;
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
         // y-coords also start from 0, hence the `- 1`.
-        let y = height - 1;
-        // STENT TODO should be a parameter
-        let max_thread_spawn_height = height - min(4, height);
+        let y_coord = Coordinate::y_coord_from_height(height);
 
         RecursionParams {
             x_coord_min,
             x_coord_mid,
             x_coord_max,
-            y,
-            max_thread_spawn_height,
+            y_coord,
+            // TODO need to unit test that this number matches actual thread count
+            thread_count: Arc::new(Mutex::new(1)),
+            // TODO this should be set based on number of cores but not sure how best to do that
+            max_thread_count: 1,
         }
     }
 
     fn into_left_child(mut self) -> Self {
         self.x_coord_max = self.x_coord_mid;
         self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y -= 1;
+        self.y_coord -= 1;
         self
     }
 
     fn into_right_child(mut self) -> Self {
         self.x_coord_min = self.x_coord_mid + 1;
         self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y -= 1;
+        self.y_coord -= 1;
         self
+    }
+}
+
+/// Public functions available to [super][super][path_builder].
+impl RecursionParams {
+    pub fn from_coordinate(coord: &Coordinate) -> Self {
+        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y_coord: coord.y,
+            thread_count: Arc::new(Mutex::new(0)),
+            max_thread_count: 1,
+        }
+    }
+
+    pub fn x_coord_range(&self) -> Range<u64> {
+        self.x_coord_min..self.x_coord_max
     }
 }
 
@@ -324,7 +347,7 @@ where
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {
-        let max_nodes = num_bottom_layer_nodes(params.y + 1);
+        let max_nodes = num_bottom_layer_nodes(params.y_coord + 1);
         assert!(
             leaves.len() <= max_nodes as usize,
             "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
@@ -360,7 +383,7 @@ where
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
-    if params.y == 1 {
+    if params.y_coord == 1 {
         let pair = if leaves.len() == 2 {
             MatchedPair::from_siblings(leaves.remove(0), leaves.remove(0))
         } else {
@@ -378,9 +401,14 @@ where
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
             let map_ref = Arc::clone(&map);
 
-            // Split off a thread to build the right child, but only do this if we are above
-            // a certain height otherwise we are at risk of spawning too many threads.
-            if params.y > params.max_thread_spawn_height {
+            // Split off a thread to build the right child, but only do this if the thread
+            // count is less than the max allowed.
+            if *params.thread_count.lock().unwrap() < params.max_thread_count {
+                // STENT TODO are the above & below locks going to work or will there be some panic?
+                {
+                    *params.thread_count.lock().unwrap() += 1;
+                }
+                // STENT TODO is this clone going to do the correct clone on the thread count?
                 let params_clone = params.clone();
                 let right_handler = thread::spawn(move || -> Node<C> {
                     build_node(
@@ -401,6 +429,7 @@ where
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
                 let right = right_handler.join().expect(
+                    // STENT TODO do the same static bug string as single-threaded file
                     "[bug in multi-threaded node builder] Couldn't join on the associated thread",
                 );
 

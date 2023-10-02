@@ -92,17 +92,15 @@ impl<'a, C> PathBuilder<'a, C> {
         use dashmap::DashMap;
         use std::sync::Arc;
 
-        // STENT TODO this new function doesn't work in our case, it only works for the
-        // root node
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
         let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
-            let params = RecursionParams::new(coord.to_height());
+            let params = RecursionParams::from_coordinate(coord);
 
             // STENT TODO change the build_node function so we don't need to have this
             // copying of leaf nodes
             let mut leaf_nodes = Vec::<Node<C>>::new();
-            for x in params.x_coord_min..params.x_coord_max {
+            for x in params.x_coord_range() {
                 tree.get_node(&Coordinate { x, y: 0 }).consume(|node| {
                     leaf_nodes.push(node);
                 });
