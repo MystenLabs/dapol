@@ -492,7 +492,7 @@ mod tests {
             // STENT TODO we need tests with full store and partial store
             // .with_store_depth(height)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -521,7 +521,7 @@ mod tests {
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(height)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -549,7 +549,7 @@ mod tests {
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(height)
                 .with_single_threaded_build_algorithm()
-                .with_padding_node_generator(get_padding_function())
+                .with_padding_node_content_generator(get_padding_function())
                 .build()
                 .unwrap();
 

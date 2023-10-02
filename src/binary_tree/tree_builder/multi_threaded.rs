@@ -65,7 +65,7 @@ pub struct MultiThreadedTreeBuilder<C, F> {
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
 ///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
+///     .with_padding_node_content_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
 /// The type traits on `C` & `F` are required for thread spawning.
@@ -85,7 +85,7 @@ where
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    pub fn with_padding_node_generator(mut self, new_padding_node_content: F) -> Self {
+    pub fn with_padding_node_content_generator(mut self, new_padding_node_content: F) -> Self {
         self.padding_node_generator = Some(new_padding_node_content);
         self
     }
@@ -581,7 +581,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -594,7 +594,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -608,7 +608,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
@@ -622,7 +622,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(vec![single_leaf(1, height)])
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
@@ -645,7 +645,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
@@ -661,7 +661,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -677,7 +677,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -715,7 +715,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
         let root = tree.get_root();
@@ -726,7 +726,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_padding_node_content_generator(&get_padding_function())
             .build()
             .unwrap();
 
@@ -742,7 +742,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -763,7 +763,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -804,7 +804,7 @@ mod tests {
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 

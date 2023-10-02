@@ -55,7 +55,7 @@ pub struct InputLeafNode<C> {
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
 ///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
+///     .with_padding_node_content_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
 impl<C> TreeBuilder<C>
@@ -246,7 +246,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -254,7 +254,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -273,7 +273,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -281,7 +281,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -301,7 +301,7 @@ mod tests {
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_single_threaded_build_algorithm()
-                .with_padding_node_generator(get_padding_function())
+                .with_padding_node_content_generator(get_padding_function())
                 .build()
                 .unwrap();
 
@@ -309,7 +309,7 @@ mod tests {
                 .with_height(height)
                 .with_leaf_nodes(leaf_node)
                 .with_multi_threaded_build_algorithm()
-                .with_padding_node_generator(get_padding_function())
+                .with_padding_node_content_generator(get_padding_function())
                 .build()
                 .unwrap();
 

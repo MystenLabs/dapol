@@ -181,7 +181,7 @@ impl NdmSmt {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(new_padding_node_content)
+            .with_padding_node_content_generator(new_padding_node_content)
             .build()?;
 
         let end = SystemTime::now();
@@ -196,7 +196,7 @@ impl NdmSmt {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(new_padding_node_content_2)
+            .with_padding_node_content_generator(new_padding_node_content_2)
             .build()?;
 
         let end = SystemTime::now();
