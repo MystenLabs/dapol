@@ -10,19 +10,25 @@ use std::fmt::Debug;
 
 use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
-mod multi_threaded;
+pub mod multi_threaded;
 use multi_threaded::MultiThreadedBuilder;
 
-mod single_threaded;
+pub mod single_threaded;
 use single_threaded::SingleThreadedBuilder;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
 static DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
 
+/// The root node is not actually put in the hashmap because it is
+/// returned along with the hashmap, but it is considered to be stored so
+/// `store_depth` must at least be 1.
+pub static MIN_STORE_DEPTH: u8 = 1;
+
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
+// STENT TODO docs
 #[derive(Debug)]
 pub struct TreeBuilder<C> {
     height: Option<u8>,
@@ -54,7 +60,7 @@ pub struct InputLeafNode<C> {
 /// ```
 impl<C> TreeBuilder<C>
 where
-    C: Clone + Mergeable + 'static, // TODO not sure about this static here, it's needed when the single threaded builder builds the boxed hashmap
+    C: Clone + Mergeable + 'static, // The static is needed when the single threaded builder builds the boxed hashmap.
 {
     pub fn new() -> Self {
         TreeBuilder {
@@ -113,6 +119,7 @@ where
 
     /// Use the height of the tree to determine store depth by dividing it by the
     /// default ratio.
+    // STENT TODO change these function names so that they don't contain all these extra words, just 'get_height'
     fn get_or_default_store_depth(&self, height: u8) -> u8 {
         self.store_depth
             .unwrap_or(height / DEFAULT_STORE_DEPTH_RATIO)

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    BinaryTree, Coordinate, InputLeafNode, PathError, TreeBuildError, TreeBuilder,
+    BinaryTree, Coordinate, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
 };
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
@@ -39,6 +39,24 @@ pub struct NdmSmt {
     user_mapping: HashMap<UserId, u64>,
 }
 
+fn new_padding_node_content_closure(
+    master_secret_bytes: [u8; 32],
+    salt_b_bytes: [u8; 32],
+    salt_s_bytes: [u8; 32],
+) -> impl Fn(&Coordinate) -> Content {
+    // closure that is used to create new padding nodes
+    move |coord: &Coordinate| {
+        // TODO unfortunately we copy data here, maybe there is a way to do without copying
+        let coord_bytes = coord.as_bytes();
+        // pad_secret is given as 'w' in the DAPOL+ paper
+        let pad_secret = generate_key(&master_secret_bytes, &coord_bytes);
+        let pad_secret_bytes: [u8; 32] = pad_secret.into();
+        let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes);
+        let salt = generate_key(&pad_secret_bytes, &salt_s_bytes);
+        Content::new_pad(blinding_factor.into(), coord, salt.into())
+    }
+}
+
 impl NdmSmt {
     /// Constructor.
     /// TODO more docs
@@ -54,22 +72,17 @@ impl NdmSmt {
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
 
-        // needed for the thread-safe closure
-        let master_secret_bytes_clone = master_secret_bytes.clone();
-        let salt_b_bytes_clone = salt_b_bytes.clone();
-        let salt_s_bytes_clone = salt_s_bytes.clone();
+        let new_padding_node_content = new_padding_node_content_closure(
+            master_secret_bytes.clone(),
+            salt_b_bytes.clone(),
+            salt_s_bytes.clone(),
+        );
 
-        // closure that is used to create new padding nodes
-        let new_padding_node_content = move |coord: &Coordinate| {
-            // TODO unfortunately we copy data here, maybe there is a way to do without copying
-            let coord_bytes = coord.as_bytes();
-            // pad_secret is given as 'w' in the DAPOL+ paper
-            let pad_secret = generate_key(&master_secret_bytes_clone, &coord_bytes);
-            let pad_secret_bytes: [u8; 32] = pad_secret.into();
-            let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes_clone);
-            let salt = generate_key(&pad_secret_bytes, &salt_s_bytes_clone);
-            Content::new_pad(blinding_factor.into(), coord, salt.into())
-        };
+        let new_padding_node_content_2 = new_padding_node_content_closure(
+            master_secret_bytes.clone(),
+            salt_b_bytes.clone(),
+            salt_s_bytes.clone(),
+        );
 
         let mut x_coord_generator = RandomXCoordGenerator::new(height);
 
@@ -183,7 +196,7 @@ impl NdmSmt {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(new_padding_node_content)
+            .with_padding_node_generator(new_padding_node_content_2)
             .build()?;
 
         let end = SystemTime::now();
@@ -232,7 +245,20 @@ impl NdmSmt {
             .get(user_id)
             .ok_or(NdmSmtError::UserIdNotFound)?;
 
-        let path = self.tree.build_path_for(*leaf_x_coord)?;
+        let master_secret_bytes = self.master_secret.as_bytes();
+        let salt_b_bytes = self.salt_b.as_bytes();
+        let salt_s_bytes = self.salt_s.as_bytes();
+        let new_padding_node_content = new_padding_node_content_closure(
+            master_secret_bytes.clone(),
+            salt_b_bytes.clone(),
+            salt_s_bytes.clone(),
+        );
+
+        let path = self
+            .tree
+            .path_builder()
+            .with_leaf_x_coord(*leaf_x_coord)
+            .build_using_multi_threaded_algorithm(new_padding_node_content)?;
 
         Ok(InclusionProof::generate(
             path,
@@ -267,7 +293,7 @@ pub enum NdmSmtError {
     #[error("Number of users cannot be bigger than 2^height")]
     HeightTooSmall(#[from] OutOfBoundsError),
     #[error("Inclusion proof generation failed when trying to build the path in the tree")]
-    InclusionProofPathGenerationError(#[from] PathError),
+    InclusionProofPathGenerationError(#[from] PathBuildError),
     #[error("Inclusion proof generation failed")]
     InclusionProofGenerationError(#[from] InclusionProofError),
     #[error("User ID not found in the user mapping")]

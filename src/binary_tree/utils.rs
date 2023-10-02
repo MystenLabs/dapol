@@ -42,13 +42,6 @@ pub fn num_bottom_layer_nodes(height: u8) -> u64 {
     2u64.pow(height as u32 - 1)
 }
 
-
-// TODO is this needed anymore?
-pub fn x_coord_gen(x: u64, y: u8) -> u64 {
-    2u64.pow(y as u32) * x
-}
-
-
 // -------------------------------------------------------------------------------------------------
 // Test utils for sub-modules.
 

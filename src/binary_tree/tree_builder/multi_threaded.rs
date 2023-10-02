@@ -36,12 +36,15 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use std::thread;
 
-use super::super::{num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
+use super::super::{
+    num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store,
+};
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
+// STENT TODO change name to MultiThreadedTreeBuilder
 pub struct MultiThreadedBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
@@ -63,11 +66,6 @@ where
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
-    ///
-    /// The leaf node vector is cleaned in the following ways:
-    /// - sorted according to their x-coord
-    /// - all x-coord <= max
-    /// - checked for duplicates (duplicate if same x-coords)
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
         MultiThreadedBuilder {
             parent_builder,
@@ -84,6 +82,11 @@ where
     }
 
     /// Construct the binary tree.
+    ///
+    /// The leaf node vector is cleaned in the following ways:
+    /// - sorted according to their x-coord
+    /// - all x-coord <= max
+    /// - checked for duplicates (duplicate if same x-coords)
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
@@ -237,7 +240,8 @@ impl<C: Mergeable> MatchedPair<C> {
 /// than there are cores to execute them. If too many threads are spawned then
 /// the parallelization can actually be detrimental to the run-time.
 #[derive(Clone)]
-struct RecursionParams {
+pub struct RecursionParams {
+    // STENT TODO do we need these to be pub?
     pub x_coord_min: u64,
     pub x_coord_mid: u64,
     pub x_coord_max: u64,
@@ -246,15 +250,17 @@ struct RecursionParams {
 }
 
 impl RecursionParams {
-    fn new(height: u8) -> Self {
+    pub fn new(height: u8) -> Self {
+        use std::cmp::min;
+
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = num_bottom_layer_nodes(height) - 1;
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
         // y-coords also start from 0, hence the `- 1`.
         let y = height - 1;
-        // TODO should be a parameter
-        let max_thread_spawn_height = height - 4;
+        // STENT TODO should be a parameter
+        let max_thread_spawn_height = height - min(4, height);
 
         RecursionParams {
             x_coord_min,
@@ -307,10 +313,11 @@ impl RecursionParams {
 /// function anyway. If either case is reached then either there is a bug in the
 /// original calling code or there is a bug in the splitting algorithm in this
 /// function. There is no recovery from these 2 states so we panic.
-fn build_node<C, F>(
+pub fn build_node<C, F>(
     params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
+    // STENT TODO this map is not actually used, we should add stuff to it
     map: Arc<Map<C>>,
 ) -> Node<C>
 where
@@ -370,7 +377,7 @@ where
             let left_leaves = leaves;
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
-            let store_ref = Arc::clone(&map);
+            let map_ref = Arc::clone(&map);
 
             // Split off a thread to build the right child, but only do this if we are above
             // a certain height otherwise we are at risk of spawning too many threads.
@@ -381,7 +388,7 @@ where
                         params_clone.into_right_child(),
                         right_leaves,
                         new_padding_node_content_ref,
-                        store_ref,
+                        map_ref,
                     )
                 });
 
@@ -404,7 +411,7 @@ where
                     params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
-                    store_ref,
+                    map_ref,
                 );
 
                 let left = build_node(

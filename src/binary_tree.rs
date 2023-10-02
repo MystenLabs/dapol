@@ -35,14 +35,14 @@
 use std::fmt;
 
 mod tree_builder;
-pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder};
+pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH};
 
 mod path_builder;
-pub use path_builder::{Path, PathError};
+pub use path_builder::{Path, PathBuildError, PathError};
 
 mod utils;
 pub use utils::num_bottom_layer_nodes;
-use utils::{ErrOnSome, ErrUnlessTrue, x_coord_gen};
+use utils::{ErrOnSome, ErrUnlessTrue};
 
 /// Minimum tree height supported.
 pub static MIN_HEIGHT: u8 = 2;
@@ -61,16 +61,7 @@ pub static MIN_HEIGHT: u8 = 2;
 /// The generic type `C` is for the content contained within each node.
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: Box<dyn Store<C>>, // TODO note the box & dyn pattern is needed so that the trait methods can be determined dynamically at runtime
-    // TODO we need access to all the leaf nodes and having them in the hashmap is cumbersome,
-    //  but the hashmap allows us O(1) read time if we only know the coord.
-    //  I think all we need actually is a bitmap for the base nodes.
-    //  We can have a custom store type that keeps the bitmap and uses it to determine if a node
-    //  a) a node should be in the hashmap but it wasn't put there in order to save space
-    //  b) a node is not supposed to be in the hashmap
-    //  The node generator will need only the list of leaf nodes and the coord for the node to generate as input,
-    //  the get_node function should do the checks to see if the node is in the store or needs to
-    //  be generated
+    store: Box<dyn Store<C>>, // The box & dyn pattern is needed so that the trait methods can be determined dynamically at runtime.
     height: u8,
 }
 
@@ -192,6 +183,48 @@ impl Coordinate {
             y: self.y + 1,
             x: self.x / 2,
         }
+    }
+
+    /// Returns the x-coords of the first and last bottom-layer leaf nodes for
+    /// the subtree with this coordinate as the root node.
+    ///
+    /// `x_coord_min` is x-coord for the first leaf.
+    /// `x_coord_max` is the x-coord for the last leaf.
+    ///
+    /// Note that the calculation used to get the x-coords does not depend on
+    /// the height of the main tree. This is due to the fact that we know the
+    /// `x` value of the current coordinate. The `x` encodes for the main tree
+    /// height.
+    // STENT TODO unit test
+    fn subtree_x_coord_bounds(&self) -> (u64, u64) {
+        // This is essentially the number of bottom-layer leaf nodes for the
+        // subtree, but shifted right to account for the subtree's position
+        // in the main tree.
+        let first_leaf_x_coord = |x: u64, y: u8| {
+            2u64.pow(y as u32) * x
+        };
+
+        let x_coord_min = first_leaf_x_coord(self.x, self.y);
+        let x_coord_max = first_leaf_x_coord(self.x + 1, self.y) - 1;
+
+        (x_coord_min, x_coord_max)
+    }
+
+    /// Return the y-coord for the given height.
+    /// Why the offset? `y` starts from 0 but height starts from 1.
+    fn y_coord_from_height(height: u8) -> u8 {
+        height - 1
+    }
+
+    /// Return the height for the coordinate.
+    /// Why the offset? `y` starts from 0 but height starts from 1.
+    fn to_height(&self) -> u8 {
+        self.y + 1
+    }
+
+    /// Generate a new bottom-layer leaf coordinate from the given x-coord.
+    fn bottom_layer_leaf_from(x_coord: u64) -> Self {
+        Coordinate { x: x_coord, y: 0}
     }
 }
 

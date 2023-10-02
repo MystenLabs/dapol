@@ -1,21 +1,35 @@
-//! Data structures and methods related to paths in a binary tree.
+//! Path in a tree.
 //!
 //! A path in a binary tree goes from a leaf node to the root node. For each
 //! node (starting from the leaf node) one follows the path by moving to the
 //! parent node; since the root node has no parent this is the end of the path.
 //!
-//! A path is uniquely determined by the leaf node and only the leaf node. It
-//! can thus be referred to as the leaf node's path.
+//! A path is uniquely determined by a leaf node. It can thus be referred to as
+//! the leaf node's path.
+//!
+//! The path is built using a builder pattern, which has 2 options in terms of
+//! algorithms: sequential and multi-threaded. If the tree store is full (i.e.
+//! every node that was used to construct the root node is in the store) then
+//! the 2 build algorithms are identical. The difference only comes in when the
+//! store is not full (which is useful to save on space) and some nodes need to
+//! be regenerated. Both algorithms are the same as those used for tree
+//! construction so their implementations can be found in
+//! [super][tree_builder][multi_threaded] and
+//! [super][tree_builder][single_threaded].
 
-use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_HEIGHT};
+use super::{BinaryTree, Coordinate, Mergeable, Node};
 
 use std::fmt::Debug;
-use thiserror::Error;
 
-/// All the sibling nodes for the nodes in a leaf node's path.
-/// The nodes are ordered from bottom layer (first) to root node (last, not
-/// included). The leaf node + the siblings can be used to reconstruct the
-/// actual nodes in the path as well as the root node.
+// -------------------------------------------------------------------------------------------------
+// Main struct.
+
+/// Contains all the information for a path in a [BinaryTree].
+///
+/// The `siblings` vector contains all the sibling nodes of the nodes in a leaf
+/// node's path. The siblings are ordered from bottom layer (first) to root node
+/// (last, not included). The leaf node + the siblings can be used to
+/// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug)]
 pub struct Path<C> {
     pub leaf: Node<C>,
@@ -23,37 +37,199 @@ pub struct Path<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Constructor
+// Builder.
 
-impl<C: Clone> BinaryTree<C> {
-    /// Construct the path up the tree from the leaf node at the given x-coord
-    /// on the bottom layer to the root node. Put all the sibling nodes for
-    /// the path into a vector and use this vector to create a [Path] struct
-    /// and return it. The vector is ordered from bottom layer (first)
-    /// to root node (last, not included).
-    pub fn build_path_for(&self, leaf_x_coord: u64) -> Result<Path<C>, PathError> {
-        let coord = Coordinate {
+// STENT TODO using multi to build tree then single to gen path gives a panic,
+// so we should probably do a warning for that case
+
+/// A builder pattern is used to construct [Path].
+/// Since a path is uniquely determined by a leaf node all we need is the tree
+/// and the leaf node's x-coord.
+pub struct PathBuilder<'a, C> {
+    tree: Option<&'a BinaryTree<C>>,
+    leaf_x_coord: Option<u64>,
+}
+
+impl<'a, C> PathBuilder<'a, C> {
+    pub fn new() -> Self {
+        PathBuilder {
+            tree: None,
+            leaf_x_coord: None,
+        }
+    }
+
+    pub fn with_tree(mut self, tree: &'a BinaryTree<C>) -> Self {
+        self.tree = Some(tree);
+        self
+    }
+
+    pub fn with_leaf_x_coord(mut self, leaf_x_coord: u64) -> Self {
+        self.leaf_x_coord = Some(leaf_x_coord);
+        self
+    }
+
+    /// High performance build algorithm utilizing parallelization.
+    /// Uses the same code in [super][tree_builder][multi_threaded].
+    ///
+    /// Note that the code only differs to
+    /// [build_using_single_threaded_algorithm] if the tree store is not
+    /// full and nodes have to be regenerated.
+    ///
+    /// `new_padding_node_content` is needed to generate new nodes.
+    ///
+    /// This function defines a closure for building nodes that are not found
+    /// in the store, which is then passed to [build].
+    // TODO example code usage
+    pub fn build_using_multi_threaded_algorithm<F>(
+        self,
+        new_padding_node_content: F,
+    ) -> Result<Path<C>, PathBuildError>
+    where
+        C: Debug + Clone + Mergeable + Send + Sync + 'static,
+        F: Fn(&Coordinate) -> C + Send + Sync + 'static,
+    {
+        use super::tree_builder::multi_threaded::{build_node, RecursionParams};
+        use dashmap::DashMap;
+        use std::sync::Arc;
+
+        // STENT TODO this new function doesn't work in our case, it only works for the
+        // root node
+        let new_padding_node_content = Arc::new(new_padding_node_content);
+
+        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+            let params = RecursionParams::new(coord.to_height());
+
+            // STENT TODO change the build_node function so we don't need to have this
+            // copying of leaf nodes
+            let mut leaf_nodes = Vec::<Node<C>>::new();
+            for x in params.x_coord_min..params.x_coord_max {
+                tree.get_node(&Coordinate { x, y: 0 }).consume(|node| {
+                    leaf_nodes.push(node);
+                });
+            }
+
+            // STENT TODO if the above vector is empty then we know this node needs to be a
+            // padding node so make one of those instead of calling the build function
+
+            build_node(
+                params,
+                leaf_nodes,
+                Arc::clone(&new_padding_node_content),
+                Arc::new(DashMap::<Coordinate, Node<C>>::new()),
+            )
+        };
+
+        self.build(node_builder)
+    }
+
+    /// Sequential build algorithm.
+    /// Uses the same code in [super][tree_builder][single_threaded].
+    ///
+    /// Note that the code only differs to
+    /// [build_using_multi_threaded_algorithm] if the tree store is not full
+    /// and nodes have to be regenerated.
+    ///
+    /// `new_padding_node_content` is needed to generate new nodes.
+    pub fn build_using_single_threaded_algorithm<F>(
+        self,
+        padding_node_generator: F,
+    ) -> Result<Path<C>, PathBuildError>
+    where
+        C: Debug + Clone + Mergeable,
+        F: Fn(&Coordinate) -> C,
+    {
+        use super::tree_builder::single_threaded::build_tree;
+        use super::MIN_STORE_DEPTH;
+
+        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+            // We don't want to store anything because the store already exists
+            // inside the binary tree struct.
+            let store_depth = MIN_STORE_DEPTH;
+
+            let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
+
+            // TODO should we be storing bottom-layer padding nodes in the store? Probably
+            // not, but then we must make sure that the algorithm works for cases where
+            // there is only 1 leaf node in this vector: the leaf node that we are
+            // generating the path for TODO change the build_tree function so we
+            // don't need to have this copying of leaf nodes
+            let mut leaf_nodes = Vec::<Node<C>>::new();
+            for x in x_coord_min..x_coord_max + 1 {
+                tree.get_node(&Coordinate::bottom_layer_leaf_from(x))
+                    .consume(|node| {
+                        leaf_nodes.push(node);
+                    });
+            }
+
+            // STENT TODO if the above vector is empty then we know this node needs to be a
+            // padding node so make one of those instead of calling the build function
+
+            let (_, node) = build_tree(
+                leaf_nodes,
+                coord.to_height(),
+                store_depth,
+                &padding_node_generator,
+            );
+
+            node
+        };
+
+        self.build(node_builder)
+    }
+
+    /// Private build function that is to be called only by
+    /// [build_using_multi_threaded_algorithm] or
+    /// [build_using_single_threaded_algorithm].
+    ///
+    /// The path is traced from the leaf node to the root node. At every layer
+    /// in the tree the sibling node is grabbed from the store (or generated if
+    /// it is not in the store) and added to the vector in [Path].
+    ///
+    /// Since the store is expected to contain all non-padding leaf nodes an
+    /// error will be returned if the leaf node at the given x-coord is not
+    /// found in the store.
+    fn build<F>(self, node_builder: F) -> Result<Path<C>, PathBuildError>
+    where
+        C: Clone,
+        F: Fn(&Coordinate, &'a BinaryTree<C>) -> Node<C>,
+    {
+        let leaf_x_coord = self.leaf_x_coord.ok_or(PathBuildError::NoLeafProvided)?;
+        let tree = self.tree.ok_or(PathBuildError::NoTreeProvided)?;
+
+        let leaf_coord = Coordinate {
             x: leaf_x_coord,
             y: 0,
         };
 
-        let leaf = self
-            .get_leaf_node(leaf_x_coord)
-            .ok_or_else(|| PathError::NodeNotFound {
-                coord: coord.clone(),
-            })?;
+        let leaf =
+            tree.get_leaf_node(leaf_x_coord)
+                .ok_or_else(|| PathBuildError::LeafNodeNotFound {
+                    coord: leaf_coord.clone(),
+                })?;
 
-        let mut current_coord = coord;
-        let mut siblings = Vec::with_capacity(self.get_height() as usize);
+        // STENT TODO if we are not storing padding nodes in the store then this might
+        // return an error which is not what we want
+        let sibling_leaf_coord = leaf_coord.sibling_coord();
+        let sibling_leaf = tree.get_leaf_node(sibling_leaf_coord.x).ok_or_else(|| {
+            PathBuildError::LeafNodeNotFound {
+                coord: sibling_leaf_coord.clone(),
+            }
+        })?;
 
-        for _y in 0..self.get_height() - 1 {
+        let mut siblings = Vec::with_capacity(tree.get_height() as usize);
+        siblings.push(sibling_leaf);
+
+        let mut current_coord = leaf_coord.parent_coord();
+        let max_y_coord = Coordinate::y_coord_from_height(tree.get_height());
+
+        for _y in 1..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
-            siblings.push(
-                self.get_node(&sibling_coord)
-                    .ok_or(PathError::NodeNotFound {
-                        coord: sibling_coord,
-                    })?,
-            );
+
+            let sibling = tree
+                .get_node(&sibling_coord)
+                .unwrap_or_else(|| node_builder(&sibling_coord, tree));
+
+            siblings.push(sibling);
             current_coord = current_coord.parent_coord();
         }
 
@@ -64,32 +240,34 @@ impl<C: Clone> BinaryTree<C> {
     }
 }
 
-// -------------------------------------------------------------------------------------------------
-// Methods for Path
-
-/// Construct a [MatchedPairRef] using the 2 given nodes.
-/// Only build the pair if the 2 nodes are siblings, otherwise return an error.
-fn build_pair<'a, C: Clone>(
-    node: &'a Node<C>,
-    parent: &'a Node<C>,
-) -> Result<MatchedPairRef<'a, C>, PathError> {
-    if parent.is_right_sibling_of(node) {
-        Ok(MatchedPairRef {
-            left: LeftSiblingRef(node),
-            right: RightSiblingRef(parent),
-        })
-    } else if parent.is_left_sibling_of(node) {
-        Ok(MatchedPairRef {
-            left: LeftSiblingRef(parent),
-            right: RightSiblingRef(node),
-        })
-    } else {
-        Err(PathError::InvalidSibling {
-            node_that_needs_sibling: parent.coord.clone(),
-            sibling_given: node.coord.clone(),
-        })
+impl<C> BinaryTree<C> {
+    pub fn path_builder(&self) -> PathBuilder<C> {
+        PathBuilder::new().with_tree(self)
     }
 }
+
+trait Consume<T> {
+    fn consume<F>(self, f: F)
+    where
+        F: FnOnce(T) -> ();
+}
+
+impl<T> Consume<T> for Option<T> {
+    /// If `None` then do nothing and return nothing. If `Some` then call the
+    /// given function `f` with the value `T` but do not return anything.
+    fn consume<F>(self, f: F)
+    where
+        F: FnOnce(T) -> (),
+    {
+        match self {
+            None => {}
+            Some(x) => f(x),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Path verification.
 
 impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
     /// Verify that the given list of sibling nodes + the base leaf node matches
@@ -102,6 +280,8 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
     /// An error is returned if the number of siblings is less than the min
     /// amount, or the constructed root node does not match the given one.
     pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
+        use super::MIN_HEIGHT;
+
         let mut parent = self.leaf.clone();
 
         if self.siblings.len() < MIN_HEIGHT as usize {
@@ -109,7 +289,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
         }
 
         for node in &self.siblings {
-            let pair = build_pair(node, &parent)?;
+            let pair = MatchedPairRef::new(node, &parent)?;
             parent = pair.merge();
         }
 
@@ -120,7 +300,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
         }
     }
 
-    /// Return a vector containing only the nodes the tree path.
+    /// Return a vector containing only the nodes in the tree path.
     ///
     /// The path nodes have to be constructed using the leaf & sibling nodes in
     /// [Path] because they are not stored explicitly. The order of the
@@ -138,7 +318,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
             let parent = nodes
                 .last()
                 .expect("[Bug in path generation] Empty node vector");
-            let pair = build_pair(node, parent)?;
+            let pair = MatchedPairRef::new(node, parent)?;
             nodes.push(pair.merge());
         }
 
@@ -147,7 +327,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Conversion
+// Path conversion.
 
 impl<C> Path<C> {
     /// Convert `Path<C>` to `Path<D>`.
@@ -166,15 +346,24 @@ impl<C> Path<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Errors
+// Errors.
+
+use thiserror::Error;
 
 #[derive(Error, Debug)]
-#[allow(dead_code)]
+pub enum PathBuildError {
+    #[error("The builder must be given a padding node generator function before building")]
+    NoPaddingNodeGeneratorProvided,
+    #[error("The builder must be given a tree before building")]
+    NoTreeProvided,
+    #[error("The builder must be given the x-coord of a leaf node before building")]
+    NoLeafProvided,
+    #[error("Leaf node not found in the tree ({coord:?})")]
+    LeafNodeNotFound { coord: Coordinate },
+}
+
+#[derive(Error, Debug)]
 pub enum PathError {
-    #[error("Provided leaf node not found in the tree")]
-    LeafNotFound,
-    #[error("Node not found in tree ({coord:?})")]
-    NodeNotFound { coord: Coordinate },
     #[error("Calculated root content does not match provided root content")]
     RootMismatch,
     #[error("Provided node ({sibling_given:?}) is not a sibling of the calculated node ({node_that_needs_sibling:?})")]
@@ -187,7 +376,7 @@ pub enum PathError {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Helper structs
+// Supporting structs and methods.
 
 /// A reference to a left sibling node.
 ///
@@ -231,10 +420,39 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
             content: C::merge(&self.left.0.content, &self.right.0.content),
         }
     }
+
+    /// Construct a [MatchedPairRef] using the 2 given nodes.
+    /// Only build the pair if the 2 nodes are siblings, otherwise return an
+    /// error.
+    fn new(left: &'a Node<C>, right: &'a Node<C>) -> Result<Self, PathError>
+    where
+        C: Clone,
+    {
+        if right.is_right_sibling_of(left) {
+            Ok(MatchedPairRef {
+                left: LeftSiblingRef(left),
+                right: RightSiblingRef(right),
+            })
+        } else if right.is_left_sibling_of(left) {
+            Ok(MatchedPairRef {
+                left: LeftSiblingRef(right),
+                right: RightSiblingRef(left),
+            })
+        } else {
+            // TODO maybe we should panic here instead because doesn't mean there is a bug?
+            Err(PathError::InvalidSibling {
+                node_that_needs_sibling: right.coord.clone(),
+                sibling_given: left.coord.clone(),
+            })
+        }
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
-// Unit tests
+// Unit tests.
+
+// TODO need to test that when the node is expected to be in the store the build
+// function is not called (need to have mocking for this)
 
 #[cfg(test)]
 mod tests {
@@ -250,23 +468,26 @@ mod tests {
 
     #[test]
     fn tree_works_for_full_base_layer() {
-        let height = 8u8;
+        let height = 5u8;
 
         let leaf_nodes = full_bottom_layer(height);
-        let new_padding_node_content = get_padding_function();
 
-        // TODO compare to multi
+        // STENT TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_store_depth(height)
+            // STENT TODO we need tests with full store and partial store
+            // .with_store_depth(height)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(new_padding_node_content)
+            .with_padding_node_generator(get_padding_function())
             .build()
             .unwrap();
 
+        println!("generating path");
         let proof = tree_single_threaded
-            .build_path_for(0)
+            .path_builder()
+            .with_leaf_x_coord(10)
+            .build_using_single_threaded_algorithm(get_padding_function())
             .expect("Path generation should have been successful");
         check_path_siblings(&tree_single_threaded, &proof);
 
@@ -280,7 +501,6 @@ mod tests {
         let height = 8u8;
 
         let leaf_nodes = sparse_leaves(height);
-        let new_padding_node_content = get_padding_function();
 
         // TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
@@ -288,12 +508,14 @@ mod tests {
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(height)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(new_padding_node_content)
+            .with_padding_node_generator(get_padding_function())
             .build()
             .unwrap();
 
         let proof = tree_single_threaded
-            .build_path_for(6)
+            .path_builder()
+            .with_leaf_x_coord(6)
+            .build_using_single_threaded_algorithm(get_padding_function())
             .expect("Path generation should have been successful");
         check_path_siblings(&tree_single_threaded, &proof);
 
@@ -309,19 +531,19 @@ mod tests {
         for i in 0..num_bottom_layer_nodes(height) {
             let leaf_node = vec![single_leaf(i as u64, height)];
 
-            let new_padding_node_content = get_padding_function();
-
             let tree_single_threaded = TreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(height)
                 .with_single_threaded_build_algorithm()
-                .with_padding_node_generator(new_padding_node_content)
+                .with_padding_node_generator(get_padding_function())
                 .build()
                 .unwrap();
 
             let proof = tree_single_threaded
-                .build_path_for(i as u64)
+                .path_builder()
+                .with_leaf_x_coord(i as u64)
+                .build_using_single_threaded_algorithm(get_padding_function())
                 .expect("Path generation should have been successful");
 
             check_path_siblings(&tree_single_threaded, &proof);

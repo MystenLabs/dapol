@@ -10,6 +10,8 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use crate::binary_tree::MIN_STORE_DEPTH;
+
 use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{TreeBuildError, TreeBuilder};
 
@@ -17,6 +19,7 @@ use super::{TreeBuildError, TreeBuilder};
 // Main struct.
 
 #[derive(Debug)]
+// STENT TODO change to SingleThreadedTreeBuilder
 pub struct SingleThreadedBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
@@ -33,7 +36,7 @@ pub struct SingleThreadedBuilder<C, F> {
 /// ```
 impl<C, F> SingleThreadedBuilder<C, F>
 where
-    C: Debug + Clone + Mergeable + 'static, // TODO not sure about this static here, it's needed for the boxed hashmap
+    C: Debug + Clone + Mergeable + 'static, // This static is needed for the boxed hashmap.
     F: Fn(&Coordinate) -> C,
 {
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
@@ -71,51 +74,11 @@ where
                 .collect::<Vec<Node<C>>>()
         };
 
-        // let padding_node_generator = Rc::new(
-        //     self.padding_node_generator
-        //         .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?,
-        // );
         let padding_node_generator = self
             .padding_node_generator
             .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
 
-        // let node_generator = {
-        //     let height = height.clone();
-        //     let store_depth = 1;
-        //     let padding_node_generator = Rc::clone(&padding_node_generator);
-
-        //     move |coord: &Coordinate, store: &Store<C>| {
-        //         // 1. determine range of x-coords for bottom-layer leaf nodes
-        //         let x_coord_min = x_coord_gen(2 * coord.x, coord.y - 1);
-        //         let x_coord_max = x_coord_gen(2 * (coord.x + 1), coord.y - 1);
-
-        //         // 2. search the store for these leaf nodes
-        //         let mut leaf_nodes: Vec<Node<C>> = Vec::new();
-        //         for x in x_coord_min..x_coord_max {
-        //             let coord = Coordinate { x, y: 0 };
-        //             store
-        //                 .node_map
-        //                 .get(&coord)
-        //                 .map(|node| leaf_nodes.push((*node).clone()));
-        //         }
-
-        //         if leaf_nodes.len() == 0 {
-        //             // 3. if no nodes are there then create a padding node and return that
-        //             // TODO need to change the name here to say "content" because it does not generate a node
-        //             Node {
-        //                 content: padding_node_generator(&coord),
-        //                 coord: coord.clone(),
-        //             }
-        //         } else {
-        //             // 4. if there are nodes there then copy them from the store and send them to the build algo
-        //             let (_, node) =
-        //                 build_tree(leaf_nodes, height, store_depth, Rc::clone(&padding_node_generator));
-        //             node
-        //         }
-        //     }
-        // };
-
-        let (map, root) = build_tree(leaf_nodes, height, store_depth, padding_node_generator);
+        let (map, root) = build_tree(leaf_nodes, height, store_depth, &padding_node_generator);
 
         Ok(BinaryTree {
             root,
@@ -216,11 +179,11 @@ type RootNode<C> = Node<C>;
 ///
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
-fn build_tree<C, F>(
+pub fn build_tree<C, F>(
     leaf_nodes: Vec<Node<C>>,
     height: u8,
     store_depth: u8,
-    new_padding_node_content: F,
+    new_padding_node_content: &F,
 ) -> (Map<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
@@ -247,9 +210,10 @@ where
         }
 
         assert!(
-            store_depth >= 1,
-            "{} Store depth cannot be less than 1 since the root node is always stored",
-            BUG
+            store_depth >= MIN_STORE_DEPTH,
+            "{} Store depth cannot be less than {} since the root node is always stored",
+            BUG,
+            MIN_STORE_DEPTH
         );
         assert!(
             store_depth <= height,
