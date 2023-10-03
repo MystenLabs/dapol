@@ -208,7 +208,7 @@ impl NdmSmt {
         let lock = Arc::try_unwrap(user_mapping).expect("Lock still has multiple owners");
         let user_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
-        assert_eq!(tree.get_root(), tree_2.get_root());
+        assert_eq!(tree.root(), tree_2.root());
 
         Ok(NdmSmt {
             tree,

@@ -107,12 +107,11 @@ pub trait Mergeable {
 // -------------------------------------------------------------------------------------------------
 // Accessor methods.
 
-// TODO remove the 'get'
 impl<C: Clone> BinaryTree<C> {
-    pub fn get_height(&self) -> u8 {
+    pub fn height(&self) -> u8 {
         self.height
     }
-    pub fn get_root(&self) -> &Node<C> {
+    pub fn root(&self) -> &Node<C> {
         &self.root
     }
 

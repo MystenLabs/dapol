@@ -220,8 +220,8 @@ impl<'a, C> PathBuilder<'a, C> {
                     coord: leaf_coord.clone(),
                 })?;
 
-        let mut siblings = Vec::with_capacity(tree.get_height() as usize);
-        let max_y_coord = Coordinate::y_coord_from_height(tree.get_height());
+        let mut siblings = Vec::with_capacity(tree.height() as usize);
+        let max_y_coord = Coordinate::y_coord_from_height(tree.height());
         let mut current_coord = leaf_coord;
 
         for _y in 0..max_y_coord {
@@ -465,7 +465,7 @@ mod tests {
     };
 
     fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
-        assert_eq!(proof.siblings.len() as u8, tree.get_height() - 1);
+        assert_eq!(proof.siblings.len() as u8, tree.height() - 1);
     }
 
     #[test]
@@ -494,7 +494,7 @@ mod tests {
         check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree_single_threaded.get_root())
+            .verify(tree_single_threaded.root())
             .expect("Path verification should have been successful");
     }
 
@@ -522,7 +522,7 @@ mod tests {
         check_path_siblings(&tree_single_threaded, &proof);
 
         proof
-            .verify(tree_single_threaded.get_root())
+            .verify(tree_single_threaded.root())
             .expect("Path verification should have been successful");
     }
 
@@ -551,7 +551,7 @@ mod tests {
             check_path_siblings(&tree_single_threaded, &proof);
 
             proof
-                .verify(tree_single_threaded.get_root())
+                .verify(tree_single_threaded.root())
                 .expect("Path verification should have been successful");
         }
     }

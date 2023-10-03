@@ -718,7 +718,7 @@ mod tests {
             .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
-        let root = tree.get_root();
+        let root = tree.root();
 
         leaf_nodes.shuffle(&mut thread_rng());
 
@@ -730,7 +730,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(root, tree.get_root());
+        assert_eq!(root, tree.root());
     }
 
     #[test]
