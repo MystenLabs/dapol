@@ -341,7 +341,7 @@ impl RecursionParams {
     }
 
     pub fn x_coord_range(&self) -> Range<u64> {
-        self.x_coord_min..self.x_coord_max
+        self.x_coord_min..self.x_coord_max + 1
     }
 
     pub fn with_store_depth(mut self, store_depth: u8) -> Self {

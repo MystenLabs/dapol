@@ -111,6 +111,10 @@ impl<'a, C> PathBuilder<'a, C> {
                 });
             }
 
+            if coord.y == 1 {
+                println!("    node_builder x range {:?} leaf_nodes len {}", params.x_coord_range(), leaf_nodes.len());
+            }
+
             // If the above vector is empty then we know this node needs to be a
             // padding node.
             if leaf_nodes.len() == 0 {
@@ -205,16 +209,13 @@ impl<'a, C> PathBuilder<'a, C> {
     /// found in the store.
     fn build<F>(self, node_builder: F) -> Result<Path<C>, PathBuildError>
     where
-        C: Clone,
+        C: Debug + Clone,
         F: Fn(&Coordinate, &'a BinaryTree<C>) -> Node<C>,
     {
-        let leaf_x_coord = self.leaf_x_coord.ok_or(PathBuildError::NoLeafProvided)?;
         let tree = self.tree.ok_or(PathBuildError::NoTreeProvided)?;
 
-        let leaf_coord = Coordinate {
-            x: leaf_x_coord,
-            y: 0,
-        };
+        let leaf_x_coord = self.leaf_x_coord.ok_or(PathBuildError::NoLeafProvided)?;
+        let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
 
         let leaf =
             tree.get_leaf_node(leaf_x_coord)
@@ -226,13 +227,20 @@ impl<'a, C> PathBuilder<'a, C> {
         let max_y_coord = Coordinate::y_coord_from_height(tree.height());
         let mut current_coord = leaf_coord;
 
+        println!("before loop in build");
         for _y in 0..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
+            println!("  loop y {} sibling_coord {:?}", _y, sibling_coord);
 
             let sibling = tree
                 .get_node(&sibling_coord)
+                .map(|n| {
+                    println!("    node found in tree {:?}", n);
+                    n
+                })
                 .unwrap_or_else(|| node_builder(&sibling_coord, tree));
 
+            println!("  loop sibling {:?}", sibling);
             siblings.push(sibling);
             current_coord = current_coord.parent_coord();
         }
@@ -458,6 +466,8 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
 // TODO need to test that when the node is expected to be in the store the build
 // function is not called (need to have mocking for this)
 
+// TODO Fuzz on the tree height, and the store depth.
+
 #[cfg(test)]
 mod tests {
     use super::super::*;
@@ -471,17 +481,15 @@ mod tests {
     }
 
     #[test]
-    fn tree_works_for_full_base_layer() {
-        let height = 5u8;
+    fn path_works_for_full_base_layer_single_threaded() {
+        let height = 8u8;
 
         let leaf_nodes = full_bottom_layer(height);
 
-        // STENT TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
+            .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            // STENT TODO we need tests with full store and partial store
-            // .with_store_depth(height)
             .with_single_threaded_build_algorithm()
             .with_padding_node_content_generator(get_padding_function())
             .build()
@@ -501,16 +509,43 @@ mod tests {
     }
 
     #[test]
-    fn proofs_work_for_sparse_leaves() {
+    fn path_works_for_full_base_layer_multi_threaded() {
+        let height = 8u8;
+
+        let leaf_nodes = full_bottom_layer(height);
+
+        let tree_multi_threaded = TreeBuilder::new()
+            .with_height(height)
+            .with_store_depth(MIN_STORE_DEPTH)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let proof = tree_multi_threaded
+            .path_builder()
+            .with_leaf_x_coord(10)
+            .build_using_multi_threaded_algorithm(get_padding_function())
+            .expect("Path generation should have been successful");
+
+        check_path_siblings(&tree_multi_threaded, &proof);
+
+        proof
+            .verify(tree_multi_threaded.root())
+            .expect("Path verification should have been successful");
+    }
+
+    #[test]
+    fn path_works_for_sparse_leaves_single_threaded() {
         let height = 8u8;
 
         let leaf_nodes = sparse_leaves(height);
 
-        // TODO compare to multi
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_store_depth(height)
+            .with_store_depth(MIN_STORE_DEPTH)
             .with_single_threaded_build_algorithm()
             .with_padding_node_content_generator(get_padding_function())
             .build()
@@ -521,6 +556,7 @@ mod tests {
             .with_leaf_x_coord(6)
             .build_using_single_threaded_algorithm(get_padding_function())
             .expect("Path generation should have been successful");
+
         check_path_siblings(&tree_single_threaded, &proof);
 
         proof
@@ -529,7 +565,35 @@ mod tests {
     }
 
     #[test]
-    fn proofs_work_for_single_leaf() {
+    fn path_works_for_sparse_leaves_multi_threaded() {
+        let height = 8u8;
+
+        let leaf_nodes = sparse_leaves(height);
+
+        let tree_multi_threaded = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(MIN_STORE_DEPTH)
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let proof = tree_multi_threaded
+            .path_builder()
+            .with_leaf_x_coord(6)
+            .build_using_multi_threaded_algorithm(get_padding_function())
+            .expect("Path generation should have been successful");
+
+        check_path_siblings(&tree_multi_threaded, &proof);
+
+        proof
+            .verify(tree_multi_threaded.root())
+            .expect("Path verification should have been successful");
+    }
+
+    #[test]
+    fn path_works_for_single_leaf_single_threaded() {
         let height = 8u8;
 
         for i in 0..max_bottom_layer_nodes(height) {
@@ -538,7 +602,7 @@ mod tests {
             let tree_single_threaded = TreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
-                .with_store_depth(height)
+                .with_store_depth(MIN_STORE_DEPTH)
                 .with_single_threaded_build_algorithm()
                 .with_padding_node_content_generator(get_padding_function())
                 .build()
@@ -554,6 +618,36 @@ mod tests {
 
             proof
                 .verify(tree_single_threaded.root())
+                .expect("Path verification should have been successful");
+        }
+    }
+
+    #[test]
+    fn path_works_for_multi_leaf_multi_threaded() {
+        let height = 8u8;
+
+        for i in 0..max_bottom_layer_nodes(height) {
+            let leaf_node = vec![single_leaf(i as u64, height)];
+
+            let tree_multi_threaded = TreeBuilder::new()
+                .with_height(height)
+                .with_leaf_nodes(leaf_node.clone())
+                .with_store_depth(MIN_STORE_DEPTH)
+                .with_multi_threaded_build_algorithm()
+                .with_padding_node_content_generator(get_padding_function())
+                .build()
+                .unwrap();
+
+            let proof = tree_multi_threaded
+                .path_builder()
+                .with_leaf_x_coord(i as u64)
+                .build_using_multi_threaded_algorithm(get_padding_function())
+                .expect("Path generation should have been successful");
+
+            check_path_siblings(&tree_multi_threaded, &proof);
+
+            proof
+                .verify(tree_multi_threaded.root())
                 .expect("Path verification should have been successful");
         }
     }
