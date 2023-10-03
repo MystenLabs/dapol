@@ -116,18 +116,32 @@ impl<C: Clone> BinaryTree<C> {
     }
 
     /// Attempt to find a node in the store via it's coordinate.
+    ///
+    /// If the store does not contain a node with the given coordinate then
+    /// there are 2 possible reasons:
+    /// 1. The node was left out to save space
+    /// 2. The coordinate is outside the bounds of the tree
+    ///
     /// This function clones the data in the node so it's not advised to call
     /// this if efficiency is required. A reference to the node cannot be
     /// returned because the store uses a custom reference type and we do not
     /// want to expose that custom type to the outside calling code.
-    // TODO this won't work if the store is partially full, we need to call
-    // build some of the nodes from scratch in the half-full case
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.store.get_node(coord)
     }
 
     /// Attempt to find a bottom-layer leaf Node via it's x-coordinate in the
     /// underlying store.
+    ///
+    /// If the store does not contain a node with the given coordinate then
+    /// there are 2 possible reasons:
+    /// 1. The node was left out to save space
+    /// 2. The coordinate is outside the bounds of the tree
+    ///
+    /// This function clones the data in the node so it's not advised to call
+    /// this if efficiency is required. A reference to the node cannot be
+    /// returned because the store uses a custom reference type and we do not
+    /// want to expose that custom type to the outside calling code.
     pub fn get_leaf_node(&self, x_coord: u64) -> Option<Node<C>> {
         let coord = Coordinate { x: x_coord, y: 0 };
         self.get_node(&coord)

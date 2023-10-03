@@ -101,8 +101,9 @@ impl<'a, C> PathBuilder<'a, C> {
                 .with_store_depth(MIN_STORE_DEPTH)
                 .with_tree_height(tree.height);
 
-            // STENT TODO change the build_node function so we don't need to have this
-            // copying of leaf nodes
+            // TODO This cloning can be optimized away by changing the
+            // build_node function to use a pre-populated map instead of the
+            // mutable leaves vector.
             let mut leaf_nodes = Vec::<Node<C>>::new();
             for x in params.x_coord_range() {
                 tree.get_node(&Coordinate { x, y: 0 }).consume(|node| {
@@ -155,11 +156,9 @@ impl<'a, C> PathBuilder<'a, C> {
 
             let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
 
-            // TODO should we be storing bottom-layer padding nodes in the store? Probably
-            // not, but then we must make sure that the algorithm works for cases where
-            // there is only 1 leaf node in this vector: the leaf node that we are
-            // generating the path for TODO change the build_tree function so we
-            // don't need to have this copying of leaf nodes
+            // TODO This copying of leaf nodes could be optimized away by
+            // changing the build function to accept a map parameter as apposed
+            // to the leaf node vector.
             let mut leaf_nodes = Vec::<Node<C>>::new();
             for x in x_coord_min..x_coord_max + 1 {
                 tree.get_node(&Coordinate::bottom_layer_leaf_from(x))
@@ -177,6 +176,9 @@ impl<'a, C> PathBuilder<'a, C> {
                 };
             }
 
+            // TODO The leaf nodes are cloned and put into a store that is
+            // dropped. We should have an option to not put anything in the
+            // store, maybe by changing store_depth to be an enum.
             let (_, node) = build_tree(
                 leaf_nodes,
                 coord.to_height(),
@@ -485,12 +487,12 @@ mod tests {
             .build()
             .unwrap();
 
-        println!("generating path");
         let proof = tree_single_threaded
             .path_builder()
             .with_leaf_x_coord(10)
             .build_using_single_threaded_algorithm(get_padding_function())
             .expect("Path generation should have been successful");
+
         check_path_siblings(&tree_single_threaded, &proof);
 
         proof

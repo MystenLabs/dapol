@@ -183,8 +183,8 @@ type RootNode<C> = Node<C>;
 /// allows then there will be panic. The builder is expected to
 /// handle this case gracefully and this function is not public so a panic
 /// is acceptable here.
-/// Every element of `leaf_nodes` is assumed to have y-coord of 0; there is
-/// only a naive check for this (only first node is checked).
+/// Every element of `leaf_nodes` is assumed to have y-coord of 0. The function
+/// will panic otherwise because this means there is a bug in the calling code.
 ///
 /// The nodes are stored in a hashmap, which is returned along with the root
 /// node (which is also stored in the hashmap).
@@ -213,21 +213,23 @@ where
     {
         // Some simple parameter checks.
 
+        let max = max_bottom_layer_nodes(height);
+
         use super::super::max_bottom_layer_nodes;
         assert!(
-            leaf_nodes.len() <= max_bottom_layer_nodes(height) as usize,
+            leaf_nodes.len() <= max as usize,
             "{} Too many leaf nodes",
             BUG
         );
 
-        if let Some(node) = leaf_nodes.first() {
-            assert_eq!(
-                node.coord.y, 0,
+        assert!(leaf_nodes.len() != 0, "{} Empty leaf nodes", BUG);
+
+        // All y-coords are 0.
+        if let Some(node) = leaf_nodes.iter().find(|node| node.coord.y != 0) {
+            panic!(
                 "{} Node expected to have y-coord of 0 but was {}",
                 BUG, node.coord.y
             );
-        } else {
-            panic!("{} Empty leaf nodes", BUG);
         }
 
         use crate::binary_tree::MIN_STORE_DEPTH;
@@ -464,7 +466,10 @@ mod tests {
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
-        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided));
+        assert_err_simple!(
+            res,
+            Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided)
+        );
     }
 
     // tests that the sorting functionality works
