@@ -1,8 +1,8 @@
 //! Builder pattern for the binary tree.
 //!
 //! There are 2 options for builder type:
-//! - [single-threaded]
-//! - [multi-threaded]
+//! - [single_threaded]
+//! - [multi_threaded]
 //! Both require a vector of leaf nodes (which will live on the bottom layer
 //! of the tree) and the tree height.
 
@@ -28,7 +28,17 @@ pub static MIN_STORE_DEPTH: u8 = 1;
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
-// STENT TODO docs
+/// Parameters for building a [super][BinaryTree].
+///
+/// `leaf_nodes` is the set of non-padding bottom-layer leaves of the tree.
+/// `store_depth` determines how many nodes placed in the store.
+///
+/// By default only the non-padding leaf nodes and the root node are placed in
+/// the store. This can be increased using the `store_depth` parameter. If
+/// `store_depth == 1` then only the root node is stored and if
+/// `store_depth == n` then the root node plus the next `n-1` layers from the
+/// root node down are stored. So if `store_depth == height` then all the nodes
+/// are stored.
 #[derive(Debug)]
 pub struct TreeBuilder<C> {
     height: Option<u8>,
@@ -60,7 +70,8 @@ pub struct InputLeafNode<C> {
 /// ```
 impl<C> TreeBuilder<C>
 where
-    C: Clone + Mergeable + 'static, // The static is needed when the single threaded builder builds the boxed hashmap.
+    C: Clone + Mergeable + 'static, /* The static is needed when the single threaded builder
+                                     * builds the boxed hashmap. */
 {
     pub fn new() -> Self {
         TreeBuilder {
@@ -89,7 +100,8 @@ where
 
     /// `store_depth` determines how many layers are placed in the store. If
     /// `store_depth == 1` then only the root node is stored and if
-    /// `store_depth == 2` then the root node and the next layer down are stored.
+    /// `store_depth == 2` then the root node and the next layer down are
+    /// stored.
     ///
     /// The fewer nodes that are place in the store the smaller the serialized
     /// tree file will be, but the more time it will take to generate inclusion
@@ -117,16 +129,15 @@ where
         SingleThreadedTreeBuilder::new(self)
     }
 
-    /// Use the height of the tree to determine store depth by dividing it by the
-    /// default ratio.
-    // STENT TODO change these function names so that they don't contain all these extra words, just 'get_height'
-    fn get_or_default_store_depth(&self, height: u8) -> u8 {
+    /// Use the height of the tree to determine store depth by dividing it by
+    /// the default ratio.
+    fn store_depth(&self, height: u8) -> u8 {
         self.store_depth
             .unwrap_or(height / DEFAULT_STORE_DEPTH_RATIO)
     }
 
     /// Called by children builders to check the bounds of the `height` field.
-    fn get_and_verify_height(&self) -> Result<u8, TreeBuildError> {
+    fn height(&self) -> Result<u8, TreeBuildError> {
         let height = self.height.ok_or(TreeBuildError::NoHeightProvided)?;
         if height < MIN_HEIGHT {
             return Err(TreeBuildError::HeightTooSmall);
@@ -134,11 +145,9 @@ where
         Ok(height)
     }
 
-    /// Called by children builders to check the bounds of the `leaf_nodes` field.
-    fn get_and_verify_leaf_nodes(
-        self,
-        height: u8,
-    ) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
+    /// Called by children builders to check the bounds of the `leaf_nodes`
+    /// field.
+    fn leaf_nodes(self, height: u8) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
         use super::{max_bottom_layer_nodes, ErrUnlessTrue};
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
@@ -325,9 +334,7 @@ mod tests {
     fn err_when_parent_builder_height_not_set() {
         let height = 4;
         let leaf_nodes = full_bottom_layer(height);
-        let res = TreeBuilder::new()
-            .with_leaf_nodes(leaf_nodes)
-            .get_and_verify_height();
+        let res = TreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -338,7 +345,7 @@ mod tests {
         let height = 4;
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
-            .get_and_verify_leaf_nodes(height);
+            .leaf_nodes(height);
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
@@ -350,7 +357,7 @@ mod tests {
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::new())
-            .get_and_verify_leaf_nodes(height);
+            .leaf_nodes(height);
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
 
@@ -360,7 +367,7 @@ mod tests {
         let height = MIN_HEIGHT - 1;
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
-            .get_and_verify_height();
+            .height();
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
     }
 
@@ -380,7 +387,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .get_and_verify_leaf_nodes(height);
+            .leaf_nodes(height);
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }

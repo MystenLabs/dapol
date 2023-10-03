@@ -39,9 +39,6 @@ pub struct Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Builder.
 
-// STENT TODO using multi to build tree then single to gen path gives a panic,
-// so we should probably do a warning for that case
-
 /// A builder pattern is used to construct [Path].
 /// Since a path is uniquely determined by a leaf node all we need is the tree
 /// and the leaf node's x-coord.
@@ -467,6 +464,8 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
 // function is not called (need to have mocking for this)
 
 // TODO Fuzz on the tree height, and the store depth.
+
+// TODO tests for multi tree build then single path build, and vice versa.
 
 #[cfg(test)]
 mod tests {

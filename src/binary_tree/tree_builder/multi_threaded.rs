@@ -99,9 +99,9 @@ where
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
-        let height = self.parent_builder.get_and_verify_height()?;
-        let store_depth = self.parent_builder.get_or_default_store_depth(height);
-        let mut input_leaf_nodes = self.parent_builder.get_and_verify_leaf_nodes(height)?;
+        let height = self.parent_builder.height()?;
+        let store_depth = self.parent_builder.store_depth(height);
+        let mut input_leaf_nodes = self.parent_builder.leaf_nodes(height)?;
 
         let leaf_nodes = {
             // Sort by x-coord ascending.
@@ -231,7 +231,10 @@ impl<C: Mergeable> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
         if !left.is_left_sibling_of(&right) {
-            panic!("{} The given left node is not a left sibling of the given right node", BUG)
+            panic!(
+                "{} The given left node is not a left sibling of the given right node",
+                BUG
+            )
         }
         MatchedPair { left, right }
     }
@@ -402,12 +405,7 @@ where
             max_nodes
         );
 
-        assert_ne!(
-            leaves.len(),
-            0,
-            "{} Number of leaf nodes cannot be 0",
-            BUG
-        );
+        assert_ne!(leaves.len(), 0, "{} Number of leaf nodes cannot be 0", BUG);
 
         assert!(
             params.x_coord_min % 2 == 0,
@@ -492,10 +490,9 @@ where
 
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
-                let right = right_handler.join().unwrap_or_else(|_| panic!(
-                    "{} Couldn't join on the associated thread",
-                    BUG
-                ));
+                let right = right_handler
+                    .join()
+                    .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
                 MatchedPair { left, right }
             } else {
@@ -551,8 +548,8 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO check all leaf nodes are in the store, and that the desired level of nodes is in the store
-// TODO check certain number of leaf nodes are in the tree
+// TODO check all leaf nodes are in the store, and that the desired level of
+// nodes is in the store TODO check certain number of leaf nodes are in the tree
 // TODO recursive function err - num leaf nodes exceeds max
 // TODO recursive function err - empty leaf nodes
 // TODO recursive function err - NOT x-coord min multiple of 2 or 0
