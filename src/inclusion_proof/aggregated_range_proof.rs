@@ -1,33 +1,39 @@
-//! Aggregated range proof generation & verification using Bulletproofs protocol.
+//! Aggregated range proof generation & verification using Bulletproofs
+//! protocol.
 //!
-//! See also [super][individual_range_proof] which is used for single range proofs.
+//! See also [super][individual_range_proof] which is used for single range
+//! proofs.
 //!
-//! Bulletproofs allows multiple ranges to be grouped together (aggregated) into a single proof that
-//! is more efficient to compute than producing individual range proofs.
+//! Bulletproofs allows multiple ranges to be grouped together (aggregated) into
+//! a single proof that is more efficient to compute than producing individual
+//! range proofs.
 //!
-//! The Bulletproofs library used only supports aggregation if the number of ranges to prove is a
-//! power of 2. There are 2 different ways of getting around this limitation for arbitrary number of
-//! ranges $n$:
-//! 1. Increase $n$ to the next power of 2 by padding with extra superfluous values
-//! 2. Perform multiple range proofs, one for each of the on-bits in the $n$'s base-2 representation
+//! The Bulletproofs library used only supports aggregation if the number of
+//! ranges to prove is a power of 2. There are 2 different ways of getting
+//! around this limitation for arbitrary number of ranges $n$:
+//! 1. Increase $n$ to the next power of 2 by padding with extra superfluous
+//! values 2. Perform multiple range proofs, one for each of the on-bits in the
+//! $n$'s base-2 representation
 //!
 //! Padding example:
-//! Suppose $n=5$, `ranges = [range_1, range_2, range_3, range_4, range_5]`. We find $m=8$ to be the
-//! next power of 2, so we add 3 values to our array to get the size of the array to equal $m$:
-//! `ranges_extended = [range_1, range_2, range_3, range_4, range_5, 0, 0, 0]`
-//! We default to 0 here but any value can be used.
+//! Suppose $n=5$, `ranges = [range_1, range_2, range_3, range_4, range_5]`. We
+//! find $m=8$ to be the next power of 2, so we add 3 values to our array to get
+//! the size of the array to equal $m$: `ranges_extended = [range_1, range_2,
+//! range_3, range_4, range_5, 0, 0, 0]` We default to 0 here but any value can
+//! be used.
 //!
 //! Splitting example:
-//! Suppose $n=5$ as above. $n$'s base-2 representation is 101 which has 2 on-bits. We create 2
-//! aggregated range proofs by splitting the array into the following 2 pieces:
+//! Suppose $n=5$ as above. $n$'s base-2 representation is 101 which has 2
+//! on-bits. We create 2 aggregated range proofs by splitting the array into the
+//! following 2 pieces:
 //! - `ranges_a = [range_2, range_3, range_4, range_5]`
 //! - `ranges_b = [range_1]`
-//! We gave the tail of the array the highest power of 2 but one can also do it instead by
-//! associating the highest with the top of the array.
+//! We gave the tail of the array the highest power of 2 but one can also do it
+//! instead by associating the highest with the top of the array.
 //!
 //! When padding? When splitting?
-//! Each is more efficient in different cases. For $n=127$ splitting would be more efficient, but
-//! for $n=255$ padding would win.
+//! Each is more efficient in different cases. For $n=127$ splitting would be
+//! more efficient, but for $n=255$ padding would win.
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
@@ -35,8 +41,9 @@ use merlin::Transcript;
 
 use super::RangeProofError;
 
-/// `input_size` is u8 because it will be directly related to the length of a tree path, which is
-/// equal to the height of the tree, which is also stored as u8.
+/// `input_size` is u8 because it will be directly related to the length of a
+/// tree path, which is equal to the height of the tree, which is also stored as
+/// u8.
 #[derive(Debug)]
 pub enum AggregatedRangeProof {
     Padding {
@@ -44,20 +51,24 @@ pub enum AggregatedRangeProof {
         input_size: u8,
     },
     Splitting {
-        proofs: Vec<(RangeProof, usize)>, // the 2nd value is the number of values in the aggregated proof
+        proofs: Vec<(RangeProof, usize)>, /* the 2nd value is the number of values in the
+                                           * aggregated proof */
         input_size: u8,
     },
 }
 
-/// Used to pad the inputs to proof generation so that the length can be made a power of 2, a
-/// requirement for the [bulletproofs] library.
-// TODO are these the best option for the pad? Maybe there is another option that gives efficiency guarantees
+/// Used to pad the inputs to proof generation so that the length can be made a
+/// power of 2, a requirement for the [bulletproofs] library.
+// TODO are these the best option for the pad? Maybe there is another option
+// that gives efficiency guarantees
 fn padding_tuple() -> (u64, Scalar) {
     (0, Scalar::one())
 }
 
-/// The transcript initial state must be the same for proof generation and verification.
-// TODO we may want to make this different for padding & splitting because it may help with deserialization
+/// The transcript initial state must be the same for proof generation and
+/// verification.
+// TODO we may want to make this different for padding & splitting because it
+// may help with deserialization
 fn new_transcript() -> Transcript {
     Transcript::new(b"AggregatedRangeProof")
 }
@@ -65,10 +76,11 @@ fn new_transcript() -> Transcript {
 impl AggregatedRangeProof {
     /// Generate an aggregated proof.
     ///
-    /// Whether the padding method or splitting method is used will be determined by the input size,
-    /// so that the most efficient method is used. The code currently just naively checks whether
-    /// the size lies in the first or second half of the gap between the 2 powers of 2 on either
-    /// side if the size value.
+    /// Whether the padding method or splitting method is used will be
+    /// determined by the input size, so that the most efficient method is
+    /// used. The code currently just naively checks whether the size lies
+    /// in the first or second half of the gap between the 2 powers of 2 on
+    /// either side if the size value.
     pub fn generate(
         secrets_blindings_tuples: &Vec<(u64, Scalar)>,
         upper_bound_bit_length: u8,
@@ -77,7 +89,8 @@ impl AggregatedRangeProof {
         let next_pow_2 = size.next_power_of_two();
         let prev_pow_2 = next_pow_2 / 2;
 
-        // TODO this choice of split is fairly arbitrary, one should run the numbers and figure out where the best split is
+        // TODO this choice of split is fairly arbitrary, one should run the numbers and
+        // figure out where the best split is
         if size < (next_pow_2 - prev_pow_2) / 2 {
             Self::generate_with_splitting(secrets_blindings_tuples, upper_bound_bit_length)
         } else {
@@ -87,21 +100,23 @@ impl AggregatedRangeProof {
 
     /// Generate aggregated proof using the padding method.
     ///
-    /// `secrets_blindings_tuples` is a vector of secret & blinding_factor tuples.
-    /// `upper_bound_bit_length` is the power of 2 that the range proof will show the secret value to
-    /// be less than i.e. `secret < 2^upper_bound_bit_length`.
+    /// `secrets_blindings_tuples` is a vector of secret & blinding_factor
+    /// tuples. `upper_bound_bit_length` is the power of 2 that the range
+    /// proof will show the secret value to be less than i.e. `secret <
+    /// 2^upper_bound_bit_length`.
     pub fn generate_with_padding(
         secrets_blindings_tuples: &Vec<(u64, Scalar)>,
         upper_bound_bit_length: u8,
     ) -> Result<AggregatedRangeProof, RangeProofError> {
         // We want a mutable vector so that we can add padding to it.
-        // Since proofs will be for paths in a binary tree the length of the input should be the
-        // the same as the height of the tree, which can reasonably be assumed to be less than 256,
-        // small enough for the copy not to affect performance too much.
+        // Since proofs will be for paths in a binary tree the length of the input
+        // should be the the same as the height of the tree, which can
+        // reasonably be assumed to be less than 256, small enough for the copy
+        // not to affect performance too much.
         let mut secrets_blindings_tuples_clone = secrets_blindings_tuples.clone();
 
-        // Is this cast safe? Yes because the tree height (which is the same as the length of the
-        // input) is also stored as a u8.
+        // Is this cast safe? Yes because the tree height (which is the same as the
+        // length of the input) is also stored as a u8.
         let input_size = secrets_blindings_tuples.len() as u8;
         let next_pow_2 = input_size.next_power_of_two();
 
@@ -133,9 +148,10 @@ impl AggregatedRangeProof {
 
     /// Generate aggregated proof using the splitting method.
     ///
-    /// `secrets_blindings_tuples` is a vector of secret & blinding_factor tuples.
-    /// `upper_bound_bit_length` is the power of 2 that the range proof will show the secret value to
-    /// be less than i.e. `secret < 2^upper_bound_bit_length`.
+    /// `secrets_blindings_tuples` is a vector of secret & blinding_factor
+    /// tuples. `upper_bound_bit_length` is the power of 2 that the range
+    /// proof will show the secret value to be less than i.e. `secret <
+    /// 2^upper_bound_bit_length`.
     pub fn generate_with_splitting(
         secrets_blindings_tuples: &Vec<(u64, Scalar)>,
         upper_bound_bit_length: u8,
@@ -144,23 +160,26 @@ impl AggregatedRangeProof {
 
         let mut prover_transcript = new_transcript();
 
-        // Is this cast safe? Yes because the tree height (which is the same as the length of the
-        // input) is also stored as a u8.
+        // Is this cast safe? Yes because the tree height (which is the same as the
+        // length of the input) is also stored as a u8.
         let input_size = secrets_blindings_tuples.len() as u8;
         let mut next_pow_2 = input_size.next_power_of_two();
 
         // We want mutable vectors to make the code easier to read.
-        // Since proofs will be for paths in a binary tree the length of the input should be the
-        // the same as the height of the tree, which can reasonably be assumed to be less than 256,
-        // small enough for the copy not to affect performance too much.
+        // Since proofs will be for paths in a binary tree the length of the input
+        // should be the the same as the height of the tree, which can
+        // reasonably be assumed to be less than 256, small enough for the copy
+        // not to affect performance too much.
         let (mut secrets, mut blinding_factors): (Vec<u64>, Vec<Scalar>) =
             secrets_blindings_tuples.iter().cloned().unzip();
 
-        // We avoid initializing with capacity because it's not easy to get the exact capacity and
-        // the vectors should be relatively short so performance should not be impacted.
+        // We avoid initializing with capacity because it's not easy to get the exact
+        // capacity and the vectors should be relatively short so performance
+        // should not be impacted.
         let mut proofs: Vec<(RangeProof, usize)> = Vec::new();
 
-        // We slowly shave off parts of the 2 vectors (from the tail) till there is nothing left.
+        // We slowly shave off parts of the 2 vectors (from the tail) till there is
+        // nothing left.
         while secrets.len() > 0 {
             if input_size & next_pow_2 > 0 {
                 let bp_gens =
@@ -198,16 +217,14 @@ impl AggregatedRangeProof {
         let mut prover_transcript = new_transcript();
 
         // We want a mutable vector.
-        // Since proofs will be for paths in a binary tree the length of the input should be the
-        // the same as the height of the tree, which can reasonably be assumed to be less than 256,
-        // small enough for the copy not to affect performance too much.
+        // Since proofs will be for paths in a binary tree the length of the input
+        // should be the the same as the height of the tree, which can
+        // reasonably be assumed to be less than 256, small enough for the copy
+        // not to affect performance too much.
         let mut commitments_clone = commitments.clone();
 
         match self {
-            AggregatedRangeProof::Padding {
-                proof,
-                input_size,
-            } => {
+            AggregatedRangeProof::Padding { proof, input_size } => {
                 let next_pow_2 = input_size.next_power_of_two();
                 let bp_gens =
                     BulletproofGens::new(upper_bound_bit_length as usize, next_pow_2 as usize);
@@ -262,7 +279,8 @@ impl AggregatedRangeProof {
     }
 }
 
-// TODO need to test the generate function once we have decided on the best split point
+// TODO need to test the generate function once we have decided on the best
+// split point
 #[cfg(test)]
 mod tests {
     use bulletproofs::ProofError;
@@ -270,9 +288,10 @@ mod tests {
     use super::*;
     use crate::testing_utils::assert_err;
 
-    // This test does not call any of the above code but it just checks to make sure that there is
-    // no drop in efficiency with the `next_power_of_two` function. Basically need to check that
-    // the function does not give a greater value if the input is already a power of 2.
+    // This test does not call any of the above code but it just checks to make sure
+    // that there is no drop in efficiency with the `next_power_of_two`
+    // function. Basically need to check that the function does not give a
+    // greater value if the input is already a power of 2.
     #[test]
     // TODO fuzz the power of 2 here
     fn next_power_of_2_works_for_boundary_value() {
@@ -369,7 +388,8 @@ mod tests {
                 .compress()];
             let input = vec![(secret, blinding_factor)];
 
-            // NOTE the proof generation succeeds even though the secret value is greater than the bound
+            // NOTE the proof generation succeeds even though the secret value is greater
+            // than the bound
             let proof = AggregatedRangeProof::generate_with_padding(&input, upper_bound_bit_length)
                 .unwrap();
 
@@ -486,7 +506,8 @@ mod tests {
                 .compress()];
             let input = vec![(secret, blinding_factor)];
 
-            // NOTE the proof generation succeeds even though the secret value is greater than the bound
+            // NOTE the proof generation succeeds even though the secret value is greater
+            // than the bound
             let proof =
                 AggregatedRangeProof::generate_with_splitting(&input, upper_bound_bit_length)
                     .unwrap();

@@ -27,28 +27,34 @@
 //! input leaf nodes, and will split the vector between the left & right
 //! recursive calls, each of which will split the vector to their children, etc.
 //!
-//! TODO talk about store and why some nodes are not stored
+//! Not all of the nodes in the tree are necessarily placed in the store. By
+//! default only the non-padding leaf nodes and the root node are placed in the
+//! store. This can be increased using the `store_depth` parameter. If
+//! `store_depth == 1` then only the root node is stored and if
+//! `store_depth == n` then the root node plus the next `n-1` layers from the
+//! root node down are stored. So if `store_depth == height` then all the nodes
+//! are stored.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
+use std::ops::Range;
 
+use dashmap::DashMap;
 use rayon::prelude::*;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 
 use super::super::{
-    num_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node,
-    Sibling,
+    max_bottom_layer_nodes, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store,
+    MIN_STORE_DEPTH,
 };
 use super::{BinaryTree, TreeBuildError, TreeBuilder};
+
+static BUG: &'static str = "[Bug in multi-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
-pub struct MultiThreadedBuilder<C, F>
-where
-    C: Clone,
-{
+pub struct MultiThreadedTreeBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -59,23 +65,18 @@ where
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
 ///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
+///     .with_padding_node_content_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
 /// The type traits on `C` & `F` are required for thread spawning.
-impl<C, F> MultiThreadedBuilder<C, F>
+impl<C, F> MultiThreadedTreeBuilder<C, F>
 where
-    C: Debug + Clone + Mergeable + Send + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     /// Constructor for the builder, to be called by the [super][TreeBuilder].
-    ///
-    /// The leaf node vector is cleaned in the following ways:
-    /// - sorted according to their x-coord
-    /// - all x-coord <= max
-    /// - checked for duplicates (duplicate if same x-coords)
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
-        MultiThreadedBuilder {
+        MultiThreadedTreeBuilder {
             parent_builder,
             padding_node_generator: None,
         }
@@ -84,16 +85,23 @@ where
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
-        self.padding_node_generator = Some(padding_node_generator);
+    pub fn with_padding_node_content_generator(mut self, new_padding_node_content: F) -> Self {
+        self.padding_node_generator = Some(new_padding_node_content);
         self
     }
 
     /// Construct the binary tree.
+    ///
+    /// The leaf node vector is cleaned in the following ways:
+    /// - sorted according to their x-coord
+    /// - all x-coord <= max
+    /// - checked for duplicates (duplicate if same x-coords)
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
-        let (mut input_leaf_nodes, height) = self.parent_builder.verify_and_return_fields()?;
+        let height = self.parent_builder.height()?;
+        let store_depth = self.parent_builder.store_depth(height);
+        let mut input_leaf_nodes = self.parent_builder.leaf_nodes(height)?;
 
         let leaf_nodes = {
             // Sort by x-coord ascending.
@@ -110,22 +118,42 @@ where
 
         let padding_node_generator = self
             .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+            .ok_or(TreeBuildError::NoPaddingNodeContentGeneratorProvided)?;
+
+        let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
+        let params = RecursionParams::from_tree_height(height).with_store_depth(store_depth);
 
         let root = build_node(
-            RecursionParams::new(height),
+            params,
             leaf_nodes,
             Arc::new(padding_node_generator),
+            Arc::clone(&store),
         );
 
-        // TODO put some nodes in the store
-        let store = HashMap::new();
+        let store = Box::new(DashMapStore {
+            map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
+        });
 
         Ok(BinaryTree {
             root,
             store,
             height,
         })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Store.
+
+type Map<C> = DashMap<Coordinate, Node<C>>;
+
+struct DashMapStore<C> {
+    map: Map<C>,
+}
+
+impl<C: Clone> Store<C> for DashMapStore<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        self.map.get(coord).map(|n| n.clone())
     }
 }
 
@@ -138,7 +166,7 @@ where
 /// If all nodes satisfy `node.coord.x <= mid` then `AllNodes` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `NoNodes` is returned.
 // TODO can be optimized using a binary search
-fn get_num_nodes_left_of<C: Clone>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -157,21 +185,21 @@ enum NumNodes {
     SomeNodes(usize),
 }
 
-impl<C: Clone> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
-    /// type C is defined, for example.
+    /// type `C` is defined, for example.
     fn new_sibling_padding_node_arc<F>(&self, new_padding_node_content: Arc<F>) -> Node<C>
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.get_sibling_coord();
+        let coord = self.sibling_coord();
         let content = new_padding_node_content(&coord);
         Node { coord, content }
     }
 }
 
-impl<C: Mergeable + Clone> MatchedPair<C> {
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
@@ -203,7 +231,10 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
         if !left.is_left_sibling_of(&right) {
-            panic!("[bug in multi-threaded node builder] Given nodes were expected to be siblings")
+            panic!(
+                "{} The given left node is not a left sibling of the given right node",
+                BUG
+            )
         }
         MatchedPair { left, right }
     }
@@ -214,55 +245,115 @@ impl<C: Mergeable + Clone> MatchedPair<C> {
 
 /// Parameters for the recursive build function.
 ///
+/// Every iteration of [build_node] relates to a particular layer in the tree,
+/// and `y_coord` is exactly what defines this layer.
+///
+/// The x-coord fields relate to the bottom layer of the tree.
+///
+/// `x_coord_min` is the left-most x-coord of the bottom layer nodes of the
+/// subtree whose root node is the current one being generated by the recursive
+/// iteration. `x_coord_max` is the right-most x-coord of the bottom layer nodes
+/// of the same subtree.
+///
 /// `x_coord_mid` is used to split the leaves into left and right vectors.
 /// Nodes in the left vector have x-coord <= mid, and
 /// those in the right vector have x-coord > mid.
 ///
-/// `max_thread_spawn_height` is there to prevent more threads being spawned
+/// `max_thread_count` is there to prevent more threads being spawned
 /// than there are cores to execute them. If too many threads are spawned then
-/// the parallelization can actually be detrimental to the run-time.
+/// the parallelization can actually be detrimental to the run-time. Threads
 #[derive(Clone)]
-struct RecursionParams {
-    pub x_coord_min: u64,
-    pub x_coord_mid: u64,
-    pub x_coord_max: u64,
-    pub y: u8,
-    pub height: u8,
-    pub max_thread_spawn_height: u8,
+pub struct RecursionParams {
+    x_coord_min: u64,
+    x_coord_mid: u64,
+    x_coord_max: u64,
+    y_coord: u8,
+    thread_count: Arc<Mutex<u8>>,
+    max_thread_count: u8,
+    store_depth: u8,
+    height: u8,
 }
 
+/// Private functions for use within this file only.
 impl RecursionParams {
-    fn new(height: u8) -> Self {
+    /// Construct the parameters given only the height of the tree.
+    ///
+    /// `x_coord_min` points to the start of the bottom layer.
+    /// `x_coord_max` points to the end of the bottom layer.
+    /// `store_depth` defaults to the min value.
+    fn from_tree_height(height: u8) -> Self {
+        // Start from the first node.
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
-        let x_coord_max = num_bottom_layer_nodes(height) - 1;
+        let x_coord_max = max_bottom_layer_nodes(height) - 1;
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
         // y-coords also start from 0, hence the `- 1`.
-        let y = height - 1;
-        // TODO should be a parameter
-        let max_thread_spawn_height = height - 4;
+        let y_coord = Coordinate::y_coord_from_height(height);
 
         RecursionParams {
             x_coord_min,
             x_coord_mid,
             x_coord_max,
-            y,
+            y_coord,
+            // TODO need to unit test that this number matches actual thread count
+            thread_count: Arc::new(Mutex::new(1)),
+            // TODO this should be set based on number of cores but not sure how best to do that
+            max_thread_count: 1,
+            store_depth: MIN_STORE_DEPTH,
             height,
-            max_thread_spawn_height,
         }
     }
 
+    /// Convert the params for the node which is the focus of the current
+    /// iteration to params for that node's left child.
     fn into_left_child(mut self) -> Self {
         self.x_coord_max = self.x_coord_mid;
         self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y -= 1;
+        self.y_coord -= 1;
         self
     }
 
+    /// Convert the params for the node which is the focus of the current
+    /// iteration to params for that node's right child.
     fn into_right_child(mut self) -> Self {
         self.x_coord_min = self.x_coord_mid + 1;
         self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y -= 1;
+        self.y_coord -= 1;
+        self
+    }
+}
+
+/// Public functions available to [super][super][path_builder].
+impl RecursionParams {
+    pub fn from_coordinate(coord: &Coordinate) -> Self {
+        use super::super::MAX_HEIGHT;
+
+        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y_coord: coord.y,
+            thread_count: Arc::new(Mutex::new(0)),
+            max_thread_count: 1,
+            store_depth: MIN_STORE_DEPTH,
+            height: MAX_HEIGHT,
+        }
+    }
+
+    pub fn x_coord_range(&self) -> Range<u64> {
+        self.x_coord_min..self.x_coord_max + 1
+    }
+
+    pub fn with_store_depth(mut self, store_depth: u8) -> Self {
+        self.store_depth = store_depth;
+        self
+    }
+
+    pub fn with_tree_height(mut self, height: u8) -> Self {
+        self.height = height;
         self
     }
 }
@@ -294,61 +385,76 @@ impl RecursionParams {
 /// function anyway. If either case is reached then either there is a bug in the
 /// original calling code or there is a bug in the splitting algorithm in this
 /// function. There is no recovery from these 2 states so we panic.
-fn build_node<C, F>(
+pub fn build_node<C, F>(
     params: RecursionParams,
     mut leaves: Vec<Node<C>>,
     new_padding_node_content: Arc<F>,
+    map: Arc<Map<C>>,
 ) -> Node<C>
 where
-    C: Debug + Clone + Mergeable + Send + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {
-        let max_nodes = num_bottom_layer_nodes(params.y + 1);
+        let max_nodes = max_bottom_layer_nodes(params.y_coord + 1);
         assert!(
             leaves.len() <= max_nodes as usize,
-            "[bug in multi-threaded node builder] Leaf node count ({}) exceeds layer max node number ({})",
+            "{} Leaf node count ({}) exceeds layer max node number ({})",
+            BUG,
             leaves.len(),
             max_nodes
         );
 
-        assert_ne!(
-            leaves.len(),
-            0,
-            "[bug in multi-threaded node builder] Number of leaf nodes cannot be 0"
-        );
+        assert_ne!(leaves.len(), 0, "{} Number of leaf nodes cannot be 0", BUG);
 
         assert!(
             params.x_coord_min % 2 == 0,
-            "[bug in multi-threaded node builder] x_coord_min ({}) must be a multiple of 2 or 0",
+            "{} x_coord_min ({}) must be a multiple of 2 or 0",
+            BUG,
             params.x_coord_min
         );
 
         assert!(
             params.x_coord_max % 2 == 1,
-            "[bug in multi-threaded node builder] x_coord_max ({}) must not be a multiple of 2",
+            "{} x_coord_max ({}) must not be a multiple of 2",
+            BUG,
             params.x_coord_max
         );
 
         let v = params.x_coord_max - params.x_coord_min + 1;
         assert!(
             (v & (v - 1)) == 0,
-            "[bug in multi-threaded node builder] x_coord_max - x_coord_min + 1 ({}) must be a power of 2",
+            "{} x_coord_max - x_coord_min + 1 ({}) must be a power of 2",
+            BUG,
             v
         );
     }
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
-    if params.y == 1 {
+    if params.y_coord == 1 {
         let pair = if leaves.len() == 2 {
-            MatchedPair::from_siblings(leaves.remove(0), leaves.remove(0))
+            let right = leaves.pop().unwrap();
+            let left = leaves.pop().unwrap();
+
+            map.insert(left.coord.clone(), left.clone());
+            map.insert(right.coord.clone(), right.clone());
+
+            MatchedPair::from_siblings(left, right)
         } else {
-            MatchedPair::from_node(leaves.remove(0), new_padding_node_content)
+            let node = leaves.pop().unwrap();
+
+            // Only the leaf node is placed in the store, it's sibling pad node
+            // is left out.
+            map.insert(node.coord.clone(), node.clone());
+
+            MatchedPair::from_node(node, new_padding_node_content)
         };
 
         return pair.merge();
     }
+
+    let within_store_depth_for_children = params.y_coord - 1 >= params.height - params.store_depth;
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::SomeNodes(index) => {
@@ -357,15 +463,21 @@ where
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
 
-            // Split off a thread to build the right child, but only do this if we are above
-            // a certain height otherwise we are at risk of spawning too many threads.
-            if params.y > params.max_thread_spawn_height {
+            // Split off a thread to build the right child, but only do this if the thread
+            // count is less than the max allowed.
+            if *params.thread_count.lock().unwrap() < params.max_thread_count {
+                {
+                    *params.thread_count.lock().unwrap() += 1;
+                }
                 let params_clone = params.clone();
+                let map_ref = Arc::clone(&map);
+
                 let right_handler = thread::spawn(move || -> Node<C> {
                     build_node(
                         params_clone.into_right_child(),
                         right_leaves,
                         new_padding_node_content_ref,
+                        map_ref,
                     )
                 });
 
@@ -373,13 +485,14 @@ where
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
+                    Arc::clone(&map),
                 );
 
                 // If there is a problem joining onto the thread then there is no way to recover
                 // so panic.
-                let right = right_handler.join().expect(
-                    "[bug in multi-threaded node builder] Couldn't join on the associated thread",
-                );
+                let right = right_handler
+                    .join()
+                    .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
                 MatchedPair { left, right }
             } else {
@@ -387,12 +500,14 @@ where
                     params.clone().into_right_child(),
                     right_leaves,
                     new_padding_node_content_ref,
+                    Arc::clone(&map),
                 );
 
                 let left = build_node(
                     params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
+                    Arc::clone(&map),
                 );
 
                 MatchedPair { left, right }
@@ -404,6 +519,7 @@ where
                 params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
+                Arc::clone(&map),
             );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
@@ -414,11 +530,17 @@ where
                 params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
+                Arc::clone(&map),
             );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
     };
+
+    if within_store_depth_for_children {
+        map.insert(pair.left.coord.clone(), pair.left.clone());
+        map.insert(pair.right.coord.clone(), pair.right.clone());
+    }
 
     pair.merge()
 }
@@ -426,8 +548,8 @@ where
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO check all leaf nodes are in the store
-// TODO check certain number of leaf nodes are in the tree
+// TODO check all leaf nodes are in the store, and that the desired level of
+// nodes is in the store TODO check certain number of leaf nodes are in the tree
 // TODO recursive function err - num leaf nodes exceeds max
 // TODO recursive function err - empty leaf nodes
 // TODO recursive function err - NOT x-coord min multiple of 2 or 0
@@ -441,12 +563,13 @@ mod tests {
     use crate::binary_tree::utils::test_utils::{
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};
 
-    type Func = Box<dyn Fn(&Coordinate) -> TestContent>;
+    // type Func = Fn(&Coordinate) -> TestContent;
+    type ThreadSafeFunc = Box<dyn Fn(&Coordinate) -> TestContent + Send + Sync + 'static>;
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
@@ -455,7 +578,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -468,7 +591,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -482,7 +605,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
@@ -496,7 +619,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(vec![single_leaf(1, height)])
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
@@ -508,7 +631,7 @@ mod tests {
         let mut leaf_nodes = full_bottom_layer(height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: num_bottom_layer_nodes(height) + 1,
+            x_coord: max_bottom_layer_nodes(height) + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -519,7 +642,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
@@ -535,7 +658,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -545,13 +668,13 @@ mod tests {
     #[test]
     fn err_when_x_coord_greater_than_max() {
         let height = 4;
-        let leaf_node = single_leaf(num_bottom_layer_nodes(height) + 1, height);
+        let leaf_node = single_leaf(max_bottom_layer_nodes(height) + 1, height);
 
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
             .with_multi_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -566,11 +689,14 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_single_threaded_build_algorithm::<Func>()
+            .with_multi_threaded_build_algorithm::<ThreadSafeFunc>()
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
-        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeGeneratorProvided));
+        assert_err_simple!(
+            res,
+            Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided)
+        );
     }
 
     // tests that the sorting functionality works
@@ -585,11 +711,11 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
-        let root = tree.get_root();
+        let root = tree.root();
 
         leaf_nodes.shuffle(&mut thread_rng());
 
@@ -597,11 +723,11 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_padding_node_content_generator(&get_padding_function())
             .build()
             .unwrap();
 
-        assert_eq!(root, tree.get_root());
+        assert_eq!(root, tree.root());
     }
 
     #[test]
@@ -612,8 +738,8 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
             .build()
             .unwrap();
 
@@ -622,6 +748,81 @@ mod tests {
                 "Leaf node at x-coord {} is not present in the store",
                 leaf.x_coord
             ));
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let middle_layer = height / 2;
+        let layer_below_root = height - 1;
+
+        // These nodes should be in the store.
+        for y in middle_layer..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                tree.store
+                    .get_node(&coord)
+                    .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+            }
+        }
+
+        // These nodes should not be in the store.
+        // Why 1 and not 0? Because leaf nodes are checked in another test.
+        for y in 1..middle_layer {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+        // TODO fuzz on this store depth
+        let store_depth = 1;
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(store_depth)
+            .with_multi_threaded_build_algorithm()
+            .with_padding_node_content_generator(get_padding_function())
+            .build()
+            .unwrap();
+
+        let layer_below_root = height - 1;
+
+        // Only the leaf nodes should be in the store.
+        for x in 0..2u64.pow((height - 1) as u32) {
+            let coord = Coordinate { x, y: 0 };
+            tree.store
+                .get_node(&coord)
+                .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+        }
+
+        // All internal nodes should not be in the store.
+        for y in 1..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
         }
     }
 }

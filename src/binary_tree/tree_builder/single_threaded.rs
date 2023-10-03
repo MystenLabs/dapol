@@ -6,21 +6,28 @@
 //! The build algorithm starts with the inputted bottom-layer leaf nodes, adds
 //! padding nodes where required, and then constructs the next layer by merging
 //! pairs of sibling nodes together.
+//!
+//! Not all of the nodes in the tree are necessarily placed in the store. By
+//! default only the non-padding leaf nodes and the root node are placed in the
+//! store. This can be increased using the `store_depth` parameter. If
+//! `store_depth == 1` then only the root node is stored and if
+//! `store_depth == n` then the root node plus the next `n-1` layers from the
+//! root node down are stored. So if `store_depth == height` then all the nodes
+//! are stored.
 
 use std::collections::HashMap;
 use std::fmt::Debug;
 
-use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling};
+use super::super::{BinaryTree, Coordinate, MatchedPair, Mergeable, Node, Sibling, Store};
 use super::{TreeBuildError, TreeBuilder};
+
+static BUG: &'static str = "[Bug in single-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
 
 #[derive(Debug)]
-pub struct SingleThreadedBuilder<C, F>
-where
-    C: Clone,
-{
+pub struct SingleThreadedTreeBuilder<C, F> {
     parent_builder: TreeBuilder<C>,
     padding_node_generator: Option<F>,
 }
@@ -31,16 +38,16 @@ where
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
 ///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_generator(new_padding_node_content)
+///     .with_padding_node_content_generator(new_padding_node_content)
 ///     .build()?;
 /// ```
-impl<C, F> SingleThreadedBuilder<C, F>
+impl<C, F> SingleThreadedTreeBuilder<C, F>
 where
-    C: Debug + Clone + Mergeable,
+    C: Debug + Clone + Mergeable + 'static, // This static is needed for the boxed hashmap.
     F: Fn(&Coordinate) -> C,
 {
     pub fn new(parent_builder: TreeBuilder<C>) -> Self {
-        SingleThreadedBuilder {
+        SingleThreadedTreeBuilder {
             parent_builder,
             padding_node_generator: None,
         }
@@ -49,15 +56,24 @@ where
     /// New padding nodes are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
-    pub fn with_padding_node_generator(mut self, padding_node_generator: F) -> Self {
-        self.padding_node_generator = Some(padding_node_generator);
+    pub fn with_padding_node_content_generator(mut self, new_padding_node_content: F) -> Self {
+        self.padding_node_generator = Some(new_padding_node_content);
         self
     }
 
+    /// Construct the tree using the provided parameters.
+    ///
+    /// An error is returned if the parameters were not configured correctly
+    /// (or at all).
+    ///
+    /// The leaf nodes are sorted by x-coord, checked for duplicates, and
+    /// converted to the right type.
     pub fn build(self) -> Result<BinaryTree<C>, TreeBuildError> {
         use super::verify_no_duplicate_leaves;
 
-        let (mut input_leaf_nodes, height) = self.parent_builder.verify_and_return_fields()?;
+        let height = self.parent_builder.height()?;
+        let store_depth = self.parent_builder.store_depth(height);
+        let mut input_leaf_nodes = self.parent_builder.leaf_nodes(height)?;
 
         let leaf_nodes = {
             // Sort by x-coord ascending.
@@ -72,17 +88,30 @@ where
                 .collect::<Vec<Node<C>>>()
         };
 
-        let padding_node_generator = self
+        let new_padding_node_content = self
             .padding_node_generator
-            .ok_or(TreeBuildError::NoPaddingNodeGeneratorProvided)?;
+            .ok_or(TreeBuildError::NoPaddingNodeContentGeneratorProvided)?;
 
-        let (store, root) = build_tree(leaf_nodes, height, padding_node_generator);
+        let (map, root) = build_tree(leaf_nodes, height, store_depth, &new_padding_node_content);
 
         Ok(BinaryTree {
             root,
-            store,
+            store: Box::new(HashMapStore { map }),
             height,
         })
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Store.
+
+struct HashMapStore<C> {
+    map: Map<C>,
+}
+
+impl<C: Clone> Store<C> for HashMapStore<C> {
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        self.map.get(coord).map(|n| (*n).clone())
     }
 }
 
@@ -90,12 +119,23 @@ where
 // Supporting structs & methods.
 
 /// A pair of sibling nodes, but one might be absent.
-struct MaybeUnmatchedPair<C: Mergeable + Clone> {
+///
+/// At least one of the fields is expected to be set. If this is not the case
+/// then it is assumed there is a bug in the code using this struct.
+struct MaybeUnmatchedPair<C> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
-impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
+impl<C> MaybeUnmatchedPair<C> {
+    /// Convert the partially matched pair into a matched pair.
+    ///
+    /// If both left and right nodes are not present then the function will
+    /// panic because this case indicates a bug in the calling code, which is
+    /// not a recoverable scenario.
+    ///
+    /// If only one of the nodes is not present then it is created as a padding
+    /// node.
     fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
@@ -103,22 +143,21 @@ impl<C: Mergeable + Clone> MaybeUnmatchedPair<C> {
         match (self.left, self.right) {
             (Some(left), Some(right)) => MatchedPair { left, right },
             (Some(left), None) => MatchedPair {
-                right: left.new_sibling_padding_node(&new_padding_node_content),
+                right: left.new_sibling_padding_node(new_padding_node_content),
                 left,
             },
             (None, Some(right)) => MatchedPair {
-                left: right.new_sibling_padding_node(&new_padding_node_content),
+                left: right.new_sibling_padding_node(new_padding_node_content),
                 right,
             },
-            // If this case is reached then there is a bug in the above fold.
             (None, None) => {
-                panic!("[Bug in tree constructor] Invalid pair (None, None) found")
+                panic!("{} Invalid pair (None, None) found", BUG)
             }
         }
     }
 }
 
-impl<C: Clone> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -126,7 +165,7 @@ impl<C: Clone> Node<C> {
     where
         F: Fn(&Coordinate) -> C,
     {
-        let coord = self.get_sibling_coord();
+        let coord = self.sibling_coord();
         let content = new_padding_node_content(&coord);
         Node { coord, content }
     }
@@ -135,28 +174,84 @@ impl<C: Clone> Node<C> {
 // -------------------------------------------------------------------------------------------------
 // Build algorithm.
 
-type Store<C> = HashMap<Coordinate, Node<C>>;
+type Map<C> = HashMap<Coordinate, Node<C>>;
 type RootNode<C> = Node<C>;
 
 /// Construct a new binary tree.
 ///
-/// The nodes are stored in a hashmap, which is returned along with the root node
-/// (which is also stored in the hashmap).
+/// If `leaf_nodes` is empty or has length greater than what the tree height
+/// allows then there will be panic. The builder is expected to
+/// handle this case gracefully and this function is not public so a panic
+/// is acceptable here.
+/// Every element of `leaf_nodes` is assumed to have y-coord of 0. The function
+/// will panic otherwise because this means there is a bug in the calling code.
+///
+/// The nodes are stored in a hashmap, which is returned along with the root
+/// node (which is also stored in the hashmap).
+///
+/// `store_depth` determines how many layers are placed in the store. If
+/// `store_depth == 1` then only the root node is stored and if
+/// `store_depth == 2` then the root node and the next layer down are stored.
+///
+/// Note that the root node is not actually put in the hashmap because it is
+/// returned along with the hashmap, but it is considered to be stored so
+/// `store_depth` must at least be 1.
+/// Also note that all bottom layer nodes are stored, both the inputted leaf
+/// nodes and their accompanying padding nodes.
 // TODO there should be a warning if the height/leaves < min_sparsity (which was
 // set to 2 in prev code)
-fn build_tree<C, F>(
-    mut nodes: Vec<Node<C>>,
+pub fn build_tree<C, F>(
+    leaf_nodes: Vec<Node<C>>,
     height: u8,
-    new_padding_node_content: F,
-) -> (Store<C>, RootNode<C>)
+    store_depth: u8,
+    new_padding_node_content: &F,
+) -> (Map<C>, RootNode<C>)
 where
     C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
-    let mut store = HashMap::new();
+    {
+        // Some simple parameter checks.
 
-    // Repeat for each layer of the tree.
-    for _i in 0..height - 1 {
+        let max = max_bottom_layer_nodes(height);
+
+        use super::super::max_bottom_layer_nodes;
+        assert!(
+            leaf_nodes.len() <= max as usize,
+            "{} Too many leaf nodes",
+            BUG
+        );
+
+        assert!(leaf_nodes.len() != 0, "{} Empty leaf nodes", BUG);
+
+        // All y-coords are 0.
+        if let Some(node) = leaf_nodes.iter().find(|node| node.coord.y != 0) {
+            panic!(
+                "{} Node expected to have y-coord of 0 but was {}",
+                BUG, node.coord.y
+            );
+        }
+
+        use crate::binary_tree::MIN_STORE_DEPTH;
+        assert!(
+            store_depth >= MIN_STORE_DEPTH,
+            "{} Store depth cannot be less than {} since the root node is always stored",
+            BUG,
+            MIN_STORE_DEPTH
+        );
+        assert!(
+            store_depth <= height,
+            "{} Store depth cannot exceed the height of the tree",
+            BUG
+        );
+    }
+
+    let mut map = HashMap::new();
+    let mut nodes = leaf_nodes;
+
+    // Repeat for each layer of the tree, except the root node layer.
+    let layer_below_root = height - 1;
+    for y in 0..layer_below_root {
         // Create the next layer up of nodes from the current layer of nodes.
         nodes = nodes
             .into_iter()
@@ -183,7 +278,7 @@ where
                                 .last_mut()
                                 // This case should never be reached because of the way
                                 // is_right_sibling_of_prev_node is built.
-                                .expect("[Bug in tree constructor] Previous node not found")
+                                .unwrap_or_else(|| panic!("{} Previous node not found", BUG))
                                 .right = Option::Some(right_sibling);
                         } else {
                             pairs.push(MaybeUnmatchedPair {
@@ -201,8 +296,15 @@ where
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
-                store.insert(pair.left.coord.clone(), pair.left);
-                store.insert(pair.right.coord.clone(), pair.right);
+                // TODO may be able to further optimize by leaving out the padding leaf nodes
+                // from the store.
+                // Only insert nodes in the store if
+                // a) node is a bottom layer leaf node (including padding nodes)
+                // b) node is in one of the top X layers where X = store_depth
+                if y == 0 || y >= height - store_depth {
+                    map.insert(pair.left.coord.clone(), pair.left);
+                    map.insert(pair.right.coord.clone(), pair.right);
+                }
                 parent
             })
             .collect();
@@ -211,32 +313,31 @@ where
     // If the root node is not present then there is a bug in the above code.
     let root = nodes
         .pop()
-        .expect("[Bug in tree constructor] Unable to find root node");
+        .unwrap_or_else(|| panic!("{} Unable to find root node", BUG));
 
     assert!(
         nodes.len() == 0,
-        "[Bug in tree constructor] Should be no nodes left to process"
+        "{} Should be no nodes left to process",
+        BUG
     );
 
-    store.insert(root.coord.clone(), root.clone());
-
-    (store, root)
+    (map, root)
 }
 
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
-// TODO perform manual calculation of a tree and check that it equals the one generated here
-// TODO check certain number of leaf nodes are in the tree
+// TODO perform manual calculation of a tree and check that it equals the one
+// generated here TODO check certain number of leaf nodes are in the tree
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::num_bottom_layer_nodes;
+    use super::super::super::max_bottom_layer_nodes;
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent
+        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err_simple, assert_err};
+    use crate::testing_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};
@@ -250,7 +351,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -263,7 +364,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -277,7 +378,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
@@ -291,7 +392,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(vec![single_leaf(1, height)])
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::HeightTooSmall));
@@ -303,7 +404,7 @@ mod tests {
         let mut leaf_nodes = full_bottom_layer(height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: num_bottom_layer_nodes(height) + 1,
+            x_coord: max_bottom_layer_nodes(height) + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -314,7 +415,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
@@ -330,7 +431,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -340,13 +441,13 @@ mod tests {
     #[test]
     fn err_when_x_coord_greater_than_max() {
         let height = 4;
-        let leaf_node = single_leaf(num_bottom_layer_nodes(height) + 1, height);
+        let leaf_node = single_leaf(max_bottom_layer_nodes(height) + 1, height);
 
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(get_padding_function())
+            .with_padding_node_content_generator(get_padding_function())
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -365,7 +466,10 @@ mod tests {
             .build();
 
         // cannot use assert_err because it requires Func to have the Debug trait
-        assert_err_simple!(res, Err(TreeBuildError::NoPaddingNodeGeneratorProvided));
+        assert_err_simple!(
+            res,
+            Err(TreeBuildError::NoPaddingNodeContentGeneratorProvided)
+        );
     }
 
     // tests that the sorting functionality works
@@ -381,10 +485,10 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_padding_node_content_generator(&get_padding_function())
             .build()
             .unwrap();
-        let root = tree.get_root();
+        let root = tree.root();
 
         leaf_nodes.shuffle(&mut thread_rng());
 
@@ -392,11 +496,11 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_padding_node_content_generator(&get_padding_function())
             .build()
             .unwrap();
 
-        assert_eq!(root, tree.get_root());
+        assert_eq!(root, tree.root());
     }
 
     #[test]
@@ -408,7 +512,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_single_threaded_build_algorithm()
-            .with_padding_node_generator(&get_padding_function())
+            .with_padding_node_content_generator(&get_padding_function())
             .build()
             .unwrap();
 
@@ -419,4 +523,82 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_content_generator(&get_padding_function())
+            .build()
+            .unwrap();
+
+        let middle_layer = height / 2;
+        let layer_below_root = height - 1;
+
+        // These nodes should be in the store.
+        for y in middle_layer..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                tree.store
+                    .get_node(&coord)
+                    .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+            }
+        }
+
+        // These nodes should not be in the store.
+        // Why 1 and not 0? Because leaf nodes are checked in another test.
+        for y in 1..middle_layer {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
+        let height = 8;
+        let leaf_nodes = full_bottom_layer(height);
+        // TODO fuzz on this store depth
+        let store_depth = 1;
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes.clone())
+            .with_store_depth(store_depth)
+            .with_single_threaded_build_algorithm()
+            .with_padding_node_content_generator(&get_padding_function())
+            .build()
+            .unwrap();
+
+        let layer_below_root = height - 1;
+
+        // Only the leaf nodes should be in the store.
+        for x in 0..2u64.pow((height - 1) as u32) {
+            let coord = Coordinate { x, y: 0 };
+            tree.store
+                .get_node(&coord)
+                .unwrap_or_else(|| panic!("{:?} was expected to be in the store", coord));
+        }
+
+        // All internal nodes should not be in the store.
+        for y in 1..layer_below_root {
+            for x in 0..2u64.pow((height - y - 1) as u32) {
+                let coord = Coordinate { x, y };
+                if tree.store.get_node(&coord).is_some() {
+                    panic!("{:?} was expected to not be in the store", coord);
+                }
+            }
+        }
+    }
+
+    // TODO check padding nodes on bottom layer are not in the store unless
+    // store depth is the max
 }

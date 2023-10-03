@@ -1,12 +1,14 @@
-//! Single range proof generation and verification using the Bulletproofs protocol.
+//! Single range proof generation and verification using the Bulletproofs
+//! protocol.
 //!
-//! See also [super][aggregated_range_proof] which is used for batching range proofs with an
-//! efficiency gain.
+//! See also [super][aggregated_range_proof] which is used for batching range
+//! proofs with an efficiency gain.
 //!
-//! Note `upper_bound_bit_length` parameter is in u8 because it is not expected to require bounds
-//! higher than $2^256$.
+//! Note `upper_bound_bit_length` parameter is in u8 because it is not expected
+//! to require bounds higher than $2^256$.
 //!
-//! TODO more docs, on Pedersen gens maybe, on bulletproof gens maybe, on transcript maybe
+//! TODO more docs, on Pedersen gens maybe, on bulletproof gens maybe, on
+//! transcript maybe
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
@@ -19,11 +21,13 @@ pub struct IndividualRangeProof(RangeProof);
 
 /// Maximum number of parties that can produce an aggregated proof.
 ///
-/// It is required to produce the generator group elements for Bulletproofs protocol. The value is
-/// set to 1 because only 1 proof is generated at a time and so no aggregation is required.
+/// It is required to produce the generator group elements for Bulletproofs
+/// protocol. The value is set to 1 because only 1 proof is generated at a time
+/// and so no aggregation is required.
 const PARTY_CAPACITY: usize = 1;
 
-/// The transcript initial state must be the same for proof generation and verification.
+/// The transcript initial state must be the same for proof generation and
+/// verification.
 fn new_transcript() -> Transcript {
     Transcript::new(b"IndividualRangeProof")
 }
@@ -31,10 +35,11 @@ fn new_transcript() -> Transcript {
 impl IndividualRangeProof {
     /// Generate a range proof using the Bulletproofs protocol.
     ///
-    /// The proof will convince a verifier that $0 <= secret <= 2^upper_bound_bit_length$.
+    /// The proof will convince a verifier that $0 <= secret <=
+    /// 2^upper_bound_bit_length$.
     ///
-    /// `upper_bound_bit_length` is in u8 because it is not expected to require bounds higher than
-    /// $2^256$.
+    /// `upper_bound_bit_length` is in u8 because it is not expected to require
+    /// bounds higher than $2^256$.
     pub fn generate(
         secret: u64,
         blinding_factor: &Scalar,
@@ -60,11 +65,11 @@ impl IndividualRangeProof {
     ///
     /// `commitment` - the Pedersen commitment, in compressed form.
     ///
-    /// `upper_bound_bit_length` - $2^upper_bound_bit_length$ is the value that the commitment
-    /// should be less than.
+    /// `upper_bound_bit_length` - $2^upper_bound_bit_length$ is the value that
+    /// the commitment should be less than.
     ///
-    /// Both `commitment` & `upper_bound_bit_length` should be the same as the values that were was
-    /// used to generate the proof.
+    /// Both `commitment` & `upper_bound_bit_length` should be the same as the
+    /// values that were was used to generate the proof.
     pub fn verify(
         &self,
         commitment: &CompressedRistretto,
@@ -91,12 +96,14 @@ impl IndividualRangeProof {
 // -------------------------------------------------------------------------------------------------
 // Unit tests
 //
-// Note that the tests here penetrate into the Bulletproofs library, as apposed to mocking that
-// library. This is intentional because we cannot write our own unit tests for that library so we
-// rather use the unit tests here as integration tests.
+// Note that the tests here penetrate into the Bulletproofs library, as apposed
+// to mocking that library. This is intentional because we cannot write our own
+// unit tests for that library so we rather use the unit tests here as
+// integration tests.
 
-// TODO how to get the generation to emit an error from the underlying bulletproof library?
-// TODO need to test that bound bit lengths not equal to one of 8, 16, 32, 64 produce errors in generation/verification
+// TODO how to get the generation to emit an error from the underlying
+// bulletproof library? TODO need to test that bound bit lengths not equal to
+// one of 8, 16, 32, 64 produce errors in generation/verification
 #[cfg(test)]
 mod tests {
     use bulletproofs::ProofError;
@@ -113,7 +120,8 @@ mod tests {
         IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length).unwrap();
     }
 
-    // this is unexpected but verification will definitely fail so it's not a problem
+    // this is unexpected but verification will definitely fail so it's not a
+    // problem
     #[test]
     fn generation_works_when_secret_out_of_bounds() {
         // secret = 2^32 > 2^8 = upper_bound
@@ -196,7 +204,8 @@ mod tests {
         let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
         let commitment = PedersenGens::default().commit(Scalar::from(secret), blinding_factor);
 
-        // NOTE the proof generation succeeds even though the secret value is greater than the bound
+        // NOTE the proof generation succeeds even though the secret value is greater
+        // than the bound
         let proof =
             IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length)
                 .unwrap();

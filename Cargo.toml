@@ -31,6 +31,7 @@ curve25519-dalek-ng = "4.1.1"
 thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
+dashmap = "5.5.3"
 
 [dev-dependencies]
 criterion = "0.4.0"

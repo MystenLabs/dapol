@@ -38,7 +38,7 @@ impl ErrUnlessTrue for Option<bool> {
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
 /// TODO latex `max = 2^(height-1)`
 // TODO change name to 'max'
-pub fn num_bottom_layer_nodes(height: u8) -> u64 {
+pub fn max_bottom_layer_nodes(height: u8) -> u64 {
     2u64.pow(height as u32 - 1)
 }
 
@@ -103,7 +103,7 @@ pub mod test_utils {
     pub fn full_bottom_layer(height: u8) -> Vec<InputLeafNode<TestContent>> {
         let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();
 
-        // note we don't use the helper function num_bottom_layer_nodes
+        // note we don't use the helper function max_bottom_layer_nodes
         for i in 0..2usize.pow(height as u32 - 1) {
             leaf_nodes.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
