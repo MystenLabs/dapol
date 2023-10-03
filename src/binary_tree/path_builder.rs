@@ -220,22 +220,11 @@ impl<'a, C> PathBuilder<'a, C> {
                     coord: leaf_coord.clone(),
                 })?;
 
-        // STENT TODO if we are not storing padding nodes in the store then this might
-        // return an error which is not what we want
-        let sibling_leaf_coord = leaf_coord.sibling_coord();
-        let sibling_leaf = tree.get_leaf_node(sibling_leaf_coord.x).ok_or_else(|| {
-            PathBuildError::LeafNodeNotFound {
-                coord: sibling_leaf_coord.clone(),
-            }
-        })?;
-
         let mut siblings = Vec::with_capacity(tree.get_height() as usize);
-        siblings.push(sibling_leaf);
-
-        let mut current_coord = leaf_coord.parent_coord();
         let max_y_coord = Coordinate::y_coord_from_height(tree.get_height());
+        let mut current_coord = leaf_coord;
 
-        for _y in 1..max_y_coord {
+        for _y in 0..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
 
             let sibling = tree
