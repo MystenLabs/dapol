@@ -180,9 +180,7 @@ impl NdmSmt {
         let tree_2 = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(new_padding_node_content)
-            .build()?;
+            .build_using_single_threaded_algorithm(new_padding_node_content)?;
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);

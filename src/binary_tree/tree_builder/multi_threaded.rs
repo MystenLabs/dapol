@@ -649,9 +649,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(&get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         assert_eq!(root, tree.root());

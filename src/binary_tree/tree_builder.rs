@@ -12,7 +12,6 @@ use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
 pub mod multi_threaded;
 pub mod single_threaded;
-use single_threaded::SingleThreadedTreeBuilder;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
@@ -62,9 +61,7 @@ pub struct InputLeafNode<C> {
 /// let tree = TreeBuilder::new()
 ///     .with_height(height)?
 ///     .with_leaf_nodes(leaf_nodes)?
-///     .with_single_threaded_build_algorithm()?
-///     .with_padding_node_content_generator(new_padding_node_content)
-///     .build()?;
+///     .build_using_single_threaded_algorithm(new_padding_node_content)?;
 /// ```
 impl<C> TreeBuilder<C>
 where
@@ -131,12 +128,18 @@ where
     }
 
     /// Regular build algorithm.
-    pub fn with_single_threaded_build_algorithm<F>(self) -> SingleThreadedTreeBuilder<C, F>
+    pub fn build_using_single_threaded_algorithm<F>(self,
+                                                    new_padding_node_content: F,
+    ) -> Result<BinaryTree<C>, TreeBuildError>
     where
         C: Debug,
         F: Fn(&Coordinate) -> C,
     {
-        SingleThreadedTreeBuilder::new(self)
+        let height = self.height()?;
+        let store_depth = self.store_depth(height);
+        let input_leaf_nodes = self.leaf_nodes(height)?;
+
+        single_threaded::build_tree(height, store_depth, input_leaf_nodes, new_padding_node_content)
     }
 
     /// Use the height of the tree to determine store depth by dividing it by
@@ -264,9 +267,7 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
@@ -289,9 +290,7 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
@@ -315,9 +314,7 @@ mod tests {
             let single_threaded = TreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
-                .with_single_threaded_build_algorithm()
-                .with_padding_node_content_generator(get_padding_function())
-                .build()
+                .build_using_single_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             let multi_threaded = TreeBuilder::new()
