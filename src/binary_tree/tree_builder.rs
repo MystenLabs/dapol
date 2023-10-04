@@ -11,8 +11,6 @@ use std::fmt::Debug;
 use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
 
 pub mod multi_threaded;
-use multi_threaded::MultiThreadedTreeBuilder;
-
 pub mod single_threaded;
 use single_threaded::SingleThreadedTreeBuilder;
 
@@ -112,12 +110,24 @@ where
     }
 
     /// High performance build algorithm utilizing parallelization.
-    pub fn with_multi_threaded_build_algorithm<F>(self) -> MultiThreadedTreeBuilder<C, F>
+    pub fn build_using_multi_threaded_algorithm<F>(
+        self,
+        new_padding_node_content: F,
+    ) -> Result<BinaryTree<C>, TreeBuildError>
     where
         C: Debug + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
-        MultiThreadedTreeBuilder::new(self)
+        let height = self.height()?;
+        let store_depth = self.store_depth(height);
+        let input_leaf_nodes = self.leaf_nodes(height)?;
+
+        multi_threaded::build_tree(
+            height,
+            store_depth,
+            input_leaf_nodes,
+            new_padding_node_content,
+        )
     }
 
     /// Regular build algorithm.
@@ -262,9 +272,7 @@ mod tests {
         let multi_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -289,9 +297,7 @@ mod tests {
         let multi_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -317,9 +323,7 @@ mod tests {
             let multi_threaded = TreeBuilder::new()
                 .with_height(height)
                 .with_leaf_nodes(leaf_node)
-                .with_multi_threaded_build_algorithm()
-                .with_padding_node_content_generator(get_padding_function())
-                .build()
+                .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             assert_eq!(single_threaded.root, multi_threaded.root);

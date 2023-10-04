@@ -195,9 +195,7 @@ impl NdmSmt {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(new_padding_node_content_2)
-            .build()?;
+            .build_using_multi_threaded_algorithm(new_padding_node_content_2)?;
 
         let end = SystemTime::now();
         let dur = end.duration_since(start);

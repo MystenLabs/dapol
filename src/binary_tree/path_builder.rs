@@ -517,9 +517,7 @@ mod tests {
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_multi_threaded
@@ -573,9 +571,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_multi_threaded
@@ -632,9 +628,7 @@ mod tests {
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
-                .with_multi_threaded_build_algorithm()
-                .with_padding_node_content_generator(get_padding_function())
-                .build()
+                .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             let proof = tree_multi_threaded
