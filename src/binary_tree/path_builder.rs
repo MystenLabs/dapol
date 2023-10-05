@@ -148,7 +148,7 @@ impl<'a, C> PathBuilder<'a, C> {
         C: Debug + Clone + Mergeable,
         F: Fn(&Coordinate) -> C,
     {
-        use super::tree_builder::single_threaded::build_tree;
+        use super::tree_builder::single_threaded::build_node;
 
         let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
             // We don't want to store anything because the store already exists
@@ -180,7 +180,7 @@ impl<'a, C> PathBuilder<'a, C> {
             // TODO The leaf nodes are cloned and put into a store that is
             // dropped. We should have an option to not put anything in the
             // store, maybe by changing store_depth to be an enum.
-            let (_, node) = build_tree(
+            let (_, node) = build_node(
                 leaf_nodes,
                 coord.to_height(),
                 store_depth,
@@ -489,9 +489,7 @@ mod tests {
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_single_threaded
@@ -517,9 +515,7 @@ mod tests {
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_multi_threaded
@@ -545,9 +541,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
-            .with_single_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_single_threaded
@@ -573,9 +567,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
-            .with_multi_threaded_build_algorithm()
-            .with_padding_node_content_generator(get_padding_function())
-            .build()
+            .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let proof = tree_multi_threaded
@@ -602,9 +594,7 @@ mod tests {
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
-                .with_single_threaded_build_algorithm()
-                .with_padding_node_content_generator(get_padding_function())
-                .build()
+                .build_using_single_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             let proof = tree_single_threaded
@@ -632,9 +622,7 @@ mod tests {
                 .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
-                .with_multi_threaded_build_algorithm()
-                .with_padding_node_content_generator(get_padding_function())
-                .build()
+                .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             let proof = tree_multi_threaded
