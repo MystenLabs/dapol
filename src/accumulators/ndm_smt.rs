@@ -65,6 +65,7 @@ impl NdmSmt {
         master_secret: D256,
         salt_b: D256,
         salt_s: D256,
+        // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
         height: u8,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
