@@ -128,8 +128,9 @@ where
     }
 
     /// Regular build algorithm.
-    pub fn build_using_single_threaded_algorithm<F>(self,
-                                                    new_padding_node_content: F,
+    pub fn build_using_single_threaded_algorithm<F>(
+        self,
+        new_padding_node_content: F,
     ) -> Result<BinaryTree<C>, TreeBuildError>
     where
         C: Debug,
@@ -139,7 +140,12 @@ where
         let store_depth = self.store_depth(height);
         let input_leaf_nodes = self.leaf_nodes(height)?;
 
-        single_threaded::build_tree(height, store_depth, input_leaf_nodes, new_padding_node_content)
+        single_threaded::build_tree(
+            height,
+            store_depth,
+            input_leaf_nodes,
+            new_padding_node_content,
+        )
     }
 
     /// Use the height of the tree to determine store depth by dividing it by
