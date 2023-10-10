@@ -15,8 +15,11 @@ use smtree::{
 };
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+use env_logger;
 
 fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
+
     let start = SystemTime::now();
     println!("start {:?}", start);
     new();
@@ -32,7 +35,7 @@ fn new() {
     let tree_height = 32;
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
-    let num_leaves: usize = 2usize.pow(17);
+    let num_leaves: usize = 2usize.pow(10);
 
     let entities = build_item_list_new(num_leaves, tree_height);
 
