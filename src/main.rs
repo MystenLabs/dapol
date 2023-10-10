@@ -5,7 +5,7 @@ use dapol::{NdmSmt, Entity, EntityId, D256};
 use core::fmt::Debug;
 use dapol::{
     utils::get_secret, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting, RangeProvable,
-    RangeVerifiable,
+    RangeVerifiable, Args
 };
 use digest::Digest;
 use rand::{distributions::Uniform, thread_rng, Rng};
@@ -15,7 +15,9 @@ use smtree::{
 };
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+
 use env_logger;
+use clap::Parser;
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
@@ -36,10 +38,15 @@ fn new() {
     let salt_b: D256 = D256::from(5u64);
     let salt_s: D256 = D256::from(7u64);
 
-    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
+    // let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
 
     // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1
     // ID").unwrap()).unwrap(); println!("{:?}", proof);
+    let args = Args::parse();
+
+    for _ in 0..args.count {
+        println!("Hello {}!", args.name)
+    }
 }
 
 fn old() {
