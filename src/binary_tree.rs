@@ -6,7 +6,7 @@
 //!
 //! The definition given in appendix C.2 (Accumulators) in the DAPOL+ paper
 //! defines a Sparse Merkle Tree (SMT) as being a Merkle tree that is *full* but
-//! not necessarily *complete* or *perfect*: "In an SMT, users are mapped to and
+//! not necessarily *complete* or *perfect*: "In an SMT, entities are mapped to and
 //! reside in nodes at height 𝐻. Instead of constructing a full binary tree,
 //! only tree nodes that are necessary for Merkle proofs exist"
 //!

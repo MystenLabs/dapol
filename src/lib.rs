@@ -27,8 +27,8 @@ pub use inclusion_proof::{InclusionProof, InclusionProofError};
 mod primitives;
 pub use primitives::D256;
 
-mod user;
-pub use user::{User, UserId};
+mod entity;
+pub use entity::{Entity, EntityId};
 
 mod accumulators;
 pub use accumulators::NdmSmt;

@@ -11,7 +11,7 @@
 
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::primitives::D256;
-use crate::user::UserId;
+use crate::entity::EntityId;
 
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
@@ -83,8 +83,8 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     pub fn new_leaf(
         liability: u64,
         blinding_factor: D256,
-        user_id: UserId,
-        user_salt: D256,
+        entity_id: EntityId,
+        entity_salt: D256,
     ) -> FullNodeContent<H> {
         // Scalar expects bytes to be in little-endian
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
@@ -93,14 +93,14 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
         let commitment =
             PedersenGens::default().commit(Scalar::from(liability), blinding_factor_scalar);
 
-        let user_id_bytes: [u8; 32] = user_id.into();
-        let user_salt_bytes: [u8; 32] = user_salt.into();
+        let entity_id_bytes: [u8; 32] = entity_id.into();
+        let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
-        // Compute the hash: `H("leaf" | user_id | user_salt)`
+        // Compute the hash: `H("leaf" | entity_id | entity_salt)`
         let mut hasher = H::new();
         hasher.update("leaf".as_bytes());
-        hasher.update(user_id_bytes);
-        hasher.update(user_salt_bytes);
+        hasher.update(entity_id_bytes);
+        hasher.update(entity_salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
@@ -202,43 +202,43 @@ mod tests {
     fn new_leaf_works() {
         let liability = 11u64;
         let blinding_factor = 7u64.into();
-        let user_id = UserId::from_str("some user").unwrap();
-        let user_salt = 13u64.into();
+        let entity_id = EntityId::from_str("some entity").unwrap();
+        let entity_salt = 13u64.into();
 
-        FullNodeContent::<blake3::Hasher>::new_leaf(liability, blinding_factor, user_id, user_salt);
+        FullNodeContent::<blake3::Hasher>::new_leaf(liability, blinding_factor, entity_id, entity_salt);
     }
 
     #[test]
     fn new_pad_works() {
         let blinding_factor = 7u64.into();
         let coord = Coordinate { x: 1u64, y: 2u8 };
-        let user_salt = 13u64.into();
+        let entity_salt = 13u64.into();
 
-        FullNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, user_salt);
+        FullNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, entity_salt);
     }
 
     #[test]
     fn merge_works() {
         let liability_1 = 11u64;
         let blinding_factor_1 = 7u64.into();
-        let user_id_1 = UserId::from_str("some user 1").unwrap();
-        let user_salt_1 = 13u64.into();
+        let entity_id_1 = EntityId::from_str("some entity 1").unwrap();
+        let entity_salt_1 = 13u64.into();
         let node_1 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_1,
             blinding_factor_1,
-            user_id_1,
-            user_salt_1,
+            entity_id_1,
+            entity_salt_1,
         );
 
         let liability_2 = 21u64;
         let blinding_factor_2 = 27u64.into();
-        let user_id_2 = UserId::from_str("some user 2").unwrap();
-        let user_salt_2 = 23u64.into();
+        let entity_id_2 = EntityId::from_str("some entity 2").unwrap();
+        let entity_salt_2 = 23u64.into();
         let node_2 = FullNodeContent::<blake3::Hasher>::new_leaf(
             liability_2,
             blinding_factor_2,
-            user_id_2,
-            user_salt_2,
+            entity_id_2,
+            entity_salt_2,
         );
 
         FullNodeContent::merge(&node_1, &node_2);

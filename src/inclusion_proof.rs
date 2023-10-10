@@ -29,8 +29,8 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// - the range proof for the Pedersen commitments
 ///
 /// The tree path is taken to be of a compressed node content type because
-/// sharing a full node content type with users would leak secret information
-/// such as other user's liabilities and the total sum of liabilities.
+/// sharing a full node content type with entities would leak secret information
+/// such as other entity's liabilities and the total sum of liabilities.
 ///
 /// The Bulletproofs protocol allows aggregating multiple range proofs into 1
 /// proof, which is more efficient to produce & verify than doing them

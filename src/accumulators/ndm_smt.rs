@@ -13,7 +13,7 @@ use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofEr
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
-use crate::user::{User, UserId};
+use crate::entity::{Entity, EntityId};
 
 use std::time::SystemTime;
 
@@ -29,14 +29,14 @@ type Hash = blake3::Hasher;
 type Content = FullNodeContent<Hash>;
 
 /// Main struct containing tree object, master secret and the salts.
-/// The user mapping structure is required because it is non-deterministic.
+/// The entity mapping structure is required because it is non-deterministic.
 #[allow(dead_code)]
 pub struct NdmSmt {
     master_secret: D256,
     salt_b: D256,
     salt_s: D256,
     tree: BinaryTree<Content>,
-    user_mapping: HashMap<UserId, u64>,
+    entity_mapping: HashMap<EntityId, u64>,
 }
 
 fn new_padding_node_content_closure(
@@ -66,7 +66,7 @@ impl NdmSmt {
         salt_b: D256,
         salt_s: D256,
         height: u8,
-        users: Vec<User>,
+        entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
         let salt_b_bytes = salt_b.as_bytes();
@@ -88,52 +88,52 @@ impl NdmSmt {
 
         let start = SystemTime::now();
         println!(
-            "  ndm start conversion of users to inputleafnode {:?}",
+            "  ndm start conversion of entities to inputleafnode {:?}",
             start
         );
 
         // [single] first create vec with x_coords
-        // join with users vec
+        // join with entities vec
         // [multiple] then generate keys, map to leaf node and
         // [single] add into map
 
-        let mut x_coords = Vec::<u64>::with_capacity(users.len());
-        for i in 0..users.len() {
+        let mut x_coords = Vec::<u64>::with_capacity(entities.len());
+        for i in 0..entities.len() {
             x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
         }
 
-        let tuples = users
+        let tuples = entities
             .into_iter()
             .zip(x_coords.into_iter())
-            .collect::<Vec<(User, u64)>>();
+            .collect::<Vec<(Entity, u64)>>();
 
         let leaf_nodes = tuples
             .par_iter()
             // .into_par_iter()
-            .map(|(user, x_coord)| {
+            .map(|(entity, x_coord)| {
                 let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
                 let w_bytes: [u8; 32] = w.into();
                 let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-                let user_salt = generate_key(&w_bytes, salt_s_bytes);
+                let entity_salt = generate_key(&w_bytes, salt_s_bytes);
 
                 InputLeafNode {
                     content: Content::new_leaf(
-                        user.liability,
+                        entity.liability,
                         blinding_factor.into(),
-                        user.id.clone(),
-                        user_salt.into(),
+                        entity.id.clone(),
+                        entity_salt.into(),
                     ),
                     x_coord: *x_coord,
                 }
             })
             .collect::<Vec<InputLeafNode<Content>>>();
 
-        let user_mapping = Arc::new(Mutex::new(HashMap::new()));
-        let user_mapping_ref = Arc::clone(&user_mapping);
+        let entity_mapping = Arc::new(Mutex::new(HashMap::new()));
+        let entity_mapping_ref = Arc::clone(&entity_mapping);
         let handle = thread::spawn(move || {
-            let mut my_user_mapping = user_mapping_ref.lock().unwrap();
-            tuples.into_iter().for_each(|(user, x_coord)| {
-                my_user_mapping.insert(user.id, x_coord);
+            let mut my_entity_mapping = entity_mapping_ref.lock().unwrap();
+            tuples.into_iter().for_each(|(entity, x_coord)| {
+                my_entity_mapping.insert(entity.id, x_coord);
             });
         });
         // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
@@ -143,27 +143,27 @@ impl NdmSmt {
             size_of_val(&*leaf_nodes)
         );
 
-        // let mut leaves = Vec::with_capacity(users.len());
-        // for user in users.into_iter() {
+        // let mut leaves = Vec::with_capacity(entities.len());
+        // for entity in entities.into_iter() {
         //     let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
         //     i = i + 1;
 
         //     let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
         //     let w_bytes: [u8; 32] = w.into();
         //     let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-        //     let user_salt = generate_key(&w_bytes, salt_s_bytes);
+        //     let entity_salt = generate_key(&w_bytes, salt_s_bytes);
 
         //     leaves.push(InputLeafNode {
         //         content: Content::new_leaf(
-        //             user.liability,
+        //             entity.liability,
         //             blinding_factor.into(),
-        //             user.id.clone(),
-        //             user_salt.into(),
+        //             entity.id.clone(),
+        //             entity_salt.into(),
         //         ),
         //         x_coord,
         //     });
 
-        //     user_mapping.insert(user.id, x_coord);
+        //     entity_mapping.insert(entity.id, x_coord);
         // }
 
         let end = SystemTime::now();
@@ -201,8 +201,8 @@ impl NdmSmt {
         println!("  duration {:?}", dur);
 
         handle.join().unwrap();
-        let lock = Arc::try_unwrap(user_mapping).expect("Lock still has multiple owners");
-        let user_mapping = lock.into_inner().expect("Mutex cannot be locked");
+        let lock = Arc::try_unwrap(entity_mapping).expect("Lock still has multiple owners");
+        let entity_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
         assert_eq!(tree.root(), tree_2.root());
 
@@ -211,11 +211,11 @@ impl NdmSmt {
             master_secret,
             salt_b,
             salt_s,
-            user_mapping,
+            entity_mapping,
         })
     }
 
-    /// Generate an inclusion proof for the given user_id.
+    /// Generate an inclusion proof for the given entity_id.
     ///
     /// The NdmSmt struct defines the content type that is used, and so must define how to extract
     /// the secret value (liability) and blinding factor for the range proof, which are both
@@ -232,14 +232,14 @@ impl NdmSmt {
     /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
     pub fn generate_inclusion_proof_with_custom_range_proof_params(
         &self,
-        user_id: &UserId,
+        entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
         let leaf_x_coord = self
-            .user_mapping
-            .get(user_id)
-            .ok_or(NdmSmtError::UserIdNotFound)?;
+            .entity_mapping
+            .get(entity_id)
+            .ok_or(NdmSmtError::EntityIdNotFound)?;
 
         let master_secret_bytes = self.master_secret.as_bytes();
         let salt_b_bytes = self.salt_b.as_bytes();
@@ -263,19 +263,19 @@ impl NdmSmt {
         )?)
     }
 
-    /// Generate an inclusion proof for the given user_id.
+    /// Generate an inclusion proof for the given entity_id.
     ///
     /// Use the default values for Bulletproof parameters:
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most real-world cases)
     pub fn generate_inclusion_proof(
         &self,
-        user_id: &UserId,
+        entity_id: &EntityId,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
         self.generate_inclusion_proof_with_custom_range_proof_params(
-            user_id,
+            entity_id,
             aggregation_factor,
             upper_bound_bit_length,
         )
@@ -286,14 +286,14 @@ impl NdmSmt {
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
     TreeError(#[from] TreeBuildError),
-    #[error("Number of users cannot be bigger than 2^height")]
+    #[error("Number of entities cannot be bigger than 2^height")]
     HeightTooSmall(#[from] OutOfBoundsError),
     #[error("Inclusion proof generation failed when trying to build the path in the tree")]
     InclusionProofPathGenerationError(#[from] PathBuildError),
     #[error("Inclusion proof generation failed")]
     InclusionProofGenerationError(#[from] InclusionProofError),
-    #[error("User ID not found in the user mapping")]
-    UserIdNotFound,
+    #[error("Entity ID not found in the entity mapping")]
+    EntityIdNotFound,
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -389,12 +389,12 @@ mod tests {
             let salt_b: D256 = 2u64.into();
             let salt_s: D256 = 3u64.into();
             let height = 4u8;
-            let users = vec![User {
+            let entities = vec![Entity {
                 liability: 5u64,
-                id: UserId::from_str("some user").unwrap(),
+                id: EntityId::from_str("some entity").unwrap(),
             }];
 
-            NdmSmt::new(master_secret, salt_b, salt_s, height, users).unwrap();
+            NdmSmt::new(master_secret, salt_b, salt_s, height, entities).unwrap();
         }
     }
 

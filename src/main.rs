@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use dapol::{NdmSmt, User, UserId, D256};
+use dapol::{NdmSmt, Entity, EntityId, D256};
 
 use core::fmt::Debug;
 use dapol::{
@@ -34,15 +34,15 @@ fn new() {
     let num_leaves: usize = 2usize.pow(23); // 8.4M
     let num_leaves: usize = 2usize.pow(17);
 
-    let users = build_item_list_new(num_leaves, tree_height);
+    let entities = build_item_list_new(num_leaves, tree_height);
 
     let master_secret: D256 = D256::from(3u64);
     let salt_b: D256 = D256::from(5u64);
     let salt_s: D256 = D256::from(7u64);
 
-    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, users).unwrap();
+    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
 
-    // let proof = ndsmt.generate_inclusion_proof(&UserId::from_str("user1
+    // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1
     // ID").unwrap()).unwrap(); println!("{:?}", proof);
 }
 
@@ -70,15 +70,15 @@ where
     dapol
 }
 
-fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<User> {
+fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<Entity> {
     let start = SystemTime::now();
     println!("build_item_list_new {:?}", start);
 
     let mut result = Vec::with_capacity(num_leaves);
     for i in 0..num_leaves {
-        result.push(User {
+        result.push(Entity {
             liability: i as u64,
-            id: UserId::from_str(i.to_string().as_str()).unwrap(),
+            id: EntityId::from_str(i.to_string().as_str()).unwrap(),
         })
     }
 
