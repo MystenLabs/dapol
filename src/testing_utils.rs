@@ -1,4 +1,5 @@
-// TODO rename this file to test_utils to be aligned with the other test utils file
+// TODO rename this file to test_utils to be aligned with the other test utils
+// file
 /// Check 2 errors are the same.
 /// https://stackoverflow.com/a/65618681
 macro_rules! assert_err {
@@ -22,3 +23,9 @@ macro_rules! assert_err_simple {
         }
     }
 pub(crate) use assert_err_simple;
+
+pub fn init_logger() {
+    let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+        .is_test(true)
+        .try_init();
+}

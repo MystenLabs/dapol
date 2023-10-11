@@ -8,9 +8,9 @@
 //! pairs of sibling nodes together.
 //!
 //! Not all of the nodes in the tree are necessarily placed in the store. By
-//! default only the non-padding leaf nodes and the root node are placed in the
-//! store. This can be increased using the `store_depth` parameter. If
-//! `store_depth == 1` then only the root node is stored and if
+//! default only the non-padding leaf nodes and the nodes in the top half of the
+//! tree are placed in the store. This can be increased using the `store_depth`
+//! parameter. If `store_depth == 1` then only the root node is stored and if
 //! `store_depth == n` then the root node plus the next `n-1` layers from the
 //! root node down are stored. So if `store_depth == height` then all the nodes
 //! are stored.
@@ -18,8 +18,14 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use log::warn;
+use logging_timer::stime;
+
+use crate::binary_tree::max_bottom_layer_nodes;
+
 use super::super::{
     BinaryTree, Coordinate, InputLeafNode, MatchedPair, Mergeable, Node, Sibling, Store,
+    MIN_RECOMMENDED_SPARSITY,
 };
 use super::TreeBuildError;
 
@@ -35,6 +41,7 @@ static BUG: &'static str = "[Bug in single-threaded builder]";
 ///
 /// The leaf nodes are sorted by x-coord, checked for duplicates, and
 /// converted to the right type.
+#[stime("info", "SingleThreadedBuilder::{}")]
 pub fn build_tree<C, F>(
     height: u8,
     store_depth: u8,
@@ -59,6 +66,13 @@ where
             .map(|leaf| leaf.to_node())
             .collect::<Vec<Node<C>>>()
     };
+
+    if max_bottom_layer_nodes(height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+        warn!(
+            "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
+            MIN_RECOMMENDED_SPARSITY
+        );
+    }
 
     let (map, root) = build_node(leaf_nodes, height, store_depth, &new_padding_node_content);
 
@@ -160,13 +174,10 @@ type RootNode<C> = Node<C>;
 /// `store_depth == 1` then only the root node is stored and if
 /// `store_depth == 2` then the root node and the next layer down are stored.
 ///
-/// Note that the root node is not actually put in the hashmap because it is
-/// returned along with the hashmap, but it is considered to be stored so
-/// `store_depth` must at least be 1.
-/// Also note that all bottom layer nodes are stored, both the inputted leaf
+/// The min `store_depth` is 1. The function will panic if this is not the case.
+///
+/// Note that all bottom layer nodes are stored, both the inputted leaf
 /// nodes and their accompanying padding nodes.
-// TODO there should be a warning if the height/leaves < min_sparsity (which was
-// set to 2 in prev code)
 pub fn build_node<C, F>(
     leaf_nodes: Vec<Node<C>>,
     height: u8,
@@ -182,7 +193,6 @@ where
 
         let max = max_bottom_layer_nodes(height);
 
-        use super::super::max_bottom_layer_nodes;
         assert!(
             leaf_nodes.len() <= max as usize,
             "{} Too many leaf nodes",
@@ -268,6 +278,7 @@ where
                 // Only insert nodes in the store if
                 // a) node is a bottom layer leaf node (including padding nodes)
                 // b) node is in one of the top X layers where X = store_depth
+                // NOTE this includes the root node.
                 if y == 0 || y >= height - store_depth {
                     map.insert(pair.left.coord.clone(), pair.left);
                     map.insert(pair.right.coord.clone(), pair.right);

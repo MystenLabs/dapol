@@ -28,15 +28,18 @@
 //! recursive calls, each of which will split the vector to their children, etc.
 //!
 //! Not all of the nodes in the tree are necessarily placed in the store. By
-//! default only the non-padding leaf nodes and the root node are placed in the
-//! store. This can be increased using the `store_depth` parameter. If
-//! `store_depth == 1` then only the root node is stored and if
+//! default only the non-padding leaf nodes and the nodes in the top half of the
+//! tree are placed in the store. This can be increased using the `store_depth`
+//! parameter. If `store_depth == 1` then only the root node is stored and if
 //! `store_depth == n` then the root node plus the next `n-1` layers from the
 //! root node down are stored. So if `store_depth == height` then all the nodes
 //! are stored.
 
 use std::fmt::Debug;
 use std::ops::Range;
+
+use log::warn;
+use logging_timer::stime;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
@@ -45,7 +48,7 @@ use std::thread;
 
 use super::super::{
     max_bottom_layer_nodes, Coordinate, InputLeafNode, MatchedPair, Mergeable, Node, Sibling,
-    Store, MIN_STORE_DEPTH,
+    Store, MIN_RECOMMENDED_SPARSITY, MIN_STORE_DEPTH,
 };
 use super::{BinaryTree, TreeBuildError};
 
@@ -60,6 +63,7 @@ static BUG: &'static str = "[Bug in multi-threaded builder]";
 /// - sorted according to their x-coord
 /// - all x-coord <= max
 /// - checked for duplicates (duplicate if same x-coords)
+#[stime("info", "MultiThreadedBuilder::{}")]
 pub fn build_tree<C, F>(
     height: u8,
     store_depth: u8,
@@ -87,6 +91,13 @@ where
 
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
     let params = RecursionParams::from_tree_height(height).with_store_depth(store_depth);
+
+    if max_bottom_layer_nodes(height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+        warn!(
+            "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
+            MIN_RECOMMENDED_SPARSITY
+        );
+    }
 
     let root = build_node(
         params,
@@ -418,6 +429,7 @@ where
         return pair.merge();
     }
 
+    // NOTE this includes the root node.
     let within_store_depth_for_children = params.y_coord - 1 >= params.height - params.store_depth;
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {

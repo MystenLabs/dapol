@@ -32,6 +32,9 @@ thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
 dashmap = "5.5.3"
+env_logger = "0.10.0"
+log = "0.4.20"
+logging_timer = "1.1.0"
 
 [dev-dependencies]
 criterion = "0.4.0"

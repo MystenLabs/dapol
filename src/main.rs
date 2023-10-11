@@ -15,15 +15,11 @@ use smtree::{
 };
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+use env_logger;
 
 fn main() {
-    let start = SystemTime::now();
-    println!("start {:?}", start);
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     new();
-    let end = SystemTime::now();
-    let dur = end.duration_since(start);
-    println!("end {:?}", end);
-    println!("duration {:?}", dur);
 }
 
 fn new() {
@@ -32,7 +28,7 @@ fn new() {
     let tree_height = 32;
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
-    let num_leaves: usize = 2usize.pow(17);
+    let num_leaves: usize = 2usize.pow(10);
 
     let entities = build_item_list_new(num_leaves, tree_height);
 
@@ -48,6 +44,9 @@ fn new() {
 
 fn old() {
     println!("old");
+    let start = SystemTime::now();
+    println!("start {:?}", start);
+
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
 
@@ -57,6 +56,11 @@ fn old() {
     // we bench range proof padding only because building a tree does not depend on
     // the type of range proof we do
     build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
+
+    let end = SystemTime::now();
+    let dur = end.duration_since(start);
+    println!("end {:?}", end);
+    println!("duration {:?}", dur);
 }
 
 fn build_dapol_tree<D, R>(items: &[(TreeIndex, DapolNode<D>)], tree_height: usize) -> Dapol<D, R>

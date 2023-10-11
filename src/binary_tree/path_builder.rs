@@ -109,7 +109,11 @@ impl<'a, C> PathBuilder<'a, C> {
             }
 
             if coord.y == 1 {
-                println!("    node_builder x range {:?} leaf_nodes len {}", params.x_coord_range(), leaf_nodes.len());
+                println!(
+                    "    node_builder x range {:?} leaf_nodes len {}",
+                    params.x_coord_range(),
+                    leaf_nodes.len()
+                );
             }
 
             // If the above vector is empty then we know this node needs to be a

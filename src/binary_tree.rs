@@ -6,8 +6,8 @@
 //!
 //! The definition given in appendix C.2 (Accumulators) in the DAPOL+ paper
 //! defines a Sparse Merkle Tree (SMT) as being a Merkle tree that is *full* but
-//! not necessarily *complete* or *perfect*: "In an SMT, entities are mapped to and
-//! reside in nodes at height 𝐻. Instead of constructing a full binary tree,
+//! not necessarily *complete* or *perfect*: "In an SMT, entities are mapped to
+//! and reside in nodes at height 𝐻. Instead of constructing a full binary tree,
 //! only tree nodes that are necessary for Merkle proofs exist"
 //!
 //! The definition given by
@@ -54,21 +54,39 @@ pub static MIN_HEIGHT: u8 = 2;
 /// it's just a soft limit that can be increased later if need be.
 pub static MAX_HEIGHT: u8 = 64;
 
+
+/// Minimum recommended empty-space-to-leaf-node ratio.
+///
+/// The ratio of max number of bottom-layer nodes to the actual number of leaf
+/// nodes given to the protocol is known as *sparsity*.
+
+/// The whole reason a sparse
+/// binary tree is used is to help hide the total number of users of the
+/// exchange, since the max number of bottom-layer nodes can be calculated
+/// from an inclusion proof (giving an upper bound on the number of users).
+/// The greater the sparsity the greater the upper bound and the better
+/// the total is hidden.
+///
+/// It is not recommended to have less sparsity than 2 because this means the
+/// upper bound is exactly double the actual number.
+pub static MIN_RECOMMENDED_SPARSITY: u8 = 2;
+
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
 /// Main data structure.
 ///
-/// Nodes are stored in a hash map, their index in the tree being the key.
-/// There is no guarantee that all of the nodes in the tree are stored. For
-/// space optimization there may be some nodes that are left out, but the
-/// leaf nodes that were originally fed into the tree builder are guaranteed
-/// to be stored.
+/// The root node and height are important and get their own fields. The other
+/// nodes in the tree are not all guaranteed to be stored, nor do we restrict
+/// the data-structure used to store them. All non-padding bottom-layer leaf
+/// nodes are guaranteed to be stored, but the rest of the nodes are stored
+/// according to logic in [tree_builder].
 ///
 /// The generic type `C` is for the content contained within each node.
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: Box<dyn Store<C>>, // The box & dyn pattern is needed so that the trait methods can be determined dynamically at runtime.
+    store: Box<dyn Store<C>>, /* The box & dyn pattern is needed so that the trait methods can
+                               * be determined dynamically at runtime. */
     height: u8,
 }
 
@@ -82,18 +100,24 @@ pub struct Node<C> {
 }
 
 /// Index of a [Node] in the tree.
-/// `y` is the vertical index (height) of the Node (0 being the bottom of the
-/// tree) and `x` is the horizontal index of the Node (0 being the leftmost
-/// index).
+///
+/// `y` is the vertical index of the [Node] with a range of
+/// `[0, height)`.
+///
+/// `x` is the horizontal index of the [Node] with a range of
+/// `[0, 2^y]`
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
-    pub y: u8, // from 0 to height
+    pub y: u8,
     // TODO this enforces a max tree height of 2^64 so we should make sure that is accounted for in
     // other bits of the code, and make it easy to upgrade this max to something larger in the
     // future
-    pub x: u64, // from 0 to 2^y
+    pub x: u64,
 }
 
+/// Generic type representing the structure that stores the nodes of the tree.
+/// This trait is necessary to allow both the single- and multi-threaded tree
+/// build algorithms to use a data structure that bests suits them.
 trait Store<C: Clone> {
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>>;
 }
@@ -111,6 +135,7 @@ impl<C: Clone> BinaryTree<C> {
     pub fn height(&self) -> u8 {
         self.height
     }
+
     pub fn root(&self) -> &Node<C> {
         &self.root
     }
@@ -119,13 +144,14 @@ impl<C: Clone> BinaryTree<C> {
     ///
     /// If the store does not contain a node with the given coordinate then
     /// there are 2 possible reasons:
-    /// 1. The node was left out to save space
-    /// 2. The coordinate is outside the bounds of the tree
+    /// 1. The node was left out by the builder to save space
+    /// 2. The coordinate parameter is outside the bounds of the tree
     ///
-    /// This function clones the data in the node so it's not advised to call
-    /// this if efficiency is required. A reference to the node cannot be
-    /// returned because the store uses a custom reference type and we do not
-    /// want to expose that custom type to the outside calling code.
+    /// Implementations of this function may clone the node so it's not advised
+    /// to call this if efficiency is required. A reference to the node
+    /// cannot be returned in the multi-threaded case because the store
+    /// implementation there uses a custom reference type and we do not want
+    /// to expose that custom type to the outside calling code.
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.store.get_node(coord)
     }
@@ -135,13 +161,14 @@ impl<C: Clone> BinaryTree<C> {
     ///
     /// If the store does not contain a node with the given coordinate then
     /// there are 2 possible reasons:
-    /// 1. The node was left out to save space
-    /// 2. The coordinate is outside the bounds of the tree
+    /// 1. The node was left out by the builder to save space
+    /// 2. The x-coord parameter is outside the bounds of the tree
     ///
-    /// This function clones the data in the node so it's not advised to call
-    /// this if efficiency is required. A reference to the node cannot be
-    /// returned because the store uses a custom reference type and we do not
-    /// want to expose that custom type to the outside calling code.
+    /// Implementations of this function may clone the node so it's not advised
+    /// to call this if efficiency is required. A reference to the node
+    /// cannot be returned in the multi-threaded case because the store
+    /// implementation there uses a custom reference type and we do not want
+    /// to expose that custom type to the outside calling code.
     pub fn get_leaf_node(&self, x_coord: u64) -> Option<Node<C>> {
         let coord = Coordinate { x: x_coord, y: 0 };
         self.get_node(&coord)
@@ -172,6 +199,7 @@ impl Coordinate {
 
     /// Returns left if a node with this coord is a left sibling and vice versa
     /// for right.
+    ///
     /// Since we are working with a binary tree we can tell if the node is a
     /// left sibling of the above layer by checking the x-coord modulus 2.
     /// Since x-coord starts from 0 we check if the modulus is equal to 0.
@@ -194,10 +222,10 @@ impl Coordinate {
         Coordinate { y: self.y, x }
     }
 
-    /// Return the coordinates of the parent to the node that has this coordinate.
-    /// The x-coord divide-by-2 works for both left _and_ right siblings because
-    /// of truncation. Note that this function can be misused if tree height
-    /// is not used to bound the y-coord from above.
+    /// Return the coordinates of the parent to the node that has this
+    /// coordinate. The x-coord divide-by-2 works for both left _and_ right
+    /// siblings because of truncation. Note that this function can be
+    /// misused if tree height is not used to bound the y-coord from above.
     fn parent_coord(&self) -> Coordinate {
         Coordinate {
             y: self.y + 1,
@@ -215,14 +243,11 @@ impl Coordinate {
     /// the height of the main tree. This is due to the fact that we know the
     /// `x` value of the current coordinate. The `x` encodes for the main tree
     /// height.
-    // STENT TODO unit test
     fn subtree_x_coord_bounds(&self) -> (u64, u64) {
         // This is essentially the number of bottom-layer leaf nodes for the
         // subtree, but shifted right to account for the subtree's position
         // in the main tree.
-        let first_leaf_x_coord = |x: u64, y: u8| {
-            2u64.pow(y as u32) * x
-        };
+        let first_leaf_x_coord = |x: u64, y: u8| 2u64.pow(y as u32) * x;
 
         let x_coord_min = first_leaf_x_coord(self.x, self.y);
         let x_coord_max = first_leaf_x_coord(self.x + 1, self.y) - 1;
@@ -244,7 +269,7 @@ impl Coordinate {
 
     /// Generate a new bottom-layer leaf coordinate from the given x-coord.
     fn bottom_layer_leaf_from(x_coord: u64) -> Self {
-        Coordinate { x: x_coord, y: 0}
+        Coordinate { x: x_coord, y: 0 }
     }
 }
 
@@ -324,7 +349,7 @@ impl<C: fmt::Debug> fmt::Debug for BinaryTree<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Supporting structs.
+// Supporting structs & implementations.
 
 /// Used to organise nodes into left/right siblings.
 #[derive(Debug, PartialEq)]
@@ -340,14 +365,12 @@ enum Sibling<C> {
     Right(Node<C>),
 }
 
+// TODO we should have a `from` function for this with an error check, just to be extra careful
 /// A pair of sibling nodes.
 struct MatchedPair<C> {
     left: Node<C>,
     right: Node<C>,
 }
-
-// -------------------------------------------------------------------------------------------------
-// Supporting struct implementations.
 
 impl<C> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
@@ -409,19 +432,24 @@ mod tests {
         }
     }
 
+    // TODO repeat for Coordinate::orientation
     #[test]
     fn node_orientation_correctly_determined() {
         let height = 8;
 
+        // TODO can fuzz on any even number
         let x_coord = 0;
         let left_node = single_leaf(x_coord, height).to_node();
         assert_eq!(left_node.orientation(), NodeOrientation::Left);
 
+        // TODO can fuzz on any odd number
         let x_coord = 1;
         let right_node = single_leaf(x_coord, height).to_node();
         assert_eq!(right_node.orientation(), NodeOrientation::Right);
     }
 
+    // TODO do for internal nodes
+    // TODO fuzz on the one x-coord then calculate the other one from this
     #[test]
     fn is_sibling_of_works() {
         let height = 5;
@@ -448,9 +476,13 @@ mod tests {
         }
     }
 
+    // TODO do for internal node
+    // TODO do for root node
+    // TODO fuzz on the x,y coord
     #[test]
     fn sibling_coord_calculated_correctly() {
         let height = 8;
+
         let x_coord = 5;
         let right_node = single_leaf(x_coord, height).to_node();
         let sibling_coord = right_node.sibling_coord();
@@ -470,6 +502,10 @@ mod tests {
         assert_eq!(sibling_coord.x, 1, "Sibling's x-coord should be 1 more than the node's x-coord because the node is a left sibling");
     }
 
+    // TODO repeat for Coordinate::parent_coord
+    // TODO do for internal node
+    // TODO do for root node
+    // TODO fuzz on the x,y coord
     #[test]
     fn parent_coord_calculated_correctly() {
         let height = 8;
@@ -496,6 +532,7 @@ mod tests {
         );
     }
 
+    // TODO fuzz on x-coord
     #[test]
     fn input_node_correctly_converted_to_node() {
         let height = 8;
@@ -515,6 +552,7 @@ mod tests {
         assert_eq!(content, node.content);
     }
 
+    // TODO fuzz on the x-coord, we just need to make sure the value is even or odd depending on the case
     #[test]
     fn sibling_from_node_works() {
         let height = 8;
@@ -536,6 +574,7 @@ mod tests {
         }
     }
 
+    // TODO fuzz on the 1 x-coord then calculate the other one from this
     #[test]
     fn matched_pair_merge_works() {
         let height = 8;
@@ -557,5 +596,13 @@ mod tests {
             parent.coord.x, 8,
             "Parent's x-coord should be half the child's"
         );
+    }
+
+    #[test]
+    fn subtree_bounds_works() {
+        let coord = Coordinate{x: 2, y: 2};
+        let (lower, upper) = coord.subtree_x_coord_bounds();
+        assert_eq!(lower, 8, "Incorrect lower x-coord bound for subtree");
+        assert_eq!(upper, 11, "Incorrect upper x-coord bound for subtree");
     }
 }

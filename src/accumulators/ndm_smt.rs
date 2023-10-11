@@ -9,13 +9,13 @@ use thiserror::Error;
 use crate::binary_tree::{
     BinaryTree, Coordinate, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
 };
+use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 use crate::primitives::D256;
-use crate::entity::{Entity, EntityId};
 
-use std::time::SystemTime;
+use logging_timer::{finish, timer, Level};
 
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ use std::sync::Mutex;
 use std::thread;
 
 // -------------------------------------------------------------------------------------------------
-// NDM-SMT struct and methods
+// Main struct and implementation.
 
 type Hash = blake3::Hasher;
 type Content = FullNodeContent<Hash>;
@@ -39,24 +39,6 @@ pub struct NdmSmt {
     entity_mapping: HashMap<EntityId, u64>,
 }
 
-fn new_padding_node_content_closure(
-    master_secret_bytes: [u8; 32],
-    salt_b_bytes: [u8; 32],
-    salt_s_bytes: [u8; 32],
-) -> impl Fn(&Coordinate) -> Content {
-    // closure that is used to create new padding nodes
-    move |coord: &Coordinate| {
-        // TODO unfortunately we copy data here, maybe there is a way to do without copying
-        let coord_bytes = coord.as_bytes();
-        // pad_secret is given as 'w' in the DAPOL+ paper
-        let pad_secret = generate_key(&master_secret_bytes, &coord_bytes);
-        let pad_secret_bytes: [u8; 32] = pad_secret.into();
-        let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes);
-        let salt = generate_key(&pad_secret_bytes, &salt_s_bytes);
-        Content::new_pad(blinding_factor.into(), coord, salt.into())
-    }
-}
-
 impl NdmSmt {
     /// Constructor.
     /// TODO more docs
@@ -65,6 +47,7 @@ impl NdmSmt {
         master_secret: D256,
         salt_b: D256,
         salt_s: D256,
+        // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
         height: u8,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
@@ -72,142 +55,98 @@ impl NdmSmt {
         let salt_b_bytes = salt_b.as_bytes();
         let salt_s_bytes = salt_s.as_bytes();
 
-        let new_padding_node_content = new_padding_node_content_closure(
-            master_secret_bytes.clone(),
-            salt_b_bytes.clone(),
-            salt_s_bytes.clone(),
-        );
+        let (leaf_nodes, entity_coord_tuples) = {
+            // Map the entities to bottom-layer leaf nodes.
 
-        let new_padding_node_content_2 = new_padding_node_content_closure(
-            master_secret_bytes.clone(),
-            salt_b_bytes.clone(),
-            salt_s_bytes.clone(),
-        );
+            let tmr = timer!(Level::Info; "Entity to leaf node conversion");
 
-        let mut x_coord_generator = RandomXCoordGenerator::new(height);
+            let mut x_coord_generator = RandomXCoordGenerator::new(height);
+            let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
-        let start = SystemTime::now();
-        println!(
-            "  ndm start conversion of entities to inputleafnode {:?}",
-            start
-        );
+            for i in 0..entities.len() {
+                x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
+            }
 
-        // [single] first create vec with x_coords
-        // join with entities vec
-        // [multiple] then generate keys, map to leaf node and
-        // [single] add into map
+            let entity_coord_tuples = entities
+                .into_iter()
+                .zip(x_coords.into_iter())
+                .collect::<Vec<(Entity, u64)>>();
 
-        let mut x_coords = Vec::<u64>::with_capacity(entities.len());
-        for i in 0..entities.len() {
-            x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
-        }
+            let leaf_nodes = entity_coord_tuples
+                .par_iter()
+                .map(|(entity, x_coord)| {
+                    let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
+                    let w_bytes: [u8; 32] = w.into();
+                    let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
+                    let entity_salt = generate_key(&w_bytes, salt_s_bytes);
 
-        let tuples = entities
-            .into_iter()
-            .zip(x_coords.into_iter())
-            .collect::<Vec<(Entity, u64)>>();
+                    InputLeafNode {
+                        content: Content::new_leaf(
+                            entity.liability,
+                            blinding_factor.into(),
+                            entity.id.clone(),
+                            entity_salt.into(),
+                        ),
+                        x_coord: *x_coord,
+                    }
+                })
+                .collect::<Vec<InputLeafNode<Content>>>();
 
-        let leaf_nodes = tuples
-            .par_iter()
-            // .into_par_iter()
-            .map(|(entity, x_coord)| {
-                let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
-                let w_bytes: [u8; 32] = w.into();
-                let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-                let entity_salt = generate_key(&w_bytes, salt_s_bytes);
+            // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
+            use std::mem::size_of_val;
+            finish!(
+                tmr,
+                "Leaf nodes have length {} and size {}",
+                leaf_nodes.len(),
+                size_of_val(&*leaf_nodes)
+            );
 
-                InputLeafNode {
-                    content: Content::new_leaf(
-                        entity.liability,
-                        blinding_factor.into(),
-                        entity.id.clone(),
-                        entity_salt.into(),
-                    ),
-                    x_coord: *x_coord,
-                }
-            })
-            .collect::<Vec<InputLeafNode<Content>>>();
+            (leaf_nodes, entity_coord_tuples)
+        };
+
+        // Spawn a new thread to convert the tuples object into a hashmap, while
+        // the main thread goes ahead with the tree build.
 
         let entity_mapping = Arc::new(Mutex::new(HashMap::new()));
         let entity_mapping_ref = Arc::clone(&entity_mapping);
+
         let handle = thread::spawn(move || {
-            let mut my_entity_mapping = entity_mapping_ref.lock().unwrap();
-            tuples.into_iter().for_each(|(entity, x_coord)| {
-                my_entity_mapping.insert(entity.id, x_coord);
-            });
+            let mut my_entity_mapping = entity_mapping_ref
+                .lock()
+                .expect("Cannot acquire lock on the entity map");
+            entity_coord_tuples
+                .into_iter()
+                .for_each(|(entity, x_coord)| {
+                    my_entity_mapping.insert(entity.id, x_coord);
+                });
         });
-        // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
-        use std::mem::size_of_val;
-        println!(
-            "The size of `input_leaf_nodes` is {}",
-            size_of_val(&*leaf_nodes)
-        );
 
-        // let mut leaves = Vec::with_capacity(entities.len());
-        // for entity in entities.into_iter() {
-        //     let x_coord = x_coord_generator.new_unique_x_coord(i as u64)?;
-        //     i = i + 1;
-
-        //     let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
-        //     let w_bytes: [u8; 32] = w.into();
-        //     let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-        //     let entity_salt = generate_key(&w_bytes, salt_s_bytes);
-
-        //     leaves.push(InputLeafNode {
-        //         content: Content::new_leaf(
-        //             entity.liability,
-        //             blinding_factor.into(),
-        //             entity.id.clone(),
-        //             entity_salt.into(),
-        //         ),
-        //         x_coord,
-        //     });
-
-        //     entity_mapping.insert(entity.id, x_coord);
-        // }
-
-        let end = SystemTime::now();
-        let dur = end.duration_since(start);
-        println!("  end {:?}", end);
-        println!("  duration {:?}", dur);
-
-        // println!("leaves len {}", leaves.len());
-        println!("leaves len {}", leaf_nodes.len());
-
-        let start = SystemTime::now();
-        println!("  ndm start single threaded build {:?}", start);
-
-        let tree_2 = TreeBuilder::new()
+        let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(new_padding_node_content)?;
+            .build_using_single_threaded_algorithm(new_padding_node_content_closure(
+                master_secret_bytes.clone(),
+                salt_b_bytes.clone(),
+                salt_s_bytes.clone(),
+            ))?;
 
-        let end = SystemTime::now();
-        let dur = end.duration_since(start);
-        println!("  end {:?}", end);
-        println!("  duration {:?}", dur);
-
-        let start = SystemTime::now();
-        println!("  ndm start multi threaded build {:?}", start);
-
-        let tree = TreeBuilder::new()
+        let tree_multi_threaded = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(new_padding_node_content_2)?;
-
-        let end = SystemTime::now();
-        let dur = end.duration_since(start);
-        println!("  end {:?}", end);
-        println!("  duration {:?}", dur);
+            .build_using_multi_threaded_algorithm(new_padding_node_content_closure(
+                master_secret_bytes.clone(),
+                salt_b_bytes.clone(),
+                salt_s_bytes.clone(),
+            ))?;
 
         handle.join().unwrap();
         let lock = Arc::try_unwrap(entity_mapping).expect("Lock still has multiple owners");
         let entity_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
-        assert_eq!(tree.root(), tree_2.root());
+        assert_eq!(tree_multi_threaded.root(), tree_single_threaded.root());
 
         Ok(NdmSmt {
-            tree,
+            tree: tree_multi_threaded,
             master_secret,
             salt_b,
             salt_s,
@@ -282,22 +221,8 @@ impl NdmSmt {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum NdmSmtError {
-    #[error("Problem constructing the tree")]
-    TreeError(#[from] TreeBuildError),
-    #[error("Number of entities cannot be bigger than 2^height")]
-    HeightTooSmall(#[from] OutOfBoundsError),
-    #[error("Inclusion proof generation failed when trying to build the path in the tree")]
-    InclusionProofPathGenerationError(#[from] PathBuildError),
-    #[error("Inclusion proof generation failed")]
-    InclusionProofGenerationError(#[from] InclusionProofError),
-    #[error("Entity ID not found in the entity mapping")]
-    EntityIdNotFound,
-}
-
 // -------------------------------------------------------------------------------------------------
-// Random shuffle algorithm
+// Random shuffle algorithm.
 
 /// Used for generating x-coordinate values on the bottom layer of the tree.
 ///
@@ -365,6 +290,44 @@ impl RandomXCoordGenerator {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Helper functions.
+
+fn new_padding_node_content_closure(
+    master_secret_bytes: [u8; 32],
+    salt_b_bytes: [u8; 32],
+    salt_s_bytes: [u8; 32],
+) -> impl Fn(&Coordinate) -> Content {
+    // closure that is used to create new padding nodes
+    move |coord: &Coordinate| {
+        // TODO unfortunately we copy data here, maybe there is a way to do without copying
+        let coord_bytes = coord.as_bytes();
+        // pad_secret is given as 'w' in the DAPOL+ paper
+        let pad_secret = generate_key(&master_secret_bytes, &coord_bytes);
+        let pad_secret_bytes: [u8; 32] = pad_secret.into();
+        let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes);
+        let salt = generate_key(&pad_secret_bytes, &salt_s_bytes);
+        Content::new_pad(blinding_factor.into(), coord, salt.into())
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Errors.
+
+#[derive(Error, Debug)]
+pub enum NdmSmtError {
+    #[error("Problem constructing the tree")]
+    TreeError(#[from] TreeBuildError),
+    #[error("Number of entities cannot be bigger than 2^height")]
+    HeightTooSmall(#[from] OutOfBoundsError),
+    #[error("Inclusion proof generation failed when trying to build the path in the tree")]
+    InclusionProofPathGenerationError(#[from] PathBuildError),
+    #[error("Inclusion proof generation failed")]
+    InclusionProofGenerationError(#[from] InclusionProofError),
+    #[error("Entity ID not found in the entity mapping")]
+    EntityIdNotFound,
+}
+
 #[derive(Error, Debug)]
 #[error("Counter i cannot exceed max value {max_value:?}")]
 pub struct OutOfBoundsError {
@@ -372,7 +335,7 @@ pub struct OutOfBoundsError {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Unit tests
+// Unit tests.
 
 // TODO test that the tree error propagates correctly (how do we mock in rust?)
 // TODO we should fuzz on these tests because the code utilizes a random number generator
