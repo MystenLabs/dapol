@@ -20,7 +20,6 @@ use env_logger;
 use clap::Parser;
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     new();
 }
 
@@ -38,13 +37,16 @@ fn new() {
     let salt_b: D256 = D256::from(5u64);
     let salt_s: D256 = D256::from(7u64);
 
-    // let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
-
-    // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1
-    // ID").unwrap()).unwrap(); println!("{:?}", proof);
     let args = Args::parse();
 
-    println!("Hello {}!", args.height.unwrap())
+    // println!("Hello {}!", args.height.unwrap())
+    println!("verbosity {}", args.verbose.log_level_filter());
+
+    env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
+
+    // let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
+
+    // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1 ID").unwrap()).unwrap(); println!("{:?}", proof);
 }
 
 fn old() {

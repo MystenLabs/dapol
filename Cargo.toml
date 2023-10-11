@@ -38,6 +38,7 @@ log = "0.4.20"
 logging_timer = "1.1.0"
 
 clap = { version = "4.4.6", features = ["derive"] }
+clap-verbosity-flag = "2.0.1"
 
 [dev-dependencies]
 criterion = "0.4.0"
