@@ -15,7 +15,6 @@ use std::str::FromStr;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
-
 pub struct Entity {
     pub liability: u64,
     pub id: EntityId,
@@ -28,6 +27,19 @@ const ENTITY_ID_MAX_LENGTH: usize = 256;
 /// Abstract representation of an entity ID.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 pub struct EntityId([u8; 32]);
+
+// -------------------------------------------------------------------------------------------------
+// Associated functions.
+
+impl Entity {
+    pub fn verify_entity_id(entities: &Vec<Entity>, id: &EntityId) {
+        for e in entities {
+            if e.id == *id {
+                panic!("Duplicate entity ID found: {:?}", id)
+            }
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 // Constructors.
@@ -65,4 +77,3 @@ pub struct EntityIdTooLongError;
 // Unit tests
 
 // TODO
-

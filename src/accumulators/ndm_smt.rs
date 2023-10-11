@@ -63,6 +63,10 @@ impl NdmSmt {
             let mut x_coord_generator = RandomXCoordGenerator::new(height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
+            entities
+                .iter()
+                .for_each(|e| Entity::verify_entity_id(&entities, &e.id));
+
             for i in 0..entities.len() {
                 x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
             }
