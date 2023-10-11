@@ -1,5 +1,6 @@
 use clap::{Parser, command};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
+use clio::Input;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -9,4 +10,7 @@ pub struct Args {
 
     #[arg(long)]
     pub height: Option<u8>,
+
+    #[clap(short, long, value_parser, default_value="-")]
+    pub test: Input,
 }

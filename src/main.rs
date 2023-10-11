@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, io::Read};
 
 use dapol::{NdmSmt, Entity, EntityId, D256};
 
@@ -37,10 +37,21 @@ fn new() {
     let salt_b: D256 = D256::from(5u64);
     let salt_s: D256 = D256::from(7u64);
 
-    let args = Args::parse();
+    let mut args = Args::parse();
 
     // println!("Hello {}!", args.height.unwrap())
     println!("verbosity {}", args.verbose.log_level_filter());
+
+    use std::io::{self, Write, BufReader, BufWriter};
+    let stdout = io::stdout(); // get the global stdout entity
+    let mut handle = BufWriter::new(stdout); // optional: wrap that handle in a buffer
+    let mut file = args.test.get_file().unwrap();
+    let mut buf_reader = BufReader::new(file);
+    // writeln!(handle, "foo: {}", 42); // add `?` if you care about errors here
+    // buf_reader
+    let mut contents = String::new();
+    buf_reader.read_to_string(&mut contents).unwrap();
+    println!("{}", contents);
 
     env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
 
