@@ -26,7 +26,6 @@ fn main() {
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
 struct Test {
     first_name: String,
     last_name: String,
@@ -54,16 +53,16 @@ fn new() {
     use std::io::{self, Write, BufReader, BufWriter};
     // let stdout = io::stdout();
     // let mut handle = BufWriter::new(stdout);
-    let mut file = args.test.get_file().unwrap();
-    let mut buf_reader = BufReader::new(file);
+    let file = args.test.get_file().unwrap();
     // writeln!(handle, "foo: {}", 42); // add `?` if you care about errors here
-    // let mut contents = String::new();
-    // buf_reader.read_to_string(&mut contents).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).expect("Unable to read the file");
     // println!("{}", contents);
 
     env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
 
-    let thing: Test = serde_json::from_reader(buf_reader).map_err(|err| {println!("{:?}", err); err}).expect("Malformed json");
+    let thing: Test = toml::from_str(&contents).unwrap();
+
     println!("thing {:?}", thing);
 
     // let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
