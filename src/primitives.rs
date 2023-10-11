@@ -1,10 +1,14 @@
 use std::convert::From;
+use std::str::FromStr;
+
 use primitive_types::H256;
 
 use crate::kdf::Key;
 
-// ======================================================
-// D256 data type
+// -------------------------------------------------------------------------------------------------
+// D256 data type.
+
+const BITS_256: usize = 256;
 
 /// 256-bit data packet.
 ///
@@ -24,7 +28,7 @@ impl From<Key> for D256 {
 }
 
 impl From<u64> for D256 {
-    // TODO is there a way to do this without copying? By taking ownership?
+    /// Constructor that takes in a u64.
     fn from(num: u64) -> Self {
         let bytes = num.to_le_bytes();
         let mut arr = [0u8; 32];
@@ -32,6 +36,23 @@ impl From<u64> for D256 {
             arr[i] = bytes[i]
         }
         D256(arr)
+    }
+}
+
+impl FromStr for D256 {
+    type Err = StringTooLongError;
+
+    /// Constructor that takes in a string slice.
+    /// If the length of the str is greater than the max then Err is returned.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() > BITS_256 {
+            Err(StringTooLongError {})
+        } else {
+            let mut arr = [0u8; 32];
+            // this works because string slices are stored fundamentally as u8 arrays
+            arr[..s.len()].copy_from_slice(s.as_bytes());
+            Ok(D256(arr))
+        }
     }
 }
 
@@ -47,8 +68,14 @@ impl D256 {
     }
 }
 
-// ======================================================
-// H256 extensions
+// -------------------------------------------------------------------------------------------------
+// Errors.
+
+#[derive(Debug)]
+pub struct StringTooLongError;
+
+// -------------------------------------------------------------------------------------------------
+// H256 extensions.
 
 /// Trait for a hasher to output [primitive_types][H256].
 pub trait H256Finalizable {

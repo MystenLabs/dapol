@@ -22,7 +22,8 @@ pub struct Entity {
 }
 
 /// The max size of the entity ID is 256 bits, but this is a soft limit so it
-/// can be increased if necessary.
+/// can be increased if necessary. Note that the underlying array length will
+/// also have to be increased.
 const ENTITY_ID_MAX_LENGTH: usize = 256;
 
 /// Abstract representation of an entity ID.

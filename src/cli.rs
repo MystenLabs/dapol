@@ -11,6 +11,6 @@ pub struct Args {
     #[arg(long)]
     pub height: Option<u8>,
 
-    #[clap(short, long, value_parser, default_value="-")]
-    pub test: Input,
+    #[clap(short, long, value_parser)]
+    pub secrets: Option<Input>,
 }
