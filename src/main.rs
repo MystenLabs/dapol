@@ -19,14 +19,7 @@ use env_logger;
 
 fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
-
-    let start = SystemTime::now();
-    println!("start {:?}", start);
     new();
-    let end = SystemTime::now();
-    let dur = end.duration_since(start);
-    println!("end {:?}", end);
-    println!("duration {:?}", dur);
 }
 
 fn new() {
@@ -51,6 +44,9 @@ fn new() {
 
 fn old() {
     println!("old");
+    let start = SystemTime::now();
+    println!("start {:?}", start);
+
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
 
@@ -60,6 +56,11 @@ fn old() {
     // we bench range proof padding only because building a tree does not depend on
     // the type of range proof we do
     build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
+
+    let end = SystemTime::now();
+    let dur = end.duration_since(start);
+    println!("end {:?}", end);
+    println!("duration {:?}", dur);
 }
 
 fn build_dapol_tree<D, R>(items: &[(TreeIndex, DapolNode<D>)], tree_height: usize) -> Dapol<D, R>

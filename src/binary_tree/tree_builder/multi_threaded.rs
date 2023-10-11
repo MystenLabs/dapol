@@ -39,6 +39,7 @@ use std::fmt::Debug;
 use std::ops::Range;
 
 use log::warn;
+use logging_timer::stime;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
@@ -62,6 +63,7 @@ static BUG: &'static str = "[Bug in multi-threaded builder]";
 /// - sorted according to their x-coord
 /// - all x-coord <= max
 /// - checked for duplicates (duplicate if same x-coords)
+#[stime("info", "MultiThreadedBuilder::{}")]
 pub fn build_tree<C, F>(
     height: u8,
     store_depth: u8,

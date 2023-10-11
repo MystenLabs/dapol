@@ -19,6 +19,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use log::warn;
+use logging_timer::stime;
 
 use crate::binary_tree::max_bottom_layer_nodes;
 
@@ -40,6 +41,7 @@ static BUG: &'static str = "[Bug in single-threaded builder]";
 ///
 /// The leaf nodes are sorted by x-coord, checked for duplicates, and
 /// converted to the right type.
+#[stime("info", "SingleThreadedBuilder::{}")]
 pub fn build_tree<C, F>(
     height: u8,
     store_depth: u8,
