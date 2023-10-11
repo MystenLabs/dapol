@@ -44,9 +44,7 @@ fn new() {
     // ID").unwrap()).unwrap(); println!("{:?}", proof);
     let args = Args::parse();
 
-    for _ in 0..args.count {
-        println!("Hello {}!", args.name)
-    }
+    println!("Hello {}!", args.height.unwrap())
 }
 
 fn old() {
