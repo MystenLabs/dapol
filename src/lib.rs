@@ -33,5 +33,8 @@ pub use entity::{Entity, EntityId};
 mod accumulators;
 pub use accumulators::NdmSmt;
 
+mod cli;
+pub use cli::Args;
+
 #[cfg(test)]
 mod testing_utils;

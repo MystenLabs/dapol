@@ -1,11 +1,11 @@
-use std::str::FromStr;
+use std::{str::FromStr, io::Read};
 
 use dapol::{NdmSmt, Entity, EntityId, D256};
 
 use core::fmt::Debug;
 use dapol::{
     utils::get_secret, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting, RangeProvable,
-    RangeVerifiable,
+    RangeVerifiable, Args
 };
 use digest::Digest;
 use rand::{distributions::Uniform, thread_rng, Rng};
@@ -15,11 +15,21 @@ use smtree::{
 };
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
+
 use env_logger;
+use clap::Parser;
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn")).init();
     new();
+}
+
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+struct Secrets {
+    master_secret: String,
+    salt_b: String,
+    salt_s: String,
 }
 
 fn new() {
@@ -30,16 +40,23 @@ fn new() {
     let num_leaves: usize = 2usize.pow(23); // 8.4M
     let num_leaves: usize = 2usize.pow(10);
 
-    let entities = build_item_list_new(num_leaves, tree_height);
+    let mut args = Args::parse();
 
-    let master_secret: D256 = D256::from(3u64);
-    let salt_b: D256 = D256::from(5u64);
-    let salt_s: D256 = D256::from(7u64);
+    env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
+
+    let mut contents = String::new();
+    args.secrets.unwrap().read_to_string(&mut contents).expect("Malformed input");
+    let secrets: Secrets = toml::from_str(&contents).unwrap();
+
+    let master_secret: D256 = D256::from_str(secrets.master_secret.as_str()).unwrap();
+    let salt_b: D256 = D256::from_str(secrets.salt_b.as_str()).unwrap();
+    let salt_s: D256 = D256::from_str(secrets.salt_s.as_str()).unwrap();
+
+    let entities = build_item_list_new(num_leaves, tree_height);
 
     let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
 
-    // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1
-    // ID").unwrap()).unwrap(); println!("{:?}", proof);
+    // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1 ID").unwrap()).unwrap(); println!("{:?}", proof);
 }
 
 fn old() {

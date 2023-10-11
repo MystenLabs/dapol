@@ -3,7 +3,7 @@ name = "dapol"
 version = "0.1.0"
 authors = ["Stenton Mayne <stentonian@protonmail.com>"]
 edition = "2021"
-description = "DAPOL+ in rust"
+description = "DAPOL+ Proof of Liabilities protocol in Rust"
 
 [lib]
 bench = false
@@ -32,9 +32,17 @@ thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
 dashmap = "5.5.3"
+
 env_logger = "0.10.0"
 log = "0.4.20"
 logging_timer = "1.1.0"
+
+clap = { version = "4.4.6", features = ["derive"] }
+clio = { version = "0.3.4", features = ["clap-parse"] }
+clap-verbosity-flag = "2.0.1"
+
+serde = { version = "1.0.188", features = ["derive"] }
+toml = "0.8.2"
 
 [dev-dependencies]
 criterion = "0.4.0"
