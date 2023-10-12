@@ -96,7 +96,7 @@ impl<'a, C> PathBuilder<'a, C> {
                 // We don't want to store anything because the store already exists
                 // inside the binary tree struct.
                 .with_store_depth(MIN_STORE_DEPTH)
-                .with_tree_height(tree.height);
+                .with_tree_height(tree.height.clone());
 
             // TODO This cloning can be optimized away by changing the
             // build_node function to use a pre-populated map instead of the
@@ -186,7 +186,7 @@ impl<'a, C> PathBuilder<'a, C> {
             // store, maybe by changing store_depth to be an enum.
             let (_, node) = build_node(
                 leaf_nodes,
-                coord.to_height(),
+                &coord.to_height(),
                 store_depth,
                 &new_padding_node_content,
             );
@@ -224,8 +224,8 @@ impl<'a, C> PathBuilder<'a, C> {
                     coord: leaf_coord.clone(),
                 })?;
 
-        let mut siblings = Vec::with_capacity(tree.height() as usize);
-        let max_y_coord = Coordinate::y_coord_from_height(tree.height());
+        let mut siblings = Vec::with_capacity(tree.height().as_usize());
+        let max_y_coord = tree.height().as_y_coord();
         let mut current_coord = leaf_coord;
 
         println!("before loop in build");
@@ -297,7 +297,7 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 
         let mut parent = self.leaf.clone();
 
-        if self.siblings.len() < MIN_HEIGHT as usize {
+        if self.siblings.len() < MIN_HEIGHT.as_usize() {
             return Err(PathError::TooFewSiblings);
         }
 
@@ -480,14 +480,14 @@ mod tests {
     };
 
     fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
-        assert_eq!(proof.siblings.len() as u8, tree.height() - 1);
+        assert_eq!(proof.siblings.len() as u8, tree.height().as_y_coord());
     }
 
     #[test]
     fn path_works_for_full_base_layer_single_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = full_bottom_layer(height);
+        let leaf_nodes = full_bottom_layer(&height);
 
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
@@ -511,9 +511,9 @@ mod tests {
 
     #[test]
     fn path_works_for_full_base_layer_multi_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = full_bottom_layer(height);
+        let leaf_nodes = full_bottom_layer(&height);
 
         let tree_multi_threaded = TreeBuilder::new()
             .with_height(height)
@@ -537,9 +537,9 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_single_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = sparse_leaves(height);
+        let leaf_nodes = sparse_leaves(&height);
 
         let tree_single_threaded = TreeBuilder::new()
             .with_height(height)
@@ -563,9 +563,9 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_multi_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = sparse_leaves(height);
+        let leaf_nodes = sparse_leaves(&height);
 
         let tree_multi_threaded = TreeBuilder::new()
             .with_height(height)
@@ -589,13 +589,13 @@ mod tests {
 
     #[test]
     fn path_works_for_single_leaf_single_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(height) {
-            let leaf_node = vec![single_leaf(i as u64, height)];
+        for i in 0..max_bottom_layer_nodes(&height) {
+            let leaf_node = vec![single_leaf(i as u64)];
 
             let tree_single_threaded = TreeBuilder::new()
-                .with_height(height)
+                .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
                 .build_using_single_threaded_algorithm(get_padding_function())
@@ -617,13 +617,13 @@ mod tests {
 
     #[test]
     fn path_works_for_multi_leaf_multi_threaded() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(height) {
-            let leaf_node = vec![single_leaf(i as u64, height)];
+        for i in 0..max_bottom_layer_nodes(&height) {
+            let leaf_node = vec![single_leaf(i as u64)];
 
             let tree_multi_threaded = TreeBuilder::new()
-                .with_height(height)
+                .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
                 .build_using_multi_threaded_algorithm(get_padding_function())

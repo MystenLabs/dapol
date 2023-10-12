@@ -10,7 +10,7 @@
 //! All the logic related to how to construct the content of a node is held in this file.
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::primitives::D256;
+use crate::primitives::Secret;
 use crate::entity::EntityId;
 
 use bulletproofs::PedersenGens;
@@ -82,9 +82,9 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     #[allow(dead_code)]
     pub fn new_leaf(
         liability: u64,
-        blinding_factor: D256,
+        blinding_factor: Secret,
         entity_id: EntityId,
-        entity_salt: D256,
+        entity_salt: Secret,
     ) -> FullNodeContent<H> {
         // Scalar expects bytes to be in little-endian
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
@@ -117,7 +117,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     #[allow(dead_code)]
-    pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> FullNodeContent<H> {
+    pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> FullNodeContent<H> {
         let liability = 0u64;
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 

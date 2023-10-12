@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::primitives::H256Finalizable;
-use crate::primitives::D256;
+use crate::primitives::Secret;
 use crate::entity::EntityId;
 
 use super::FullNodeContent;
@@ -58,9 +58,9 @@ impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
     #[allow(dead_code)]
     pub fn new_leaf(
         liability: u64,
-        blinding_factor: D256,
+        blinding_factor: Secret,
         entity_id: EntityId,
-        entity_salt: D256,
+        entity_salt: Secret,
     ) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
         // TODO we should document the default group elements used here, and put them in the spec
@@ -91,7 +91,7 @@ impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     #[allow(dead_code)]
-    pub fn new_pad(blinding_factor: D256, coord: &Coordinate, salt: D256) -> HiddenNodeContent<H> {
+    pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to 0 `P = g_1^0 * g_2^blinding_factor`
         let commitment = PedersenGens::default().commit(
             Scalar::from(0u64),

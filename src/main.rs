@@ -1,6 +1,6 @@
 use std::{str::FromStr, io::Read};
 
-use dapol::{NdmSmt, Entity, EntityId, D256};
+use dapol::{NdmSmt, Entity, EntityId, Secret};
 
 use core::fmt::Debug;
 use dapol::{
@@ -35,7 +35,6 @@ struct Secrets {
 fn new() {
     println!("new");
 
-    let tree_height = 32;
     // let num_leaves: usize = 2usize.pow(27); // 134M
     let num_leaves: usize = 2usize.pow(23); // 8.4M
     let num_leaves: usize = 2usize.pow(10);
@@ -48,13 +47,14 @@ fn new() {
     args.secrets.unwrap().read_to_string(&mut contents).expect("Malformed input");
     let secrets: Secrets = toml::from_str(&contents).unwrap();
 
-    let master_secret: D256 = D256::from_str(secrets.master_secret.as_str()).unwrap();
-    let salt_b: D256 = D256::from_str(secrets.salt_b.as_str()).unwrap();
-    let salt_s: D256 = D256::from_str(secrets.salt_s.as_str()).unwrap();
+    let master_secret: Secret = Secret::from_str(secrets.master_secret.as_str()).unwrap();
+    let salt_b: Secret = Secret::from_str(secrets.salt_b.as_str()).unwrap();
+    let salt_s: Secret = Secret::from_str(secrets.salt_s.as_str()).unwrap();
 
-    let entities = build_item_list_new(num_leaves, tree_height);
+    let height = args.height.unwrap_or_default();
+    let entities = build_item_list_new(num_leaves, height.as_usize());
 
-    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, tree_height as u8, entities).unwrap();
+    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, height, entities).unwrap();
 
     // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1 ID").unwrap()).unwrap(); println!("{:?}", proof);
 }

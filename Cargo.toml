@@ -20,27 +20,31 @@ blake2 = "0.9.0"
 primitive-types = "0.12.1" # H256 & U256 (I think parity uses this so maybe we just use that crate instead)
 percentage = "0.1.0"
 
+# crypto
 rand = "0.8.5"
 blake3 = "0.3.8"
 digest = "0.9.0"
-
 bulletproofs = "4.0.0"
 merlin = "3.0.0" # Transcript is required by bulletproofs library
 curve25519-dalek-ng = "4.1.1"
 
+# concurrency
 thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
 dashmap = "5.5.3"
 
+# logging
 env_logger = "0.10.0"
 log = "0.4.20"
 logging_timer = "1.1.0"
 
+# cli
 clap = { version = "4.4.6", features = ["derive"] }
 clio = { version = "0.3.4", features = ["clap-parse"] }
 clap-verbosity-flag = "2.0.1"
 
+# serialization
 serde = { version = "1.0.188", features = ["derive"] }
 toml = "0.8.2"
 

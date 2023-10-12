@@ -44,16 +44,8 @@ mod utils;
 pub use utils::max_bottom_layer_nodes;
 use utils::{ErrOnSome, ErrUnlessTrue};
 
-/// Minimum tree height supported.
-/// It does not make any sense to have a tree of size 1 and the code may
-/// actually break with this input so 2 is a reasonable minimum.
-pub static MIN_HEIGHT: u8 = 2;
-
-/// Maximum tree height supported.
-/// This number does not have any programmatic/theoretic reason for being 64,
-/// it's just a soft limit that can be increased later if need be.
-pub static MAX_HEIGHT: u8 = 64;
-
+mod height;
+pub use height::{Height, MAX_HEIGHT, MIN_HEIGHT};
 
 /// Minimum recommended empty-space-to-leaf-node ratio.
 ///
@@ -87,7 +79,7 @@ pub struct BinaryTree<C> {
     root: Node<C>,
     store: Box<dyn Store<C>>, /* The box & dyn pattern is needed so that the trait methods can
                                * be determined dynamically at runtime. */
-    height: u8,
+    height: Height,
 }
 
 /// Fundamental structure of the tree, each element of the tree is a Node.
@@ -132,8 +124,8 @@ pub trait Mergeable {
 // Accessor methods.
 
 impl<C: Clone> BinaryTree<C> {
-    pub fn height(&self) -> u8 {
-        self.height
+    pub fn height(&self) -> &Height {
+        &self.height
     }
 
     pub fn root(&self) -> &Node<C> {
@@ -255,16 +247,10 @@ impl Coordinate {
         (x_coord_min, x_coord_max)
     }
 
-    /// Return the y-coord for the given height.
-    /// Why the offset? `y` starts from 0 but height starts from 1.
-    fn y_coord_from_height(height: u8) -> u8 {
-        height - 1
-    }
-
     /// Return the height for the coordinate.
     /// Why the offset? `y` starts from 0 but height starts from 1.
-    fn to_height(&self) -> u8 {
-        self.y + 1
+    fn to_height(&self) -> Height {
+        Height::from(self.y + 1)
     }
 
     /// Generate a new bottom-layer leaf coordinate from the given x-coord.
@@ -435,16 +421,16 @@ mod tests {
     // TODO repeat for Coordinate::orientation
     #[test]
     fn node_orientation_correctly_determined() {
-        let height = 8;
+        let height = Height::from(8);
 
         // TODO can fuzz on any even number
         let x_coord = 0;
-        let left_node = single_leaf(x_coord, height).to_node();
+        let left_node = single_leaf(x_coord).to_node();
         assert_eq!(left_node.orientation(), NodeOrientation::Left);
 
         // TODO can fuzz on any odd number
         let x_coord = 1;
-        let right_node = single_leaf(x_coord, height).to_node();
+        let right_node = single_leaf(x_coord).to_node();
         assert_eq!(right_node.orientation(), NodeOrientation::Right);
     }
 
@@ -452,12 +438,12 @@ mod tests {
     // TODO fuzz on the one x-coord then calculate the other one from this
     #[test]
     fn is_sibling_of_works() {
-        let height = 5;
+        let height = Height::from(5);
 
         let x_coord = 16;
-        let left_node = single_leaf(x_coord, height).to_node();
+        let left_node = single_leaf(x_coord).to_node();
         let x_coord = 17;
-        let right_node = single_leaf(x_coord, height).to_node();
+        let right_node = single_leaf(x_coord).to_node();
 
         assert!(right_node.is_right_sibling_of(&left_node));
         assert!(!right_node.is_left_sibling_of(&left_node));
@@ -465,8 +451,8 @@ mod tests {
         assert!(!left_node.is_right_sibling_of(&right_node));
 
         // check no other nodes trigger true for sibling check
-        for i in 0..max_bottom_layer_nodes(height) {
-            let node = single_leaf(i, height).to_node();
+        for i in 0..max_bottom_layer_nodes(&height) {
+            let node = single_leaf(i).to_node();
             if left_node.coord.x != i && right_node.coord.x != i {
                 assert!(!right_node.is_right_sibling_of(&node));
                 assert!(!right_node.is_left_sibling_of(&node));
@@ -481,10 +467,10 @@ mod tests {
     // TODO fuzz on the x,y coord
     #[test]
     fn sibling_coord_calculated_correctly() {
-        let height = 8;
+        let height = Height::from(8);
 
         let x_coord = 5;
-        let right_node = single_leaf(x_coord, height).to_node();
+        let right_node = single_leaf(x_coord).to_node();
         let sibling_coord = right_node.sibling_coord();
         assert_eq!(
             sibling_coord.y, 0,
@@ -493,7 +479,7 @@ mod tests {
         assert_eq!(sibling_coord.x, 4, "Sibling's x-coord should be 1 less than the node's x-coord because the node is a right sibling");
 
         let x_coord = 0;
-        let left_node = single_leaf(x_coord, height).to_node();
+        let left_node = single_leaf(x_coord).to_node();
         let sibling_coord = left_node.sibling_coord();
         assert_eq!(
             sibling_coord.y, 0,
@@ -508,14 +494,14 @@ mod tests {
     // TODO fuzz on the x,y coord
     #[test]
     fn parent_coord_calculated_correctly() {
-        let height = 8;
+        let height = Height::from(8);
 
         let x_coord = 5;
-        let right_node = single_leaf(x_coord, height).to_node();
+        let right_node = single_leaf(x_coord).to_node();
         let right_parent_coord = right_node.parent_coord();
 
         let x_coord = 4;
-        let left_node = single_leaf(x_coord, height).to_node();
+        let left_node = single_leaf(x_coord).to_node();
         let left_parent_coord = left_node.parent_coord();
 
         assert_eq!(
@@ -535,9 +521,9 @@ mod tests {
     // TODO fuzz on x-coord
     #[test]
     fn input_node_correctly_converted_to_node() {
-        let height = 8;
+        let height = Height::from(8);
         let x_coord = 5;
-        let input_node = single_leaf(x_coord, height);
+        let input_node = single_leaf(x_coord);
         let content = input_node.content.clone();
         let node = input_node.to_node();
 
@@ -555,10 +541,10 @@ mod tests {
     // TODO fuzz on the x-coord, we just need to make sure the value is even or odd depending on the case
     #[test]
     fn sibling_from_node_works() {
-        let height = 8;
+        let height = Height::from(8);
 
         let x_coord = 11;
-        let right_node = single_leaf(x_coord, height).to_node();
+        let right_node = single_leaf(x_coord).to_node();
         let sibling = Sibling::from_node(right_node);
         match sibling {
             Sibling::Left(_) => panic!("Node should be a right sibling"),
@@ -566,7 +552,7 @@ mod tests {
         }
 
         let x_coord = 16;
-        let left_node = single_leaf(x_coord, height).to_node();
+        let left_node = single_leaf(x_coord).to_node();
         let sibling = Sibling::from_node(left_node);
         match sibling {
             Sibling::Right(_) => panic!("Node should be a left sibling"),
@@ -577,13 +563,13 @@ mod tests {
     // TODO fuzz on the 1 x-coord then calculate the other one from this
     #[test]
     fn matched_pair_merge_works() {
-        let height = 8;
+        let height = Height::from(8);
 
         let x_coord = 17;
-        let right = single_leaf(x_coord, height).to_node();
+        let right = single_leaf(x_coord).to_node();
 
         let x_coord = 16;
-        let left = single_leaf(x_coord, height).to_node();
+        let left = single_leaf(x_coord).to_node();
 
         let pair = MatchedPair { left, right };
         let parent = pair.merge();
