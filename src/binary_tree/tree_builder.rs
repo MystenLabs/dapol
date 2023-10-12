@@ -56,13 +56,6 @@ pub struct InputLeafNode<C> {
 // -------------------------------------------------------------------------------------------------
 // Implementation.
 
-/// Example:
-/// ```
-/// let tree = TreeBuilder::new()
-///     .with_height(height)?
-///     .with_leaf_nodes(leaf_nodes)?
-///     .build_using_single_threaded_algorithm(new_padding_node_content)?;
-/// ```
 impl<C> TreeBuilder<C>
 where
     C: Clone + Mergeable + 'static, /* The static is needed when the single threaded builder
