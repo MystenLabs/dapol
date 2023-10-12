@@ -6,7 +6,7 @@ use primitive_types::H256;
 use crate::kdf::Key;
 
 // -------------------------------------------------------------------------------------------------
-// D256 data type.
+// Secret data type.
 
 const BITS_256: usize = 256;
 
@@ -18,16 +18,16 @@ const BITS_256: usize = 256;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types::U256 ] or [num256::Uint256] but those are options for later need be.
 #[derive(Clone)]
-pub struct D256([u8; 32]);
+pub struct Secret([u8; 32]);
 
-impl From<Key> for D256 {
+impl From<Key> for Secret {
     fn from(key: Key) -> Self {
         let bytes: [u8; 32] = key.into();
-        D256(bytes)
+        Secret(bytes)
     }
 }
 
-impl From<u64> for D256 {
+impl From<u64> for Secret {
     /// Constructor that takes in a u64.
     fn from(num: u64) -> Self {
         let bytes = num.to_le_bytes();
@@ -35,11 +35,11 @@ impl From<u64> for D256 {
         for i in 0..8 {
             arr[i] = bytes[i]
         }
-        D256(arr)
+        Secret(arr)
     }
 }
 
-impl FromStr for D256 {
+impl FromStr for Secret {
     type Err = StringTooLongError;
 
     /// Constructor that takes in a string slice.
@@ -51,18 +51,18 @@ impl FromStr for D256 {
             let mut arr = [0u8; 32];
             // this works because string slices are stored fundamentally as u8 arrays
             arr[..s.len()].copy_from_slice(s.as_bytes());
-            Ok(D256(arr))
+            Ok(Secret(arr))
         }
     }
 }
 
-impl From<D256> for [u8; 32] {
-    fn from(item: D256) -> Self {
+impl From<Secret> for [u8; 32] {
+    fn from(item: Secret) -> Self {
         item.0
     }
 }
 
-impl D256 {
+impl Secret {
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }

@@ -13,7 +13,7 @@ use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
-use crate::primitives::D256;
+use crate::primitives::Secret;
 
 use logging_timer::{finish, timer, Level};
 
@@ -32,9 +32,9 @@ type Content = FullNodeContent<Hash>;
 /// The entity mapping structure is required because it is non-deterministic.
 #[allow(dead_code)]
 pub struct NdmSmt {
-    master_secret: D256,
-    salt_b: D256,
-    salt_s: D256,
+    master_secret: Secret,
+    salt_b: Secret,
+    salt_s: Secret,
     tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
@@ -44,9 +44,9 @@ impl NdmSmt {
     /// TODO more docs
     #[allow(dead_code)]
     pub fn new(
-        master_secret: D256,
-        salt_b: D256,
-        salt_s: D256,
+        master_secret: Secret,
+        salt_b: Secret,
+        salt_s: Secret,
         // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
         height: u8,
         entities: Vec<Entity>,
@@ -348,9 +348,9 @@ mod tests {
 
         #[test]
         fn constructor_works() {
-            let master_secret: D256 = 1u64.into();
-            let salt_b: D256 = 2u64.into();
-            let salt_s: D256 = 3u64.into();
+            let master_secret: Secret = 1u64.into();
+            let salt_b: Secret = 2u64.into();
+            let salt_s: Secret = 3u64.into();
             let height = 4u8;
             let entities = vec![Entity {
                 liability: 5u64,

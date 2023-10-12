@@ -25,7 +25,7 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod primitives;
-pub use primitives::D256;
+pub use primitives::Secret;
 
 mod entity;
 pub use entity::{Entity, EntityId};

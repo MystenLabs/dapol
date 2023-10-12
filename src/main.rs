@@ -1,6 +1,6 @@
 use std::{str::FromStr, io::Read};
 
-use dapol::{NdmSmt, Entity, EntityId, D256};
+use dapol::{NdmSmt, Entity, EntityId, Secret};
 
 use core::fmt::Debug;
 use dapol::{
@@ -48,9 +48,9 @@ fn new() {
     args.secrets.unwrap().read_to_string(&mut contents).expect("Malformed input");
     let secrets: Secrets = toml::from_str(&contents).unwrap();
 
-    let master_secret: D256 = D256::from_str(secrets.master_secret.as_str()).unwrap();
-    let salt_b: D256 = D256::from_str(secrets.salt_b.as_str()).unwrap();
-    let salt_s: D256 = D256::from_str(secrets.salt_s.as_str()).unwrap();
+    let master_secret: Secret = Secret::from_str(secrets.master_secret.as_str()).unwrap();
+    let salt_b: Secret = Secret::from_str(secrets.salt_b.as_str()).unwrap();
+    let salt_s: Secret = Secret::from_str(secrets.salt_s.as_str()).unwrap();
 
     let entities = build_item_list_new(num_leaves, tree_height);
 
