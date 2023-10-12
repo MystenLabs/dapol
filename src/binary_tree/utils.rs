@@ -35,11 +35,12 @@ impl ErrUnlessTrue for Option<bool> {
 // -------------------------------------------------------------------------------------------------
 // Helper functions.
 
+use super::Height;
+
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
 /// TODO latex `max = 2^(height-1)`
-// TODO change name to 'max'
-pub fn max_bottom_layer_nodes(height: u8) -> u64 {
-    2u64.pow(height as u32 - 1)
+pub fn max_bottom_layer_nodes(height: &Height) -> u64 {
+    2u64.pow(height.as_u32() - 1)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -100,11 +101,11 @@ pub mod test_utils {
 
     // If the tree has a full bottom layer then all other layers will also be
     // full (if construction is correct).
-    pub fn full_bottom_layer(height: u8) -> Vec<InputLeafNode<TestContent>> {
+    pub fn full_bottom_layer(height: &Height) -> Vec<InputLeafNode<TestContent>> {
         let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();
 
         // note we don't use the helper function max_bottom_layer_nodes
-        for i in 0..2usize.pow(height as u32 - 1) {
+        for i in 0..2usize.pow(height.as_u32() - 1) {
             leaf_nodes.push(InputLeafNode::<TestContent> {
                 x_coord: i as u64,
                 content: TestContent {
@@ -117,7 +118,7 @@ pub mod test_utils {
         leaf_nodes
     }
 
-    pub fn single_leaf(x_coord_of_leaf: u64, height: u8) -> InputLeafNode<TestContent> {
+    pub fn single_leaf(x_coord_of_leaf: u64) -> InputLeafNode<TestContent> {
         let leaf = InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
@@ -129,9 +130,9 @@ pub mod test_utils {
     }
 
     // A selection of leaves dispersed sparsely along the bottom layer.
-    pub fn sparse_leaves(height: u8) -> Vec<InputLeafNode<TestContent>> {
+    pub fn sparse_leaves(height: &Height) -> Vec<InputLeafNode<TestContent>> {
         // Otherwise we will go over the max x-coord value.
-        assert!(height >= 4u8);
+        assert!(height.as_raw_int() >= 4u8);
 
         // Note the nodes are not in order here (wrt x-coord) so this test also
         // somewhat covers the sorting code in the constructor.

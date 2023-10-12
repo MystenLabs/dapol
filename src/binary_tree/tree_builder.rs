@@ -8,7 +8,7 @@
 
 use std::fmt::Debug;
 
-use super::{BinaryTree, Coordinate, Mergeable, MIN_HEIGHT};
+use super::{BinaryTree, Coordinate, Height, Mergeable};
 
 pub mod multi_threaded;
 pub mod single_threaded;
@@ -38,7 +38,7 @@ pub static MIN_STORE_DEPTH: u8 = 1;
 /// are stored.
 #[derive(Debug)]
 pub struct TreeBuilder<C> {
-    height: Option<u8>,
+    height: Option<Height>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
     store_depth: Option<u8>,
 }
@@ -78,7 +78,7 @@ where
 
     /// Set the height of the tree.
     /// Will return an error if `height` is <= the min allowed height.
-    pub fn with_height(mut self, height: u8) -> Self {
+    pub fn with_height(mut self, height: Height) -> Self {
         self.height = Some(height);
         self
     }
@@ -116,8 +116,8 @@ where
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         let height = self.height()?;
-        let store_depth = self.store_depth(height);
-        let input_leaf_nodes = self.leaf_nodes(height)?;
+        let store_depth = self.store_depth(&height);
+        let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         multi_threaded::build_tree(
             height,
@@ -137,8 +137,8 @@ where
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
-        let store_depth = self.store_depth(height);
-        let input_leaf_nodes = self.leaf_nodes(height)?;
+        let store_depth = self.store_depth(&height);
+        let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         single_threaded::build_tree(
             height,
@@ -150,23 +150,19 @@ where
 
     /// Use the height of the tree to determine store depth by dividing it by
     /// the default ratio.
-    fn store_depth(&self, height: u8) -> u8 {
+    fn store_depth(&self, height: &Height) -> u8 {
         self.store_depth
-            .unwrap_or(height / DEFAULT_STORE_DEPTH_RATIO)
+            .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO)
     }
 
     /// Called by children builders to check the bounds of the `height` field.
-    fn height(&self) -> Result<u8, TreeBuildError> {
-        let height = self.height.ok_or(TreeBuildError::NoHeightProvided)?;
-        if height < MIN_HEIGHT {
-            return Err(TreeBuildError::HeightTooSmall);
-        }
-        Ok(height)
+    fn height(&self) -> Result<Height, TreeBuildError> {
+        Ok(self.height.clone().ok_or(TreeBuildError::NoHeightProvided)?)
     }
 
     /// Called by children builders to check the bounds of the `leaf_nodes`
     /// field.
-    fn leaf_nodes(self, height: u8) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
+    fn leaf_nodes(self, height: &Height) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
         use super::{max_bottom_layer_nodes, ErrUnlessTrue};
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
@@ -229,8 +225,6 @@ pub enum TreeBuildError {
     EmptyLeaves,
     #[error("X coords for leaves must be less than 2^height")]
     InvalidXCoord,
-    #[error("Height cannot be smaller than {MIN_HEIGHT:?}")]
-    HeightTooSmall,
     #[error("Not allowed to have more than 1 leaf with the same x-coord")]
     DuplicateLeaves,
 
@@ -266,18 +260,18 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_sparse_leaves() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = sparse_leaves(height);
+        let leaf_nodes = sparse_leaves(&height);
 
         let single_threaded = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
@@ -289,18 +283,18 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_full_tree() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        let leaf_nodes = full_bottom_layer(height);
+        let leaf_nodes = full_bottom_layer(&height);
 
         let single_threaded = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
@@ -312,19 +306,19 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_single_leaf() {
-        let height = 8u8;
+        let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(height) {
-            let leaf_node = vec![single_leaf(i as u64, height)];
+        for i in 0..max_bottom_layer_nodes(&height) {
+            let leaf_node = vec![single_leaf(i as u64)];
 
             let single_threaded = TreeBuilder::new()
-                .with_height(height)
+                .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
                 .build_using_single_threaded_algorithm(get_padding_function())
                 .unwrap();
 
             let multi_threaded = TreeBuilder::new()
-                .with_height(height)
+                .with_height(height.clone())
                 .with_leaf_nodes(leaf_node)
                 .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
@@ -339,8 +333,8 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
-        let height = 4;
-        let leaf_nodes = full_bottom_layer(height);
+        let height = Height::from(4);
+        let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -349,10 +343,10 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
-        let height = 4;
+        let height = Height::from(4);
         let res = TreeBuilder::<TestContent>::new()
-            .with_height(height)
-            .leaf_nodes(height);
+            .with_height(height.clone())
+            .leaf_nodes(&height);
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
@@ -360,31 +354,21 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = 5;
+        let height = Height::from(5);
         let res = TreeBuilder::<TestContent>::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(Vec::new())
-            .leaf_nodes(height);
+            .leaf_nodes(&height);
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
 
     #[test]
-    fn err_when_height_too_small() {
-        assert!(MIN_HEIGHT > 0, "Invalid min height {}", MIN_HEIGHT);
-        let height = MIN_HEIGHT - 1;
-        let res = TreeBuilder::<TestContent>::new()
-            .with_height(height)
-            .height();
-        assert_err!(res, Err(TreeBuildError::HeightTooSmall));
-    }
-
-    #[test]
     fn err_for_too_many_leaves() {
-        let height = 8u8;
-        let mut leaf_nodes = full_bottom_layer(height);
+        let height = Height::from(8u8);
+        let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: max_bottom_layer_nodes(height) + 1,
+            x_coord: max_bottom_layer_nodes(&height) + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -392,18 +376,18 @@ mod tests {
         });
 
         let res = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
-            .leaf_nodes(height);
+            .leaf_nodes(&height);
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }
 
     #[test]
     fn err_for_duplicate_leaves() {
-        let height = 4;
-        let mut leaf_nodes = sparse_leaves(height);
-        leaf_nodes.push(single_leaf(leaf_nodes.last().unwrap().x_coord, height));
+        let height = Height::from(4);
+        let mut leaf_nodes = sparse_leaves(&height);
+        leaf_nodes.push(single_leaf(leaf_nodes.last().unwrap().x_coord));
 
         println!("leaf nodes {:?}", leaf_nodes);
         let res = verify_no_duplicate_leaves(&leaf_nodes);
@@ -414,9 +398,9 @@ mod tests {
 
     #[test]
     fn no_err_if_duplicates_but_not_sorted() {
-        let height = 4;
-        let mut leaf_nodes = sparse_leaves(height);
-        leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord, height));
+        let height = Height::from(4);
+        let mut leaf_nodes = sparse_leaves(&height);
+        leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
         println!("leaf nodes {:?}", leaf_nodes);
         let _ = verify_no_duplicate_leaves(&leaf_nodes).unwrap();
@@ -424,8 +408,8 @@ mod tests {
 
     #[test]
     fn no_err_if_no_duplicates() {
-        let height = 4;
-        let mut leaf_nodes = sparse_leaves(height);
+        let height = Height::from(4);
+        let mut leaf_nodes = sparse_leaves(&height);
         let _ = verify_no_duplicate_leaves(&leaf_nodes).unwrap();
     }
 }

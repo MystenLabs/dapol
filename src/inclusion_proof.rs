@@ -5,7 +5,7 @@
 //! contents are to be supported then new inclusion proof structs and methods
 //! will need to be written.
 
-use crate::binary_tree::{Coordinate, Node, Path, PathError};
+use crate::binary_tree::{Coordinate, Node, Path, PathError, Height};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::primitives::H256Finalizable;
 
@@ -69,14 +69,14 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         // be more siblings than max(u8). TODO might be worth using a bounded
         // vector for siblings. If the tree height changes type for some
         // reason then this code would fail silently.
-        let tree_height = path.siblings.len() as u8 + 1;
-        let aggregation_index = aggregation_factor.apply_to(tree_height);
+        let tree_height = Height::from_y_coord(path.siblings.len() as u8);
+        let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
         let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
-        let aggregated_range_proof = match aggregation_factor.is_zero(tree_height) {
+        let aggregated_range_proof = match aggregation_factor.is_zero(&tree_height) {
             false => {
                 let aggregation_tuples = nodes_for_aggregation
                     .into_iter()
@@ -90,7 +90,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
             true => None,
         };
 
-        let individual_range_proofs = match aggregation_factor.is_max(tree_height) {
+        let individual_range_proofs = match aggregation_factor.is_max(&tree_height) {
             false => Some(
                 nodes_for_individual_proofs
                     .into_iter()
@@ -122,7 +122,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         // Is this cast safe? Yes because the tree height (which is the same as the
         // length of the input) is also stored as a u8, and so there would never
         // be more siblings than max(u8).
-        let tree_height = self.path.siblings.len() as u8 + 1;
+        let tree_height = Height::from_y_coord(self.path.siblings.len() as u8);
 
         {
             // Merkle tree path verification
@@ -138,7 +138,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
                 content: HiddenNodeContent::new(dummy_commitment, root_hash),
                 coord: Coordinate {
                     x: 0,
-                    y: tree_height - 1,
+                    y: tree_height.as_y_coord(),
                 },
             };
 
@@ -148,7 +148,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
         {
             // Range proof verification
 
-            let aggregation_index = self.aggregation_factor.apply_to(tree_height) as usize;
+            let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
                 .path
@@ -227,35 +227,35 @@ impl fmt::Debug for AggregationFactor {
 impl AggregationFactor {
     /// Transform the aggregation factor into a u8, representing the number of
     /// ranges that should aggregated together into a single Bulletproof.
-    fn apply_to(&self, tree_height: u8) -> u8 {
+    fn apply_to(&self, tree_height: &Height) -> u8 {
         match self {
             Self::Divisor(div) => {
-                if *div == 0 || *div > tree_height {
+                if *div == 0 || *div > tree_height.as_raw_int() {
                     0
                 } else {
-                    tree_height / div
+                    tree_height.as_raw_int() / div
                 }
             }
-            Self::Percent(per) => per.apply_to(tree_height),
-            Self::Number(num) => *num.min(&tree_height),
+            Self::Percent(per) => per.apply_to(tree_height.as_raw_int()),
+            Self::Number(num) => *num.min(&tree_height.as_raw_int()),
         }
     }
 
     /// True if `apply_to` would result in 0 no matter the input `tree_height`.
-    fn is_zero(&self, tree_height: u8) -> bool {
+    fn is_zero(&self, tree_height: &Height) -> bool {
         match self {
-            Self::Divisor(div) => *div == 0 || *div > tree_height,
+            Self::Divisor(div) => *div == 0 || *div > tree_height.as_raw_int(),
             Self::Percent(per) => per.value() == 0,
             Self::Number(num) => *num == 0,
         }
     }
 
     /// True if `apply_to` would result in the same as the input `tree_height`.
-    fn is_max(&self, tree_height: u8) -> bool {
+    fn is_max(&self, tree_height: &Height) -> bool {
         match self {
             Self::Divisor(div) => *div == 1,
             Self::Percent(per) => per.value() == 100,
-            Self::Number(num) => *num == tree_height,
+            Self::Number(num) => *num == tree_height.as_raw_int(),
         }
     }
 }

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::binary_tree::{
-    BinaryTree, Coordinate, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
+    BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
 };
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
@@ -48,7 +48,7 @@ impl NdmSmt {
         salt_b: Secret,
         salt_s: Secret,
         // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
-        height: u8,
+        height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
         let master_secret_bytes = master_secret.as_bytes();
@@ -60,7 +60,7 @@ impl NdmSmt {
 
             let tmr = timer!(Level::Info; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::new(height);
+            let mut x_coord_generator = RandomXCoordGenerator::new(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for i in 0..entities.len() {
@@ -122,7 +122,7 @@ impl NdmSmt {
         });
 
         let tree_single_threaded = TreeBuilder::new()
-            .with_height(height)
+            .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(new_padding_node_content_closure(
                 master_secret_bytes.clone(),
@@ -241,7 +241,7 @@ impl RandomXCoordGenerator {
     ///
     /// The max value is the max number of bottom-layer leaves for the given height because we are trying to
     /// generate x-coords on the bottom layer of the tree.
-    fn new(height: u8) -> Self {
+    fn new(height: &Height) -> Self {
         use crate::binary_tree::max_bottom_layer_nodes;
 
         RandomXCoordGenerator {
@@ -343,15 +343,15 @@ pub struct OutOfBoundsError {
 mod tests {
     mod ndm_smt {
         use std::str::FromStr;
-
         use super::super::*;
+        use crate::binary_tree::Height;
 
         #[test]
         fn constructor_works() {
             let master_secret: Secret = 1u64.into();
             let salt_b: Secret = 2u64.into();
             let salt_s: Secret = 3u64.into();
-            let height = 4u8;
+            let height = Height::from(4u8);
             let entities = vec![Entity {
                 liability: 5u64,
                 id: EntityId::from_str("some entity").unwrap(),
@@ -365,29 +365,29 @@ mod tests {
         use std::collections::HashSet;
 
         use super::super::{OutOfBoundsError, RandomXCoordGenerator};
-        use crate::binary_tree::max_bottom_layer_nodes;
+        use crate::binary_tree::{max_bottom_layer_nodes, Height};
 
         #[test]
         fn constructor_works() {
-            let height = 4u8;
-            RandomXCoordGenerator::new(height);
+            let height = Height::from(4u8);
+            RandomXCoordGenerator::new(&height);
         }
 
         #[test]
         fn new_unique_value_works() {
-            let height = 4u8;
-            let mut rxcg = RandomXCoordGenerator::new(height);
-            for i in 0..max_bottom_layer_nodes(height) {
+            let height = Height::from(4u8);
+            let mut rxcg = RandomXCoordGenerator::new(&height);
+            for i in 0..max_bottom_layer_nodes(&height) {
                 rxcg.new_unique_x_coord(i).unwrap();
             }
         }
 
         #[test]
         fn generated_values_all_unique() {
-            let height = 4u8;
-            let mut rxcg = RandomXCoordGenerator::new(height);
+            let height = Height::from(4u8);
+            let mut rxcg = RandomXCoordGenerator::new(&height);
             let mut set = HashSet::<u64>::new();
-            for i in 0..max_bottom_layer_nodes(height) {
+            for i in 0..max_bottom_layer_nodes(&height) {
                 let x = rxcg.new_unique_x_coord(i).unwrap();
                 if set.contains(&x) {
                     panic!("{:?} was generated twice!", x);
@@ -400,9 +400,9 @@ mod tests {
         fn new_unique_value_fails_for_large_i() {
             use crate::testing_utils::assert_err;
 
-            let height = 4u8;
-            let max = max_bottom_layer_nodes(height);
-            let mut rxcg = RandomXCoordGenerator::new(height);
+            let height = Height::from(4u8);
+            let max = max_bottom_layer_nodes(&height);
+            let mut rxcg = RandomXCoordGenerator::new(&height);
             let res = rxcg.new_unique_x_coord(max + 1);
 
             assert_err!(res, Err(OutOfBoundsError { max_value: max }));
