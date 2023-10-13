@@ -1,19 +1,17 @@
 use std::{str::FromStr, io::Read};
 
-use dapol::{NdmSmt, Entity, EntityId, Secret};
+use dapol::{NdmSmt, Entity, EntityId, Secret, EntityParser};
 
 use core::fmt::Debug;
 use dapol::{
     utils::get_secret, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting, RangeProvable,
-    RangeVerifiable, Args
+    RangeVerifiable, Cli
 };
 use digest::Digest;
-use rand::{distributions::Uniform, thread_rng, Rng};
 use smtree::{
     index::TreeIndex,
     traits::{ProofExtractable, Rand, Serializable, TypeName},
 };
-use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use env_logger;
@@ -36,10 +34,10 @@ fn new() {
     println!("new");
 
     // let num_leaves: usize = 2usize.pow(27); // 134M
-    let num_leaves: usize = 2usize.pow(23); // 8.4M
-    let num_leaves: usize = 2usize.pow(10);
+    // let num_leaves: usize = 2usize.pow(23); // 8.4M
+    // let num_leaves: usize = 2usize.pow(10);
 
-    let mut args = Args::parse();
+    let mut args = Cli::parse();
 
     env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
 
@@ -52,7 +50,15 @@ fn new() {
     let salt_s: Secret = Secret::from_str(secrets.salt_s.as_str()).unwrap();
 
     let height = args.height.unwrap_or_default();
-    let entities = build_item_list_new(num_leaves, height.as_usize());
+
+    let entities = if let Some(path_arg) = args.entity_source.entity_file {
+        let path = path_arg.into_path().unwrap();
+        EntityParser::from_path(path).parse().unwrap()
+    } else if let Some(num_leaves) = args.entity_source.random_entities {
+        build_item_list_new(num_leaves as usize, height.as_usize())
+    } else {
+        panic!("This code should not be reachable because the cli arguments are required");
+    };
 
     let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, height, entities).unwrap();
 

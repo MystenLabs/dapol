@@ -4,7 +4,6 @@
 
 use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use std::collections::HashMap;
-use thiserror::Error;
 
 use crate::binary_tree::{
     BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
@@ -313,6 +312,8 @@ fn new_padding_node_content_closure(
 
 // -------------------------------------------------------------------------------------------------
 // Errors.
+
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum NdmSmtError {

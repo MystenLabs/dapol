@@ -28,13 +28,13 @@ mod primitives;
 pub use primitives::Secret;
 
 mod entity;
-pub use entity::{Entity, EntityId};
+pub use entity::{Entity, EntityId, EntityParser};
 
 mod accumulators;
 pub use accumulators::NdmSmt;
 
 mod cli;
-pub use cli::Args;
+pub use cli::Cli;
 
 #[cfg(test)]
 mod testing_utils;
