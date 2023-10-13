@@ -37,7 +37,7 @@ fn new() {
     // let num_leaves: usize = 2usize.pow(23); // 8.4M
     // let num_leaves: usize = 2usize.pow(10);
 
-    let mut args = Cli::parse();
+    let args = Cli::parse();
 
     env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
 

@@ -1,4 +1,4 @@
-use clap::{Parser, command, Args};
+use clap::{command, Args, Parser};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use clio::Input;
 use patharg::InputArg;
@@ -30,7 +30,8 @@ pub struct Cli {
 pub struct EntitySource {
     // TODO say where one can find supported file formats
     // TODO also say it supports stdin
-    /// Path to file containing entity ID & liability entries.
+    /// Path to file containing entity ID & liability entries (supported file
+    /// types: csv).
     #[arg(short, long)]
     pub entity_file: Option<InputArg>,
 
