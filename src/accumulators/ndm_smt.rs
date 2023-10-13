@@ -12,7 +12,7 @@ use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
-use crate::primitives::Secret;
+use crate::secret::Secret;
 
 use logging_timer::{finish, timer, Level};
 

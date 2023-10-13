@@ -20,12 +20,13 @@ mod tests;
 mod binary_tree;
 mod node_content;
 mod kdf;
+mod primitives;
+
+mod secret;
+pub use secret::Secret;
 
 mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
-
-mod primitives;
-pub use primitives::Secret;
 
 mod entity;
 pub use entity::{Entity, EntityId, EntityParser};

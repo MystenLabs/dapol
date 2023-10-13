@@ -10,7 +10,7 @@
 //! All the logic related to how to construct the content of a node is held in this file.
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::primitives::Secret;
+use crate::secret::Secret;
 use crate::entity::EntityId;
 
 use bulletproofs::PedersenGens;

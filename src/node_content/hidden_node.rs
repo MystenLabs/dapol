@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::primitives::H256Finalizable;
-use crate::primitives::Secret;
+use crate::secret::Secret;
 use crate::entity::EntityId;
 
 use super::FullNodeContent;
