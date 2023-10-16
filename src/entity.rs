@@ -12,12 +12,12 @@
 //! The entity struct has only 2 fields: ID and liability.
 
 use serde::Deserialize;
-use std::convert::From;
 use std::path::PathBuf;
+use std::convert::From;
 use std::str::FromStr;
 
 // -------------------------------------------------------------------------------------------------
-// Main structs.
+// Main structs & implementations.
 
 #[derive(Deserialize)]
 pub struct Entity {
@@ -28,14 +28,15 @@ pub struct Entity {
 /// The max size of the entity ID is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
 /// also have to be increased.
+// TODO this is not enforced on deserialization, do that
 const ENTITY_ID_MAX_BYTES: usize = 32;
 
 /// Abstract representation of an entity ID.
+// TODO having a string a apposed to a raw byte array like [u8; 32] might
+// impact performance, so we should explore changing that (deserialization
+// will be a problem)
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 pub struct EntityId(String);
-
-// -------------------------------------------------------------------------------------------------
-// Constructors.
 
 impl FromStr for EntityId {
     type Err = EntityParseError;
@@ -72,7 +73,7 @@ pub struct EntityParser {
 }
 
 /// Supported file types for the parser.
-pub enum FileType {
+enum FileType {
     Csv,
 }
 

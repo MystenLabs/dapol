@@ -32,7 +32,7 @@ mod entity;
 pub use entity::{Entity, EntityId, EntityParser};
 
 mod accumulators;
-pub use accumulators::NdmSmt;
+pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 
 mod cli;
 pub use cli::Cli;

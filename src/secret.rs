@@ -8,7 +8,13 @@ use std::str::FromStr;
 
 use crate::kdf::Key;
 
-const MAX_LENGTH_BYTES: usize = 256;
+/// The max size of the secret is 256 bits, but this is a soft limit so it
+/// can be increased if necessary. Note that the underlying array length will
+/// also have to be increased.
+pub const MAX_LENGTH_BYTES: usize = 32;
+
+// -------------------------------------------------------------------------------------------------
+// Main struct & implementations.
 
 /// 256-bit data packet.
 ///
@@ -20,6 +26,12 @@ const MAX_LENGTH_BYTES: usize = 256;
 /// later need be.
 #[derive(Clone)]
 pub struct Secret([u8; 32]);
+
+impl Secret {
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
 
 impl From<Key> for Secret {
     fn from(key: Key) -> Self {
@@ -41,13 +53,13 @@ impl From<u64> for Secret {
 }
 
 impl FromStr for Secret {
-    type Err = StringTooLongError;
+    type Err = SecretParseError;
 
     /// Constructor that takes in a string slice.
-    /// If the length of the str is greater than the max then Err is returned.
+    /// If the length of the str is greater than the max then [Err] is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() > MAX_LENGTH_BYTES {
-            Err(StringTooLongError {})
+            Err(SecretParseError::StringTooLongError)
         } else {
             let mut arr = [0u8; 32];
             // this works because string slices are stored fundamentally as u8 arrays
@@ -63,14 +75,13 @@ impl From<Secret> for [u8; 32] {
     }
 }
 
-impl Secret {
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
-
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-#[derive(Debug)]
-pub struct StringTooLongError;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum SecretParseError {
+    #[error("The given string has more than the max allowed bytes of {MAX_LENGTH_BYTES}")]
+    StringTooLongError,
+}

@@ -1,7 +1,7 @@
 //! Command Line Interface.
 //!
 //! Output of `--help`:
-//! ```
+//! ```bash,ignore
 //! DAPOL+ Proof of Liabilities protocol in Rust
 //!
 //!     Usage: dapol [OPTIONS] <--entity-file <ENTITY_FILE>|--random-entities <RANDOM_ENTITIES>>
@@ -28,7 +28,6 @@
 
 use clap::{command, Args, Parser};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
-use clio::Input;
 use patharg::InputArg;
 
 use std::str::FromStr;
@@ -48,9 +47,9 @@ pub struct Cli {
     #[arg(long, value_parser = Height::from_str)]
     pub height: Option<Height>,
 
-    /// TOML file containing secrets (see secrets_example.toml).
-    #[clap(short, long, value_parser)]
-    pub secrets: Option<Input>,
+    /// TOML file containing secrets (e.g. secrets_example.toml).
+    #[clap(short, long)]
+    pub secrets_file: Option<InputArg>,
 }
 
 #[derive(Args, Debug)]
@@ -59,7 +58,7 @@ pub struct EntitySource {
     /// Path to file containing entity ID & liability entries (supported file
     /// types: csv).
     #[arg(short, long)]
-    pub entity_file: Option<InputArg>,
+    pub entities_file: Option<InputArg>,
 
     /// Randomly generate a number of entities.
     #[arg(short, long)]

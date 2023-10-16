@@ -1,6 +1,6 @@
 use std::{str::FromStr, io::Read};
 
-use dapol::{NdmSmt, Entity, EntityId, Secret, EntityParser};
+use dapol::{NdmSmt, Secrets, SecretsParser, Entity, EntityId, Secret, EntityParser};
 
 use core::fmt::Debug;
 use dapol::{
@@ -21,15 +21,6 @@ fn main() {
     new();
 }
 
-use serde::Deserialize;
-
-#[derive(Debug, Deserialize)]
-struct Secrets {
-    master_secret: String,
-    salt_b: String,
-    salt_s: String,
-}
-
 fn new() {
     println!("new");
 
@@ -41,17 +32,16 @@ fn new() {
 
     env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
 
-    let mut contents = String::new();
-    args.secrets.unwrap().read_to_string(&mut contents).expect("Malformed input");
-    let secrets: Secrets = toml::from_str(&contents).unwrap();
-
-    let master_secret: Secret = Secret::from_str(secrets.master_secret.as_str()).unwrap();
-    let salt_b: Secret = Secret::from_str(secrets.salt_b.as_str()).unwrap();
-    let salt_s: Secret = Secret::from_str(secrets.salt_s.as_str()).unwrap();
+    let secrets = if let Some(path_arg) = args.secrets_file {
+        let path = path_arg.into_path().unwrap();
+        SecretsParser::from_path(path).parse().unwrap()
+    } else {
+        Secrets::generate_random()
+    };
 
     let height = args.height.unwrap_or_default();
 
-    let entities = if let Some(path_arg) = args.entity_source.entity_file {
+    let entities = if let Some(path_arg) = args.entity_source.entities_file {
         let path = path_arg.into_path().unwrap();
         EntityParser::from_path(path).parse().unwrap()
     } else if let Some(num_leaves) = args.entity_source.random_entities {
@@ -60,7 +50,7 @@ fn new() {
         panic!("This code should not be reachable because the cli arguments are required");
     };
 
-    let ndsmt = NdmSmt::new(master_secret, salt_b, salt_s, height, entities).unwrap();
+    let ndsmt = NdmSmt::new(secrets, height, entities).unwrap();
 
     // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1 ID").unwrap()).unwrap(); println!("{:?}", proof);
 }

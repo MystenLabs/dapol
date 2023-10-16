@@ -41,7 +41,6 @@ logging_timer = "1.1.0"
 
 # cli
 clap = { version = "4.4.6", features = ["derive"] }
-clio = { version = "0.3.4", features = ["clap-parse"] }
 clap-verbosity-flag = "2.0.1"
 patharg = "0.3.0"
 
