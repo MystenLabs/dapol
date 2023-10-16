@@ -65,7 +65,6 @@ impl NdmSmt {
     /// an unknown state, so rather panic.
     pub fn new(
         secrets: Secrets,
-        // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
         height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
@@ -81,8 +80,8 @@ impl NdmSmt {
             let mut x_coord_generator = RandomXCoordGenerator::new(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
-            for i in 0..entities.len() {
-                x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
+            for _i in 0..entities.len() {
+                x_coords.push(x_coord_generator.new_unique_x_coord()?);
             }
 
             let entity_coord_tuples = entities
@@ -298,6 +297,7 @@ struct RandomXCoordGenerator {
     rng: ThreadRng,
     used_x_coords: HashMap<u64, u64>,
     max_x_coord: u64,
+    i: u64,
 }
 
 impl RandomXCoordGenerator {
@@ -313,6 +313,7 @@ impl RandomXCoordGenerator {
             used_x_coords: HashMap::<u64, u64>::new(),
             max_x_coord: max_bottom_layer_nodes(height),
             rng: thread_rng(),
+            i: 0,
         }
     }
 
@@ -321,14 +322,14 @@ impl RandomXCoordGenerator {
     ///
     /// An error is returned if this function is called more than `max_x_coord`
     /// times.
-    fn new_unique_x_coord(&mut self, i: u64) -> Result<u64, OutOfBoundsError> {
-        if i > self.max_x_coord {
+    fn new_unique_x_coord(&mut self) -> Result<u64, OutOfBoundsError> {
+        if self.i >= self.max_x_coord {
             return Err(OutOfBoundsError {
                 max_value: self.max_x_coord,
             });
         }
 
-        let range = Uniform::from(i..self.max_x_coord);
+        let range = Uniform::from(self.i..self.max_x_coord);
         let random_x = self.rng.sample(range);
 
         let x = match self.used_x_coords.get(&random_x) {
@@ -342,7 +343,8 @@ impl RandomXCoordGenerator {
             None => random_x,
         };
 
-        self.used_x_coords.insert(random_x, i);
+        self.used_x_coords.insert(random_x, self.i);
+        self.i += 1;
         Ok(x)
     }
 }
@@ -582,7 +584,7 @@ mod tests {
             let height = Height::from(4u8);
             let mut rxcg = RandomXCoordGenerator::new(&height);
             for i in 0..max_bottom_layer_nodes(&height) {
-                rxcg.new_unique_x_coord(i).unwrap();
+                rxcg.new_unique_x_coord().unwrap();
             }
         }
 
@@ -592,7 +594,7 @@ mod tests {
             let mut rxcg = RandomXCoordGenerator::new(&height);
             let mut set = HashSet::<u64>::new();
             for i in 0..max_bottom_layer_nodes(&height) {
-                let x = rxcg.new_unique_x_coord(i).unwrap();
+                let x = rxcg.new_unique_x_coord().unwrap();
                 if set.contains(&x) {
                     panic!("{:?} was generated twice!", x);
                 }
@@ -605,9 +607,13 @@ mod tests {
             use crate::testing_utils::assert_err;
 
             let height = Height::from(4u8);
-            let max = max_bottom_layer_nodes(&height);
             let mut rxcg = RandomXCoordGenerator::new(&height);
-            let res = rxcg.new_unique_x_coord(max + 1);
+            let max = max_bottom_layer_nodes(&height);
+            let mut res = rxcg.new_unique_x_coord();
+
+            for i in 0..max {
+                res = rxcg.new_unique_x_coord();
+            }
 
             assert_err!(res, Err(OutOfBoundsError { max_value: max }));
         }
