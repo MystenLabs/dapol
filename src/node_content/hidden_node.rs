@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::primitives::H256Finalizable;
-use crate::primitives::Secret;
+use crate::secret::Secret;
 use crate::entity::EntityId;
 
 use super::FullNodeContent;
@@ -69,7 +69,7 @@ impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
             Scalar::from_bytes_mod_order(blinding_factor.into()),
         );
 
-        let entity_id_bytes: [u8; 32] = entity_id.into();
+        let entity_id_bytes: Vec<u8> = entity_id.into();
         let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
         // Compute the hash: `H("leaf" | entity_id | entity_salt)`

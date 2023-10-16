@@ -1,2 +1,2 @@
 mod ndm_smt;
-pub use ndm_smt::NdmSmt;
+pub use ndm_smt::{NdmSmt, Secrets, SecretsParser};

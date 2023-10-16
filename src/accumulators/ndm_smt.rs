@@ -1,26 +1,40 @@
 //! Non-deterministic mapping sparse Merkle tree (NDM_SMT).
 //!
-//! TODO more docs
+//! The accumulator variant is the simplest. Each entity is randomly mapped to
+//! a bottom-layer node in the tree. The algorithm used to determine the mapping
+//! uses a variation of Durstenfeld’s shuffle algorithm (see
+//! [RandomXCoordGenerator]) and will not produce the same mapping for the same
+//! inputs, hence the "non-deterministic" term in the title.
+//!
+//! The hash function chosen for the Merkle Sum Tree is blake3.
 
-use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
-use std::collections::HashMap;
-use thiserror::Error;
-
-use crate::binary_tree::{
-    BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
+use rand::{
+    distributions::{Alphanumeric, DistString, Uniform},
+    rngs::ThreadRng,
+    thread_rng, Rng,
 };
-use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
-use crate::kdf::generate_key;
-use crate::node_content::FullNodeContent;
-use crate::primitives::Secret;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Read;
 
-use logging_timer::{finish, timer, Level};
+use logging_timer::{finish, time, timer, Level};
 
 use rayon::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
+
+use crate::entity::{Entity, EntityId};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
+use crate::kdf::generate_key;
+use crate::node_content::FullNodeContent;
+use crate::secret::Secret;
+use crate::{
+    binary_tree::{
+        BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
+    },
+    secret,
+};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -30,41 +44,44 @@ type Content = FullNodeContent<Hash>;
 
 /// Main struct containing tree object, master secret and the salts.
 /// The entity mapping structure is required because it is non-deterministic.
-#[allow(dead_code)]
 pub struct NdmSmt {
-    master_secret: Secret,
-    salt_b: Secret,
-    salt_s: Secret,
+    secrets: Secrets,
     tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
 
 impl NdmSmt {
     /// Constructor.
-    /// TODO more docs
-    #[allow(dead_code)]
+    ///
+    /// Each element in `entities` is converted to a
+    /// [binary_tree][InputLeafNode] and randomly assigned a position on the
+    /// bottom layer of the tree.
+    ///
+    /// An [NdmSmtError] is returned if
+    ///
+    /// The function will panic if there is a problem joining onto a spawned
+    /// thread, or if concurrent variables are not able to be locked. It's not
+    /// clear how to recover from these scenarios because variables may be in
+    /// an unknown state, so rather panic.
     pub fn new(
-        master_secret: Secret,
-        salt_b: Secret,
-        salt_s: Secret,
-        // TODO if height is 10 and entities len is 2^10 this function panics somewhere, fix this
+        secrets: Secrets,
         height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
-        let master_secret_bytes = master_secret.as_bytes();
-        let salt_b_bytes = salt_b.as_bytes();
-        let salt_s_bytes = salt_s.as_bytes();
+        let master_secret_bytes = secrets.master_secret.as_bytes();
+        let salt_b_bytes = secrets.salt_b.as_bytes();
+        let salt_s_bytes = secrets.salt_s.as_bytes();
 
         let (leaf_nodes, entity_coord_tuples) = {
             // Map the entities to bottom-layer leaf nodes.
 
-            let tmr = timer!(Level::Info; "Entity to leaf node conversion");
+            let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
             let mut x_coord_generator = RandomXCoordGenerator::new(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
-            for i in 0..entities.len() {
-                x_coords.push(x_coord_generator.new_unique_x_coord(i as u64)?);
+            for _i in 0..entities.len() {
+                x_coords.push(x_coord_generator.new_unique_x_coord()?);
             }
 
             let entity_coord_tuples = entities
@@ -139,7 +156,12 @@ impl NdmSmt {
                 salt_s_bytes.clone(),
             ))?;
 
-        handle.join().unwrap();
+        // If there are issues wrapping up the concurrency code then it's not
+        // clear how to recover because variables may be in an unknown state,
+        // so rather panic.
+        handle
+            .join()
+            .expect("Cannot join thread, possibly due to a panic within the thread");
         let lock = Arc::try_unwrap(entity_mapping).expect("Lock still has multiple owners");
         let entity_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
@@ -147,28 +169,30 @@ impl NdmSmt {
 
         Ok(NdmSmt {
             tree: tree_multi_threaded,
-            master_secret,
-            salt_b,
-            salt_s,
+            secrets,
             entity_mapping,
         })
     }
 
     /// Generate an inclusion proof for the given entity_id.
     ///
-    /// The NdmSmt struct defines the content type that is used, and so must define how to extract
-    /// the secret value (liability) and blinding factor for the range proof, which are both
-    /// required for the range proof that is done in the [InclusionProof] constructor.
+    /// The NdmSmt struct defines the content type that is used, and so must
+    /// define how to extract the secret value (liability) and blinding
+    /// factor for the range proof, which are both required for the range
+    /// proof that is done in the [InclusionProof] constructor.
     ///
-    /// `aggregation_factor` is used to determine how many of the range proofs are aggregated.
-    /// Those that do not form part of the aggregated proof are just proved individually. The
-    /// aggregation is a feature of the Bulletproofs protocol that improves efficiency.
+    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// are aggregated. Those that do not form part of the aggregated proof
+    /// are just proved individually. The aggregation is a feature of the
+    /// Bulletproofs protocol that improves efficiency.
     //j
-    /// `upper_bound_bit_length` is used to determine the upper bound for the range proof, which
-    /// is set to `2^upper_bound_bit_length` i.e. the range proof shows
-    /// `0 <= liability <= 2^upper_bound_bit_length` for some liability. The type is set to `u8`
-    /// because we are not expected to require bounds higher than $2^256$. Note that if the value
-    /// is set to anything other than 8, 16, 32 or 64 the Bulletproofs code will return an Err.
+    /// `upper_bound_bit_length` is used to determine the upper bound for the
+    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
+    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
+    /// some liability. The type is set to `u8` because we are not expected
+    /// to require bounds higher than $2^256$. Note that if the value is set
+    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
+    /// an Err.
     pub fn generate_inclusion_proof_with_custom_range_proof_params(
         &self,
         entity_id: &EntityId,
@@ -180,9 +204,9 @@ impl NdmSmt {
             .get(entity_id)
             .ok_or(NdmSmtError::EntityIdNotFound)?;
 
-        let master_secret_bytes = self.master_secret.as_bytes();
-        let salt_b_bytes = self.salt_b.as_bytes();
-        let salt_s_bytes = self.salt_s.as_bytes();
+        let master_secret_bytes = self.secrets.master_secret.as_bytes();
+        let salt_b_bytes = self.secrets.salt_b.as_bytes();
+        let salt_s_bytes = self.secrets.salt_s.as_bytes();
         let new_padding_node_content = new_padding_node_content_closure(
             master_secret_bytes.clone(),
             salt_b_bytes.clone(),
@@ -206,7 +230,8 @@ impl NdmSmt {
     ///
     /// Use the default values for Bulletproof parameters:
     /// - `aggregation_factor`: half of all the range proofs are aggregated
-    /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most real-world cases)
+    /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
+    ///   real-world cases)
     pub fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
@@ -224,68 +249,102 @@ impl NdmSmt {
 // -------------------------------------------------------------------------------------------------
 // Random shuffle algorithm.
 
-/// Used for generating x-coordinate values on the bottom layer of the tree.
+/// Used for generating unique x-coordinate values on the bottom layer of the
+/// tree.
 ///
-/// A struct is needed is because the algorithm used to generate new values keeps a memory of
-/// previously used values so that it can generate new ones randomly different from previous ones.
+/// A struct is needed as apposed to just a function because the algorithm used
+/// to generate new values requires keeping a memory of previously used values
+/// so that it can generate new ones that are different from previous ones.
 ///
-/// The map is necessary for the algorithm used to get new unique values.
+/// Fields:
+/// - `rng` is a cryptographically secure pseudo-random number generator.
+/// - The `used_x_coords` map keeps track of which x-coords have already been
+/// generated.
+/// - `max_x_coord` is the upper bound on the generated values, 0 being the
+/// lower bound.
+/// - `i` is used to track the current position of the algorithm.
+///
+/// Usage:
+/// After creating the struct the calling code can repeatedly call
+/// `new_unique_x_coord` any number of times in the range `[1, max_x_coord]`.
+/// If the function is called more than `max_x_coord` times an error will be
+/// returned.
+///
+/// The random values are generated using Durstenfeld’s shuffle algorithm
+/// optimized by HashMap. This algorithm wraps the `rng`, efficiently avoiding
+/// collisions. Here is some pseudo code explaining how it works:
+///
+/// ```bash,ignore
+/// if N > max_x_coord throw error
+/// for i in range [0, N]:
+/// - pick random k in range [i, max_x_coord]
+/// - if k in map then set v = map[k]
+///   - while map[v] exists: v = map[v]
+///   - result = v
+/// - else result = k
+/// - set map[k] = i
+/// ```
+///
+/// Assuming `rng` is constant time the above algorithm has time complexity
+/// `O(N)`. Note that the second loop (the while loop) will only execute a
+/// total of `N` times throughout the entire loop cycle of the first loop.
+/// This is because the second loop will only execute if a chain in the map
+/// exists, and the worst case happens when there is 1 long chain containing
+/// all the elements of the map; in this case the second loop will only execute
+/// on 1 of the iterations of the first loop.
+// TODO the above explanation is not so good, improve it
 struct RandomXCoordGenerator {
-    map: HashMap<u64, u64>,
-    max_value: u64,
     rng: ThreadRng,
+    used_x_coords: HashMap<u64, u64>,
+    max_x_coord: u64,
+    i: u64,
 }
 
 impl RandomXCoordGenerator {
     /// Constructor.
     ///
-    /// The max value is the max number of bottom-layer leaves for the given height because we are trying to
-    /// generate x-coords on the bottom layer of the tree.
+    /// `height` is used to determine `max_x_coords`: `2^height`. This means
+    /// that `max_x_coords` is the total number of available leaf nodes on the
+    /// bottom layer of the tree.
     fn new(height: &Height) -> Self {
         use crate::binary_tree::max_bottom_layer_nodes;
 
         RandomXCoordGenerator {
-            map: HashMap::<u64, u64>::new(),
-            max_value: max_bottom_layer_nodes(height),
+            used_x_coords: HashMap::<u64, u64>::new(),
+            max_x_coord: max_bottom_layer_nodes(height),
             rng: thread_rng(),
+            i: 0,
         }
     }
 
-    /// Durstenfeld’s shuffle algorithm optimized by HashMap.
+    /// Generate a new unique random x-coord using Durstenfeld’s shuffle
+    /// algorithm optimized by HashMap.
     ///
-    /// TODO put this into latex
-    /// Iterate over i:
-    /// - pick random k in range [i, max_value]
-    /// - if k in map then set v = map[k]
-    ///   - while v = map[v] exists
-    ///   - result = v
-    /// - else result = k
-    /// - set map[k] = i
-    ///
-    /// This algorithm provides a constant-time random mapping of all i's without chance of
-    /// collision, as long as i <= max_value.
-    fn new_unique_x_coord(&mut self, i: u64) -> Result<u64, OutOfBoundsError> {
-        if i > self.max_value {
+    /// An error is returned if this function is called more than `max_x_coord`
+    /// times.
+    fn new_unique_x_coord(&mut self) -> Result<u64, OutOfBoundsError> {
+        if self.i >= self.max_x_coord {
             return Err(OutOfBoundsError {
-                max_value: self.max_value,
+                max_value: self.max_x_coord,
             });
         }
 
-        let range = Uniform::from(i..self.max_value);
-        let k = self.rng.sample(range);
+        let range = Uniform::from(self.i..self.max_x_coord);
+        let random_x = self.rng.sample(range);
 
-        let x = match self.map.get(&k) {
+        let x = match self.used_x_coords.get(&random_x) {
             Some(mut existing_x) => {
                 // follow the full chain of linked numbers until we find the leaf
-                while self.map.contains_key(existing_x) {
-                    existing_x = self.map.get(existing_x).unwrap();
+                while self.used_x_coords.contains_key(existing_x) {
+                    existing_x = self.used_x_coords.get(existing_x).unwrap();
                 }
                 existing_x.clone()
             }
-            None => k,
+            None => random_x,
         };
 
-        self.map.insert(k, i);
+        self.used_x_coords.insert(random_x, self.i);
+        self.i += 1;
         Ok(x)
     }
 }
@@ -293,6 +352,8 @@ impl RandomXCoordGenerator {
 // -------------------------------------------------------------------------------------------------
 // Helper functions.
 
+/// Create a new closure that generates padding node content using the secret
+/// values.
 fn new_padding_node_content_closure(
     master_secret_bytes: [u8; 32],
     salt_b_bytes: [u8; 32],
@@ -300,7 +361,8 @@ fn new_padding_node_content_closure(
 ) -> impl Fn(&Coordinate) -> Content {
     // closure that is used to create new padding nodes
     move |coord: &Coordinate| {
-        // TODO unfortunately we copy data here, maybe there is a way to do without copying
+        // TODO unfortunately we copy data here, maybe there is a way to do without
+        // copying
         let coord_bytes = coord.as_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
         let pad_secret = generate_key(&master_secret_bytes, &coord_bytes);
@@ -312,7 +374,132 @@ fn new_padding_node_content_closure(
 }
 
 // -------------------------------------------------------------------------------------------------
+// Secrets struct & parser.
+
+use serde::Deserialize;
+use std::convert::TryFrom;
+use std::path::PathBuf;
+use std::str::FromStr;
+
+/// This coding style is a bit ugly but it is the simplest way to get the
+/// desired outcome, which is to deserialize string values into a byte array.
+/// We can't deserialize automatically to
+/// [crate][secret][Secret] without a custom implementation of the
+/// [serde][Deserialize] trait. Instead we deserialize to [SecretsInput] and
+/// then convert the individual string fields to byte arrays.
+#[derive(Deserialize)]
+pub struct SecretsInput {
+    master_secret: String,
+    salt_b: String,
+    salt_s: String,
+}
+
+/// Values required for tree construction and inclusion proof generation.
+pub struct Secrets {
+    master_secret: Secret,
+    salt_b: Secret,
+    salt_s: Secret,
+}
+
+/// Supported file types for the parser.
+enum FileType {
+    Toml,
+}
+
+/// Parser for files containing secrets.
+///
+/// Supported file types: toml
+/// Note that the file type is inferred from its path extension.
+///
+/// TOML format:
+/// ```toml,ignore
+/// master_secret = "master_secret"
+/// salt_b = "salt_b"
+/// salt_s = "salt_s"
+/// ```
+pub struct SecretsParser {
+    file_path: PathBuf,
+}
+
+static STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
+
+impl Secrets {
+    #[time("debug", "NdmSmt::Secrets::{}")]
+    pub fn generate_random() -> Self {
+        let mut rng = thread_rng();
+        let master_secret_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
+        let salt_b_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
+        let salt_s_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
+
+        Secrets {
+            master_secret: Secret::from_str(&master_secret_str).expect(STRING_CONVERSION_ERR_MSG),
+            salt_b: Secret::from_str(&salt_b_str).expect(STRING_CONVERSION_ERR_MSG),
+            salt_s: Secret::from_str(&salt_s_str).expect(STRING_CONVERSION_ERR_MSG),
+        }
+    }
+}
+
+impl TryFrom<SecretsInput> for Secrets {
+    type Error = SecretsParseError;
+
+    fn try_from(input: SecretsInput) -> Result<Secrets, SecretsParseError> {
+        Ok(Secrets {
+            master_secret: Secret::from_str(&input.master_secret)?,
+            salt_b: Secret::from_str(&input.salt_b)?,
+            salt_s: Secret::from_str(&input.salt_s)?,
+        })
+    }
+}
+
+impl SecretsParser {
+    /// Constructor.
+    pub fn from_path(file_path: PathBuf) -> Self {
+        SecretsParser { file_path }
+    }
+
+    /// Open and parse the file, returning a [Secrets] struct.
+    ///
+    /// An error is returned if:
+    /// a) the file cannot be opened
+    /// b) the file cannot be read
+    /// c) the file type is not supported
+    /// d) deserialization of any of the records in the file fails
+    pub fn parse(self) -> Result<Secrets, SecretsParseError> {
+        let ext = self
+            .file_path
+            .extension()
+            .map(|s| s.to_str())
+            .flatten()
+            .ok_or(SecretsParseError::UnknownFileType)?;
+
+        let secrets = match FileType::from_str(ext)? {
+            FileType::Toml => {
+                let mut buf = String::new();
+                File::open(self.file_path)?.read_to_string(&mut buf)?;
+                let secrets: SecretsInput = toml::from_str(&buf).unwrap();
+                Secrets::try_from(secrets)?
+            }
+        };
+
+        Ok(secrets)
+    }
+}
+
+impl FromStr for FileType {
+    type Err = SecretsParseError;
+
+    fn from_str(ext: &str) -> Result<FileType, Self::Err> {
+        match ext {
+            "toml" => Ok(FileType::Toml),
+            _ => Err(SecretsParseError::UnsupportedFileType { ext: ext.into() }),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // Errors.
+
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum NdmSmtError {
@@ -334,30 +521,49 @@ pub struct OutOfBoundsError {
     max_value: u64,
 }
 
+#[derive(Error, Debug)]
+pub enum SecretsParseError {
+    #[error("Unable to find file extension")]
+    UnknownFileType,
+    #[error("The file type with extension {ext:?} is not supported")]
+    UnsupportedFileType { ext: String },
+    #[error("Error converting string found in file to Secret")]
+    StringConversionError(#[from] secret::SecretParseError),
+    #[error("Error reading the file")]
+    FileReadError(#[from] std::io::Error),
+}
+
 // -------------------------------------------------------------------------------------------------
 // Unit tests.
 
 // TODO test that the tree error propagates correctly (how do we mock in rust?)
-// TODO we should fuzz on these tests because the code utilizes a random number generator
+// TODO we should fuzz on these tests because the code utilizes a random number
+// generator
 #[cfg(test)]
 mod tests {
     mod ndm_smt {
-        use std::str::FromStr;
         use super::super::*;
         use crate::binary_tree::Height;
+        use std::str::FromStr;
 
         #[test]
         fn constructor_works() {
             let master_secret: Secret = 1u64.into();
             let salt_b: Secret = 2u64.into();
             let salt_s: Secret = 3u64.into();
+            let secrets = Secrets {
+                master_secret,
+                salt_b,
+                salt_s,
+            };
+
             let height = Height::from(4u8);
             let entities = vec![Entity {
                 liability: 5u64,
                 id: EntityId::from_str("some entity").unwrap(),
             }];
 
-            NdmSmt::new(master_secret, salt_b, salt_s, height, entities).unwrap();
+            NdmSmt::new(secrets, height, entities).unwrap();
         }
     }
 
@@ -378,7 +584,7 @@ mod tests {
             let height = Height::from(4u8);
             let mut rxcg = RandomXCoordGenerator::new(&height);
             for i in 0..max_bottom_layer_nodes(&height) {
-                rxcg.new_unique_x_coord(i).unwrap();
+                rxcg.new_unique_x_coord().unwrap();
             }
         }
 
@@ -388,7 +594,7 @@ mod tests {
             let mut rxcg = RandomXCoordGenerator::new(&height);
             let mut set = HashSet::<u64>::new();
             for i in 0..max_bottom_layer_nodes(&height) {
-                let x = rxcg.new_unique_x_coord(i).unwrap();
+                let x = rxcg.new_unique_x_coord().unwrap();
                 if set.contains(&x) {
                     panic!("{:?} was generated twice!", x);
                 }
@@ -401,9 +607,13 @@ mod tests {
             use crate::testing_utils::assert_err;
 
             let height = Height::from(4u8);
-            let max = max_bottom_layer_nodes(&height);
             let mut rxcg = RandomXCoordGenerator::new(&height);
-            let res = rxcg.new_unique_x_coord(max + 1);
+            let max = max_bottom_layer_nodes(&height);
+            let mut res = rxcg.new_unique_x_coord();
+
+            for i in 0..max {
+                res = rxcg.new_unique_x_coord();
+            }
 
             assert_err!(res, Err(OutOfBoundsError { max_value: max }));
         }

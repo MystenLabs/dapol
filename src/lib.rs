@@ -20,21 +20,22 @@ mod tests;
 mod binary_tree;
 mod node_content;
 mod kdf;
+mod primitives;
+
+mod secret;
+pub use secret::Secret;
 
 mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
-mod primitives;
-pub use primitives::Secret;
-
 mod entity;
-pub use entity::{Entity, EntityId};
+pub use entity::{Entity, EntityId, EntityParser};
 
 mod accumulators;
-pub use accumulators::NdmSmt;
+pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 
 mod cli;
-pub use cli::Args;
+pub use cli::Cli;
 
 #[cfg(test)]
 mod testing_utils;

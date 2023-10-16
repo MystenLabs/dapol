@@ -41,12 +41,14 @@ logging_timer = "1.1.0"
 
 # cli
 clap = { version = "4.4.6", features = ["derive"] }
-clio = { version = "0.3.4", features = ["clap-parse"] }
 clap-verbosity-flag = "2.0.1"
+patharg = "0.3.0"
 
-# serialization
+# files & serialization
 serde = { version = "1.0.188", features = ["derive"] }
 toml = "0.8.2"
+csv = "1.3.0"
+serde_bytes = "0.11.12"
 
 [dev-dependencies]
 criterion = "0.4.0"

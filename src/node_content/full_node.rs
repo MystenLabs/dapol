@@ -10,7 +10,7 @@
 //! All the logic related to how to construct the content of a node is held in this file.
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::primitives::Secret;
+use crate::secret::Secret;
 use crate::entity::EntityId;
 
 use bulletproofs::PedersenGens;
@@ -93,7 +93,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
         let commitment =
             PedersenGens::default().commit(Scalar::from(liability), blinding_factor_scalar);
 
-        let entity_id_bytes: [u8; 32] = entity_id.into();
+        let entity_id_bytes: Vec<u8> = entity_id.into();
         let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
         // Compute the hash: `H("leaf" | entity_id | entity_salt)`
