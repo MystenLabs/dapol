@@ -505,7 +505,7 @@ use thiserror::Error;
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
     TreeError(#[from] TreeBuildError),
-    #[error("Number of entities cannot be bigger than 2^height")]
+    #[error("Number of entities cannot be bigger than 2^(height-1)")]
     HeightTooSmall(#[from] OutOfBoundsError),
     #[error("Inclusion proof generation failed when trying to build the path in the tree")]
     InclusionProofPathGenerationError(#[from] PathBuildError),
