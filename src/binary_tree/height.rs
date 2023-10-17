@@ -1,6 +1,8 @@
 //! Abstracted height data type.
 
+use clap::builder::{OsStr, Str};
 use log::error;
+use std::convert::From;
 use std::{num::ParseIntError, str::FromStr};
 
 static UNDERLYING_INT_TYPE_STR: &str = "u8";
@@ -83,6 +85,12 @@ impl FromStr for Height {
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Height::from_with_err(UnderlyingInt::from_str(s)?)?)
+    }
+}
+
+impl From<Height> for OsStr {
+    fn from(height: Height) -> OsStr {
+        OsStr::from(Str::from(height.as_raw_int().to_string()))
     }
 }
 

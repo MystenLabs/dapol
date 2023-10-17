@@ -25,7 +25,7 @@ fn main() {
         Secrets::generate_random()
     };
 
-    let height = args.height.unwrap_or_default();
+    let height = args.height;
 
     let entities = if let Some(path_arg) = args.entity_source.entities_file {
         let path = path_arg.into_path().unwrap();

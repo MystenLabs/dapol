@@ -44,8 +44,8 @@ pub struct Cli {
     pub verbose: Verbosity<WarnLevel>,
 
     /// Height to use for the binary tree.
-    #[arg(long, value_parser = Height::from_str)]
-    pub height: Option<Height>,
+    #[arg(long, value_parser = Height::from_str, default_value = Height::default())]
+    pub height: Height,
 
     /// TOML file containing secrets (e.g. secrets_example.toml).
     #[clap(short, long)]
