@@ -119,6 +119,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     #[allow(dead_code)]
     pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> FullNodeContent<H> {
         let liability = 0u64;
+        // TODO need to think about whether this is okay or if modulo is going to break things. Maybe we should just have the kdf such that it outputs within the correct bounds
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 
         // Compute the Pedersen commitment to the liability `P = g_1^liability * g_2^blinding_factor`
