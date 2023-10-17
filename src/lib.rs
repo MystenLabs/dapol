@@ -18,5 +18,12 @@ pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 mod cli;
 pub use cli::Cli;
 
+use env_logger;
+use clap_verbosity_flag::{LevelFilter};
+
 #[cfg(test)]
 mod test_utils;
+
+pub fn activate_logging(log_level: LevelFilter) {
+    env_logger::Builder::new().filter_level(log_level).init();
+}

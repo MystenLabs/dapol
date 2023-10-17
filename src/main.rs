@@ -1,35 +1,22 @@
-use std::{str::FromStr};
-
-use dapol::{NdmSmt, Secrets, SecretsParser, Entity, EntityId, Secret, EntityParser};
-
-use core::fmt::Debug;
-use dapol::{
-    Cli
-};
-use digest::Digest;
-use smtree::{
-    index::TreeIndex,
-    traits::{ProofExtractable, Rand, Serializable, TypeName},
-};
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use env_logger;
 use clap::Parser;
+use env_logger;
+use log::error;
+
+use dapol::{
+    activate_logging, Cli, Entity, EntityId, EntityParser, NdmSmt, Secrets, SecretsParser,
+};
 
 fn main() {
-    new();
-}
-
-fn new() {
-    println!("new");
-
     // let num_leaves: usize = 2usize.pow(27); // 134M
     // let num_leaves: usize = 2usize.pow(23); // 8.4M
     // let num_leaves: usize = 2usize.pow(10);
 
     let args = Cli::parse();
 
-    env_logger::Builder::new().filter_level(args.verbose.log_level_filter()).init();
+    activate_logging(args.verbose.log_level_filter());
 
     let secrets = if let Some(path_arg) = args.secrets_file {
         let path = path_arg.into_path().unwrap();
@@ -49,11 +36,19 @@ fn new() {
         panic!("This code should not be reachable because the cli arguments are required");
     };
 
-    let ndsmt = NdmSmt::new(secrets, height, entities).unwrap();
+    let ndsmt_res = NdmSmt::new(secrets, height, entities);
+
+    match ndsmt_res {
+        Ok(_ndmsmt) => {}
+        Err(err) => {
+            error!("{:?} {}", err, err);
+        }
+    }
 
     // let proof = ndsmt.generate_inclusion_proof(&EntityId::from_str("entity1 ID").unwrap()).unwrap(); println!("{:?}", proof);
 }
 
+// TODO move this to the entities file
 fn build_item_list_new(num_leaves: usize, tree_height: usize) -> Vec<Entity> {
     let start = SystemTime::now();
     println!("build_item_list_new {:?}", start);
