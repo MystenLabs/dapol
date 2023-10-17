@@ -32,9 +32,6 @@ pub struct Entity {
 const ENTITY_ID_MAX_BYTES: usize = 32;
 
 /// Abstract representation of an entity ID.
-// TODO having a string a apposed to a raw byte array like [u8; 32] might
-// impact performance, so we should explore changing that (deserialization
-// will be a problem)
 #[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
 pub struct EntityId(String);
 

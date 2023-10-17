@@ -77,7 +77,7 @@ impl NdmSmt {
 
             let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::new(&height);
+            let mut x_coord_generator = RandomXCoordGenerator::from(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for _i in 0..entities.len() {
@@ -292,7 +292,7 @@ impl NdmSmt {
 /// exists, and the worst case happens when there is 1 long chain containing
 /// all the elements of the map; in this case the second loop will only execute
 /// on 1 of the iterations of the first loop.
-// TODO the above explanation is not so good, improve it
+// TODO DOCS the above explanation is not so good, improve it
 struct RandomXCoordGenerator {
     rng: ThreadRng,
     used_x_coords: HashMap<u64, u64>,
@@ -303,10 +303,10 @@ struct RandomXCoordGenerator {
 impl RandomXCoordGenerator {
     /// Constructor.
     ///
-    /// `height` is used to determine `max_x_coords`: `2^height`. This means
+    /// `height` is used to determine `max_x_coords`: `2^(height-1)`. This means
     /// that `max_x_coords` is the total number of available leaf nodes on the
     /// bottom layer of the tree.
-    fn new(height: &Height) -> Self {
+    fn from(height: &Height) -> Self {
         use crate::binary_tree::max_bottom_layer_nodes;
 
         RandomXCoordGenerator {
@@ -576,13 +576,13 @@ mod tests {
         #[test]
         fn constructor_works() {
             let height = Height::from(4u8);
-            RandomXCoordGenerator::new(&height);
+            RandomXCoordGenerator::from(&height);
         }
 
         #[test]
         fn new_unique_value_works() {
             let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::new(&height);
+            let mut rxcg = RandomXCoordGenerator::from(&height);
             for i in 0..max_bottom_layer_nodes(&height) {
                 rxcg.new_unique_x_coord().unwrap();
             }
@@ -591,7 +591,7 @@ mod tests {
         #[test]
         fn generated_values_all_unique() {
             let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::new(&height);
+            let mut rxcg = RandomXCoordGenerator::from(&height);
             let mut set = HashSet::<u64>::new();
             for i in 0..max_bottom_layer_nodes(&height) {
                 let x = rxcg.new_unique_x_coord().unwrap();
@@ -604,10 +604,10 @@ mod tests {
 
         #[test]
         fn new_unique_value_fails_for_large_i() {
-            use crate::testing_utils::assert_err;
+            use crate::test_utils::assert_err;
 
             let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::new(&height);
+            let mut rxcg = RandomXCoordGenerator::from(&height);
             let max = max_bottom_layer_nodes(&height);
             let mut res = rxcg.new_unique_x_coord();
 

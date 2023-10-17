@@ -63,7 +63,7 @@ impl<H: Digest + H256Finalizable> HiddenNodeContent<H> {
         entity_salt: Secret,
     ) -> HiddenNodeContent<H> {
         // Compute the Pedersen commitment to the value `P = g_1^value * g_2^blinding_factor`
-        // TODO we should document the default group elements used here, and put them in the spec
+        // TODO DOCS we should document the default group elements used here, and put them in the spec
         let commitment = PedersenGens::default().commit(
             Scalar::from(liability),
             Scalar::from_bytes_mod_order(blinding_factor.into()),

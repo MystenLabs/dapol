@@ -38,4 +38,4 @@ mod cli;
 pub use cli::Cli;
 
 #[cfg(test)]
-mod testing_utils;
+mod test_utils;
