@@ -44,11 +44,11 @@ pub struct Cli {
     pub verbose: Verbosity<WarnLevel>,
 
     /// Height to use for the binary tree.
-    #[arg(long, value_parser = Height::from_str)]
-    pub height: Option<Height>,
+    #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
+    pub height: Height,
 
     /// TOML file containing secrets (e.g. secrets_example.toml).
-    #[clap(short, long)]
+    #[clap(short, long, value_name = "FILE_PATH")]
     pub secrets_file: Option<InputArg>,
 }
 
@@ -57,10 +57,10 @@ pub struct Cli {
 pub struct EntitySource {
     /// Path to file containing entity ID & liability entries (supported file
     /// types: csv).
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "FILE_PATH")]
     pub entities_file: Option<InputArg>,
 
     /// Randomly generate a number of entities.
-    #[arg(short, long)]
+    #[arg(short, long, value_name = "NUM_ENTITIES")]
     pub random_entities: Option<u64>,
 }

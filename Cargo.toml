@@ -27,6 +27,8 @@ digest = "0.9.0"
 bulletproofs = "4.0.0"
 merlin = "3.0.0" # Transcript is required by bulletproofs library
 curve25519-dalek-ng = "4.1.1"
+hkdf = "0.12.3"
+sha2 = "0.10.8"
 
 # concurrency
 thiserror = "1.0"
@@ -40,7 +42,7 @@ log = "0.4.20"
 logging_timer = "1.1.0"
 
 # cli
-clap = { version = "4.4.6", features = ["derive"] }
+clap = { version = "4.4.6", features = ["derive", "string"] }
 clap-verbosity-flag = "2.0.1"
 patharg = "0.3.0"
 

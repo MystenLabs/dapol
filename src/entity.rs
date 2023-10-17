@@ -11,9 +11,15 @@
 //!
 //! The entity struct has only 2 fields: ID and liability.
 
+use logging_timer::time;
+use rand::{
+    distributions::{Alphanumeric, DistString, Uniform},
+    thread_rng, Rng,
+};
 use serde::Deserialize;
-use std::path::PathBuf;
+
 use std::convert::From;
+use std::path::PathBuf;
 use std::str::FromStr;
 
 // -------------------------------------------------------------------------------------------------
@@ -59,13 +65,13 @@ impl From<EntityId> for Vec<u8> {
 // -------------------------------------------------------------------------------------------------
 // Entity parser.
 
-/// Parser for files containing entity records.
+/// Parser for files containing many entity records.
 ///
 /// Supported file types: csv
 /// Note that the file type is inferred from its path extension.
 ///
 /// CSV format: id,liability
-pub struct EntityParser {
+pub struct EntitiesParser {
     file_path: PathBuf,
 }
 
@@ -74,10 +80,10 @@ enum FileType {
     Csv,
 }
 
-impl EntityParser {
+impl EntitiesParser {
     /// Constructor.
     pub fn from_path(file_path: PathBuf) -> Self {
-        EntityParser { file_path }
+        EntitiesParser { file_path }
     }
 
     /// Open and parse the file, returning a vector of entities.
@@ -124,6 +130,29 @@ impl FromStr for FileType {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Random entities generator.
+
+static STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
+
+#[time("debug")]
+pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
+    let mut rng = thread_rng();
+    let mut result = Vec::with_capacity(num_leaves as usize);
+
+    let liability_range = Uniform::new(0u64, u64::MAX / num_leaves);
+
+    for _i in 0..num_leaves {
+        let liability = rng.sample(liability_range);
+        let rand_str = Alphanumeric.sample_string(&mut rng, ENTITY_ID_MAX_BYTES);
+        let id = EntityId::from_str(&rand_str).expect(STRING_CONVERSION_ERR_MSG);
+
+        result.push(Entity { liability, id })
+    }
+
+    result
+}
+
+// -------------------------------------------------------------------------------------------------
 // Errors.
 
 #[derive(thiserror::Error, Debug)]
@@ -155,6 +184,6 @@ mod tests {
     fn parser_csv_file_happy_case() {
         let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntityParser::from_path(path.into()).parse().unwrap();
+        EntitiesParser::from_path(path.into()).parse().unwrap();
     }
 }
