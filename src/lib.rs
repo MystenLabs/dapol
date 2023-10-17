@@ -1,22 +1,3 @@
-// legacy
-
-mod dapol;
-pub use crate::dapol::{Dapol, DapolNode};
-
-mod proof;
-pub use proof::{DapolProof, DapolProofNode};
-
-mod range;
-pub use range::{RangeProofPadding, RangeProofSplitting, RangeProvable, RangeVerifiable};
-
-pub mod errors;
-pub mod utils;
-
-#[cfg(test)]
-mod tests;
-
-// new
-
 mod binary_tree;
 mod node_content;
 mod kdf;
@@ -37,5 +18,12 @@ pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 mod cli;
 pub use cli::Cli;
 
+use env_logger;
+use clap_verbosity_flag::{LevelFilter};
+
 #[cfg(test)]
 mod test_utils;
+
+pub fn activate_logging(log_level: LevelFilter) {
+    env_logger::Builder::new().filter_level(log_level).init();
+}
