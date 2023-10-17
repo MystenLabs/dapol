@@ -10,7 +10,7 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod entity;
-pub use entity::{Entity, EntityId, EntitiesParser};
+pub use entity::{Entity, EntityId, EntitiesParser, generate_random_entities};
 
 mod accumulators;
 pub use accumulators::{NdmSmt, Secrets, SecretsParser};
