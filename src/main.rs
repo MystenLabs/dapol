@@ -6,7 +6,7 @@ use env_logger;
 use log::error;
 
 use dapol::{
-    activate_logging, Cli, Entity, EntityId, EntityParser, NdmSmt, Secrets, SecretsParser,
+    activate_logging, Cli, Entity, EntityId, EntitiesParser, NdmSmt, Secrets, SecretsParser,
 };
 
 fn main() {
@@ -29,7 +29,7 @@ fn main() {
 
     let entities = if let Some(path_arg) = args.entity_source.entities_file {
         let path = path_arg.into_path().unwrap();
-        EntityParser::from_path(path).parse().unwrap()
+        EntitiesParser::from_path(path).parse().unwrap()
     } else if let Some(num_leaves) = args.entity_source.random_entities {
         build_item_list_new(num_leaves as usize, height.as_usize())
     } else {

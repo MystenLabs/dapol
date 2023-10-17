@@ -59,13 +59,13 @@ impl From<EntityId> for Vec<u8> {
 // -------------------------------------------------------------------------------------------------
 // Entity parser.
 
-/// Parser for files containing entity records.
+/// Parser for files containing many entity records.
 ///
 /// Supported file types: csv
 /// Note that the file type is inferred from its path extension.
 ///
 /// CSV format: id,liability
-pub struct EntityParser {
+pub struct EntitiesParser {
     file_path: PathBuf,
 }
 
@@ -74,10 +74,10 @@ enum FileType {
     Csv,
 }
 
-impl EntityParser {
+impl EntitiesParser {
     /// Constructor.
     pub fn from_path(file_path: PathBuf) -> Self {
-        EntityParser { file_path }
+        EntitiesParser { file_path }
     }
 
     /// Open and parse the file, returning a vector of entities.
@@ -155,6 +155,6 @@ mod tests {
     fn parser_csv_file_happy_case() {
         let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntityParser::from_path(path.into()).parse().unwrap();
+        EntitiesParser::from_path(path.into()).parse().unwrap();
     }
 }
