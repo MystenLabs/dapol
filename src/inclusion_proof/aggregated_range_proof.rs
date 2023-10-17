@@ -286,7 +286,7 @@ mod tests {
     use bulletproofs::ProofError;
 
     use super::*;
-    use crate::testing_utils::assert_err;
+    use crate::test_utils::assert_err;
 
     // This test does not call any of the above code but it just checks to make sure
     // that there is no drop in efficiency with the `next_power_of_two`

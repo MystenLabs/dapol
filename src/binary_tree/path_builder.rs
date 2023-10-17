@@ -76,7 +76,6 @@ impl<'a, C> PathBuilder<'a, C> {
     ///
     /// This function defines a closure for building nodes that are not found
     /// in the store, which is then passed to [build].
-    // TODO example code usage
     pub fn build_using_multi_threaded_algorithm<F>(
         self,
         new_padding_node_content: F,
@@ -452,7 +451,6 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
                 right: RightSiblingRef(left),
             })
         } else {
-            // TODO maybe we should panic here instead because doesn't mean there is a bug?
             Err(PathError::InvalidSibling {
                 node_that_needs_sibling: right.coord.clone(),
                 sibling_given: left.coord.clone(),

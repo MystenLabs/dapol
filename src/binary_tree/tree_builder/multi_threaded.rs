@@ -540,7 +540,7 @@ mod tests {
     use crate::binary_tree::utils::test_utils::{
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
-    use crate::testing_utils::{assert_err, assert_err_simple};
+    use crate::test_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};

@@ -24,7 +24,7 @@
 //!         -V, --version
 //!             Print version
 //! ```
-// TODO replace above help text with better description
+// TODO DOCS replace above help text with better description
 
 use clap::{command, Args, Parser};
 use clap_verbosity_flag::{Verbosity, WarnLevel};

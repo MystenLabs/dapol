@@ -109,7 +109,7 @@ mod tests {
     use bulletproofs::ProofError;
 
     use super::*;
-    use crate::testing_utils::assert_err;
+    use crate::test_utils::assert_err;
 
     #[test]
     fn generate_works() {

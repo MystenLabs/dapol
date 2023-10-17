@@ -12,9 +12,12 @@ type UnderlyingInt = u8;
 pub static MIN_HEIGHT: Height = Height(2);
 
 /// Maximum tree height supported.
-/// This number does not have any programmatic/theoretic reason for being 64,
-/// it's just a soft limit that can be increased later if need be.
+/// This number does not have any theoretic reason for being 64,
+/// it's just a soft limit that can be increased later if need be. If it is
+/// increased then we will need to change the type of the x-coord because it is
+/// currently u64, which gives a max tree height of 64.
 pub static MAX_HEIGHT: Height = Height(64);
+pub type XCoord = u64;
 
 /// 2^32 is about half the human population so it is a reasonable default height
 /// to have for any protocol involving people as the entities.

@@ -101,10 +101,7 @@ pub struct Node<C> {
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
 pub struct Coordinate {
     pub y: u8,
-    // TODO this enforces a max tree height of 2^64 so we should make sure that is accounted for in
-    // other bits of the code, and make it easy to upgrade this max to something larger in the
-    // future
-    pub x: u64,
+    pub x: height::XCoord,
 }
 
 /// Generic type representing the structure that stores the nodes of the tree.
@@ -171,7 +168,7 @@ impl<C: Clone> BinaryTree<C> {
 // Implementations.
 
 impl Coordinate {
-    // TODO 256 bits is not the min space required, 8 + 64 = 72 bits is
+    // TODO 256 bits is not the min space required, 8 + 64 = 72 bits is. So we could decrease the length of the returned byte array.
     /// Copy internal data and return as bytes.
     ///
     /// [Coordinate] is encoded into a 256-bit storage space, using a byte
@@ -421,8 +418,6 @@ mod tests {
     // TODO repeat for Coordinate::orientation
     #[test]
     fn node_orientation_correctly_determined() {
-        let height = Height::from(8);
-
         // TODO can fuzz on any even number
         let x_coord = 0;
         let left_node = single_leaf(x_coord).to_node();
