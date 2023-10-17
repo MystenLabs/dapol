@@ -19,7 +19,7 @@ use digest::Digest;
 use primitive_types::H256;
 use std::marker::PhantomData;
 
-use crate::primitives::H256Finalizable;
+use crate::H256Finalizable;
 
 use super::HiddenNodeContent;
 

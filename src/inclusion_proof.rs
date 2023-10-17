@@ -7,7 +7,7 @@
 
 use crate::binary_tree::{Coordinate, Node, Path, PathError, Height};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
-use crate::primitives::H256Finalizable;
+use crate::H256Finalizable;
 
 use bulletproofs::ProofError;
 use digest::Digest;

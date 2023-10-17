@@ -113,7 +113,7 @@ impl NdmSmt {
             use std::mem::size_of_val;
             finish!(
                 tmr,
-                "Leaf nodes have length {} and size {}",
+                "Leaf nodes have length {} and size {} bytes",
                 leaf_nodes.len(),
                 size_of_val(&*leaf_nodes)
             );
