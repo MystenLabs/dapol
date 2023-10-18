@@ -38,7 +38,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{info, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -92,7 +92,8 @@ where
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
     let params = RecursionParams::from_tree_height(height.clone()).with_store_depth(store_depth);
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
             MIN_RECOMMENDED_SPARSITY
@@ -249,13 +250,27 @@ pub struct RecursionParams {
     height: Height,
 }
 
+/// The default max number of threads.
+/// This value is used in the case where the number of threads cannot be
+/// determined from the underlying hardware. 4 was chosen as the default because
+/// most modern (circa 2023) architectures will have at least 4 cores.
+const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
+
 /// Private functions for use within this file only.
 impl RecursionParams {
     /// Construct the parameters given only the height of the tree.
     ///
-    /// `x_coord_min` points to the start of the bottom layer.
-    /// `x_coord_max` points to the end of the bottom layer.
-    /// `store_depth` defaults to the min value.
+    /// - `x_coord_min` points to the start of the bottom layer.
+    /// - `x_coord_max` points to the end of the bottom layer.
+    /// - `x_coord_mid` is set to the middle of `x_coord_min` & `x_coord_max`.
+    /// - `y_coord` is set to `height - 1` because the recursion starts from the
+    /// root node.
+    /// - `tread_count` is set to 1 (not 0) to account for the main thread.
+    /// - `max_thread_count` is set based on how much [parallelism] the
+    /// underlying machine is able to offer.
+    /// - `store_depth` defaults to the min value.
+    ///
+    /// [`parallelism`]: std::thread::available_parallelism
     fn from_tree_height(height: Height) -> Self {
         // Start from the first node.
         let x_coord_min = 0;
@@ -265,6 +280,22 @@ impl RecursionParams {
         // y-coords also start from 0, hence the `- 1`.
         let y_coord = height.as_y_coord();
 
+        let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
+        crate::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+            match *opt.borrow() {
+                None =>
+                    warn!("No default parallelism found, defaulting to {}", max_thread_count)
+                ,
+                Some(par) => {
+                    max_thread_count = par;
+                    info!(
+                        "Available parallelism detected: {}. This will be the max number of threads spawned.",
+                        max_thread_count
+                    );
+                }
+            }
+        });
+
         RecursionParams {
             x_coord_min,
             x_coord_mid,
@@ -272,8 +303,7 @@ impl RecursionParams {
             y_coord,
             // TODO need to unit test that this number matches actual thread count
             thread_count: Arc::new(Mutex::new(1)),
-            // TODO this should be set based on number of cores but not sure how best to do that
-            max_thread_count: 1,
+            max_thread_count,
             store_depth: MIN_STORE_DEPTH,
             height,
         }

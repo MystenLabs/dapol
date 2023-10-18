@@ -8,6 +8,7 @@
 //!
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
+use log::error;
 use rand::{
     distributions::{Alphanumeric, DistString, Uniform},
     rngs::ThreadRng,
@@ -68,6 +69,15 @@ impl NdmSmt {
         height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
+        // This is used to determine the number of threads to spawn in the
+        // multi-threaded builder.
+        crate::DEFAULT_PARALLELISM_APPROX.with(|opt|
+            *opt.borrow_mut() = std::thread::available_parallelism().map_err(|err| {
+                error!("Problem accessing machine parallelism: {}", err);
+                err
+            }).map_or(None, |par| Some(par.get() as u8))
+        );
+
         let master_secret_bytes = secrets.master_secret.as_bytes();
         let salt_b_bytes = secrets.salt_b.as_bytes();
         let salt_s_bytes = secrets.salt_s.as_bytes();

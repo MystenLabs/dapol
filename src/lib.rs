@@ -46,3 +46,15 @@ impl H256Finalizable for blake3::Hasher {
         H256(bytes)
     }
 }
+
+
+// -------------------------------------------------------------------------------------------------
+// Global variables.
+
+use std::cell::RefCell;
+
+/// Guessing the number of cores.
+/// This variable must NOT be shared between more than 1 thread, it is not
+/// thread-safe.
+/// https://www.sitepoint.com/rust-global-variables/#singlethreadedglobalswithruntimeinitialization
+thread_local!(static DEFAULT_PARALLELISM_APPROX: RefCell<Option<u8>> = RefCell::new(None));
