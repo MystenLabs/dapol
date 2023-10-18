@@ -43,6 +43,8 @@ use crate::{
 type Hash = blake3::Hasher;
 type Content = FullNodeContent<Hash>;
 
+const THREAD_MANAGEMENT_ISSUE: &str = "[Issue with thread management]";
+
 /// Main struct containing tree object, master secret and the salts.
 ///
 /// The entity mapping structure is required because each entity is randomly
@@ -147,9 +149,12 @@ impl NdmSmt {
         let entity_mapping_ref = Arc::clone(&entity_mapping);
 
         let handle = thread::spawn(move || {
-            let mut my_entity_mapping = entity_mapping_ref
-                .lock()
-                .expect("Cannot acquire lock on the entity map");
+            let mut my_entity_mapping = entity_mapping_ref.lock().unwrap_or_else(|_| {
+                panic!(
+                    "{} Cannot acquire lock on the entity map",
+                    THREAD_MANAGEMENT_ISSUE
+                )
+            });
 
             entity_coord_tuples
                 .into_iter()
@@ -170,11 +175,18 @@ impl NdmSmt {
         // If there are issues wrapping up the concurrency code then it's not
         // clear how to recover because variables may be in an unknown state,
         // so rather panic.
-        handle
-            .join()
-            .expect("Cannot join thread, possibly due to a panic within the thread");
-        let lock = Arc::try_unwrap(entity_mapping).expect("Lock still has multiple owners");
-        let entity_mapping = lock.into_inner().expect("Mutex cannot be locked");
+        handle.join().unwrap_or_else(|_| {
+            panic!(
+                "{} Cannot join thread, possibly due to a panic within the thread",
+                THREAD_MANAGEMENT_ISSUE
+            )
+        });
+        let lock = Arc::try_unwrap(entity_mapping).unwrap_or_else(|_| {
+            panic!("{} Lock still has multiple owners", THREAD_MANAGEMENT_ISSUE)
+        });
+        let entity_mapping = lock
+            .into_inner()
+            .unwrap_or_else(|_| panic!("{} Mutex cannot be locked", THREAD_MANAGEMENT_ISSUE));
 
         Ok(NdmSmt {
             tree,
