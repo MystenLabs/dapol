@@ -270,7 +270,7 @@ impl RecursionParams {
     /// underlying machine is able to offer.
     /// - `store_depth` defaults to the min value.
     ///
-    /// [`parallelism`]: std::thread::available_parallelism
+    /// [parallelism]: std::thread::available_parallelism
     fn from_tree_height(height: Height) -> Self {
         // Start from the first node.
         let x_coord_min = 0;

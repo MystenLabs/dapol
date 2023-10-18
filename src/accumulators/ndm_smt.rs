@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 
-use logging_timer::{finish, time, timer, Level};
+use logging_timer::{time, timer, Level};
 
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -44,7 +44,10 @@ type Hash = blake3::Hasher;
 type Content = FullNodeContent<Hash>;
 
 /// Main struct containing tree object, master secret and the salts.
-/// The entity mapping structure is required because it is non-deterministic.
+///
+/// The entity mapping structure is required because each entity is randomly
+/// mapped to a leaf node, and this assignment is non-deterministic. The map
+/// keeps track of which entity is assigned to which leaf node.
 pub struct NdmSmt {
     secrets: Secrets,
     tree: BinaryTree<Content>,
@@ -54,16 +57,21 @@ pub struct NdmSmt {
 impl NdmSmt {
     /// Constructor.
     ///
-    /// Each element in `entities` is converted to a
-    /// [binary_tree][InputLeafNode] and randomly assigned a position on the
+    /// Each element in `entities` is converted to an
+    /// [input leaf node] and randomly assigned a position on the
     /// bottom layer of the tree.
     ///
-    /// An [NdmSmtError] is returned if
+    /// An [NdmSmtError] is returned if:
+    /// 1. There are more entities than the height allows i.e. more entities
+    /// than would fit on the bottom layer.
+    /// 2. The tree build fails for some reason.
     ///
     /// The function will panic if there is a problem joining onto a spawned
     /// thread, or if concurrent variables are not able to be locked. It's not
     /// clear how to recover from these scenarios because variables may be in
     /// an unknown state, so rather panic.
+    ///
+    /// [input leaf node]: crate::binary_tree::InputLeafNode
     pub fn new(
         secrets: Secrets,
         height: Height,
@@ -71,12 +79,14 @@ impl NdmSmt {
     ) -> Result<Self, NdmSmtError> {
         // This is used to determine the number of threads to spawn in the
         // multi-threaded builder.
-        crate::DEFAULT_PARALLELISM_APPROX.with(|opt|
-            *opt.borrow_mut() = std::thread::available_parallelism().map_err(|err| {
-                error!("Problem accessing machine parallelism: {}", err);
-                err
-            }).map_or(None, |par| Some(par.get() as u8))
-        );
+        crate::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+            *opt.borrow_mut() = std::thread::available_parallelism()
+                .map_err(|err| {
+                    error!("Problem accessing machine parallelism: {}", err);
+                    err
+                })
+                .map_or(None, |par| Some(par.get() as u8))
+        });
 
         let master_secret_bytes = secrets.master_secret.as_bytes();
         let salt_b_bytes = secrets.salt_b.as_bytes();
@@ -102,10 +112,11 @@ impl NdmSmt {
             let leaf_nodes = entity_coord_tuples
                 .par_iter()
                 .map(|(entity, x_coord)| {
-                    let w = generate_key(master_secret_bytes, &x_coord.to_le_bytes());
-                    let w_bytes: [u8; 32] = w.into();
-                    let blinding_factor = generate_key(&w_bytes, salt_b_bytes);
-                    let entity_salt = generate_key(&w_bytes, salt_s_bytes);
+                    // `w` is the letter used in the DAPOL+ paper
+                    let w: [u8; 32] =
+                        generate_key(master_secret_bytes, &x_coord.to_le_bytes()).into();
+                    let blinding_factor = generate_key(&w, salt_b_bytes);
+                    let entity_salt = generate_key(&w, salt_s_bytes);
 
                     InputLeafNode {
                         content: Content::new_leaf(
@@ -119,13 +130,11 @@ impl NdmSmt {
                 })
                 .collect::<Vec<InputLeafNode<Content>>>();
 
-            // https://stackoverflow.com/questions/62613488/how-do-i-get-the-runtime-memory-size-of-an-object
-            use std::mem::size_of_val;
-            finish!(
+            logging_timer::finish!(
                 tmr,
                 "Leaf nodes have length {} and size {} bytes",
                 leaf_nodes.len(),
-                size_of_val(&*leaf_nodes)
+                std::mem::size_of_val(&*leaf_nodes)
             );
 
             (leaf_nodes, entity_coord_tuples)
@@ -141,6 +150,7 @@ impl NdmSmt {
             let mut my_entity_mapping = entity_mapping_ref
                 .lock()
                 .expect("Cannot acquire lock on the entity map");
+
             entity_coord_tuples
                 .into_iter()
                 .for_each(|(entity, x_coord)| {
@@ -148,16 +158,7 @@ impl NdmSmt {
                 });
         });
 
-        let tree_single_threaded = TreeBuilder::new()
-            .with_height(height.clone())
-            .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(new_padding_node_content_closure(
-                master_secret_bytes.clone(),
-                salt_b_bytes.clone(),
-                salt_s_bytes.clone(),
-            ))?;
-
-        let tree_multi_threaded = TreeBuilder::new()
+        let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(new_padding_node_content_closure(
@@ -175,10 +176,8 @@ impl NdmSmt {
         let lock = Arc::try_unwrap(entity_mapping).expect("Lock still has multiple owners");
         let entity_mapping = lock.into_inner().expect("Mutex cannot be locked");
 
-        assert_eq!(tree_multi_threaded.root(), tree_single_threaded.root());
-
         Ok(NdmSmt {
-            tree: tree_multi_threaded,
+            tree,
             secrets,
             entity_mapping,
         })
