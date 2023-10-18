@@ -13,6 +13,7 @@ use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
 use primitive_types::H256;
+use std::str::FromStr;
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -453,6 +454,19 @@ mod tests {
         proof.verify(root_hash).unwrap();
     }
 
+    // Ensures Blake 3 library produces correct hashed output.
+    // Comparison hash derived through the following urls:
+    // https://toolkitbay.com/tkb/tool/BLAKE3
+    // https://connor4312.github.io/blake3/index.html
+    // https://asecuritysite.com/hash/blake3
+    #[test]
+    fn verify_hasher() {
+        let mut hasher = Hash::new();
+        hasher.update("dapol-PoR".as_bytes());
+        let hash = hasher.finalize_as_h256();
+        assert_eq!(hash, H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850").unwrap());
+    }
+    
     // TODO test correct error translation from lower layers (probably should
     // mock the error responses rather than triggering them from the code in the
     // lower layers)
