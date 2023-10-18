@@ -13,6 +13,7 @@ use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
 use primitive_types::H256;
+use std::str::FromStr;
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -463,9 +464,9 @@ mod tests {
         let mut hasher = Hash::new();
         hasher.update("dapol-PoR".as_bytes());
         let hash = hasher.finalize_as_h256();
-        assert_eq!(hash, "e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850")
+        assert_eq!(hash, H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850").unwrap());
     }
-
+    
     // TODO test correct error translation from lower layers (probably should
     // mock the error responses rather than triggering them from the code in the
     // lower layers)
