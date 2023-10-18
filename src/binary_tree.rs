@@ -61,7 +61,7 @@ pub use height::{Height, MAX_HEIGHT, MIN_HEIGHT};
 ///
 /// It is not recommended to have less sparsity than 2 because this means the
 /// upper bound is exactly double the actual number.
-pub static MIN_RECOMMENDED_SPARSITY: u8 = 2;
+pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.

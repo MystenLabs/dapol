@@ -52,7 +52,7 @@ use super::super::{
 };
 use super::{BinaryTree, TreeBuildError};
 
-static BUG: &'static str = "[Bug in multi-threaded builder]";
+const BUG: &str = "[Bug in multi-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Tree build function.

@@ -29,7 +29,7 @@ use super::super::{
 };
 use super::TreeBuildError;
 
-static BUG: &'static str = "[Bug in single-threaded builder]";
+const BUG: &str = "[Bug in single-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Tree build function.

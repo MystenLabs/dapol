@@ -430,7 +430,7 @@ pub struct SecretsParser {
     file_path: PathBuf,
 }
 
-static STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
+const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
 
 impl Secrets {
     #[time("debug", "NdmSmt::Secrets::{}")]

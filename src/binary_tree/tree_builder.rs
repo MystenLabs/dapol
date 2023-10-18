@@ -15,12 +15,12 @@ pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
-static DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
+const DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
 /// `store_depth` must at least be 1.
-pub static MIN_STORE_DEPTH: u8 = 1;
+pub const MIN_STORE_DEPTH: u8 = 1;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
