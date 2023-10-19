@@ -117,7 +117,7 @@ impl<'a, C> PathBuilder<'a, C> {
 
             // If the above vector is empty then we know this node needs to be a
             // padding node.
-            if leaf_nodes.len() == 0 {
+            if leaf_nodes.is_empty() {
                 return Node {
                     coord: coord.clone(),
                     content: new_padding_node_content(coord),
@@ -173,7 +173,7 @@ impl<'a, C> PathBuilder<'a, C> {
 
             // If the above vector is empty then we know this node needs to be a
             // padding node.
-            if leaf_nodes.len() == 0 {
+            if leaf_nodes.is_empty() {
                 return Node {
                     coord: coord.clone(),
                     content: new_padding_node_content(coord),
@@ -261,7 +261,7 @@ impl<C> BinaryTree<C> {
 trait Consume<T> {
     fn consume<F>(self, f: F)
     where
-        F: FnOnce(T) -> ();
+        F: FnOnce(T);
 }
 
 impl<T> Consume<T> for Option<T> {
@@ -269,7 +269,7 @@ impl<T> Consume<T> for Option<T> {
     /// given function `f` with the value `T` but do not return anything.
     fn consume<F>(self, f: F)
     where
-        F: FnOnce(T) -> (),
+        F: FnOnce(T),
     {
         match self {
             None => {}

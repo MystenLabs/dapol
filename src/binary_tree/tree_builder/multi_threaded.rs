@@ -13,18 +13,17 @@
 //!
 //! Because the tree is sparse not all of the paths to the bottom layer need
 //! to be traversed--only those paths that will end in a bottom-layer leaf
-//! node. At each junction a thread will first
-//! determine if it needs to traverse either the left child, the right child
-//! or both. If both then it will spawn a new thread to traverse the right
-//! child before traversing the left itself, and if only left/right need to be
-//! traversed then it will do so itself without spawning a new thread. Note that
-//! children that do not need traversal are padding nodes, and are constructed
-//! using the closure given by the calling code. Each
-//! thread uses a sorted vector of bottom-layer leaf nodes to determine if a
-//! child needs traversing: the idea is that at each recursive iteration the
-//! vector should contain all the leaf nodes that will live at the bottom of
-//! the sub-tree (no more and no less). The first iteration will have all the
-//! input leaf nodes, and will split the vector between the left & right
+//! node. At each junction a thread will first determine if it needs to traverse
+//! either the left child, the right child or both. If both then it will spawn a
+//! new thread to traverse the right child before traversing the left itself,
+//! and if only left/right need to be traversed then it will do so itself
+//! without spawning a new thread. Note that children that do not need traversal
+//! are padding nodes, and are constructed using the closure given by the
+//! calling code. Each thread uses a sorted vector of bottom-layer leaf nodes to
+//! determine if a child needs traversing: the idea is that at each recursive
+//! iteration the vector should contain all the leaf nodes that will live at the
+//! bottom of the sub-tree (no more and no less). The first iteration will have
+//! all the input leaf nodes, and will split the vector between the left & right
 //! recursive calls, each of which will split the vector to their children, etc.
 //!
 //! Not all of the nodes in the tree are necessarily placed in the store. By
@@ -38,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{info, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -52,7 +51,7 @@ use super::super::{
 };
 use super::{BinaryTree, TreeBuildError};
 
-static BUG: &'static str = "[Bug in multi-threaded builder]";
+const BUG: &str = "[Bug in multi-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Tree build function.
@@ -85,20 +84,22 @@ where
         // Translate InputLeafNode to Node.
         input_leaf_nodes
             .into_par_iter()
-            .map(|leaf| leaf.to_node())
+            .map(|input_node| input_node.into_node())
             .collect::<Vec<Node<C>>>()
     };
 
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
     let params = RecursionParams::from_tree_height(height.clone()).with_store_depth(store_depth);
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
             MIN_RECOMMENDED_SPARSITY
         );
     }
 
+    // Parallelized build algorithm.
     let root = build_node(
         params,
         leaf_nodes,
@@ -138,26 +139,26 @@ impl<C: Clone> Store<C> for DashMapStore<C> {
 /// Returns the index `i` in `nodes` where `nodes[i].coord.x <= x_coord_mid`
 /// but `nodes[i+1].coord.x > x_coord_mid`.
 /// Requires `nodes` to be sorted according to the x-coord field.
-/// If all nodes satisfy `node.coord.x <= mid` then `AllNodes` is returned.
-/// If no nodes satisfy `node.coord.x <= mid` then `NoNodes` is returned.
+/// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
+/// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
 fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
-        .map_or(NumNodes::NoNodes, |index| {
+        .map_or(NumNodes::Empty, |index| {
             if index == nodes.len() - 1 {
-                NumNodes::AllNodes
+                NumNodes::Full
             } else {
-                NumNodes::SomeNodes(index)
+                NumNodes::Partial(index)
             }
         })
 }
 
 enum NumNodes {
-    AllNodes,
-    NoNodes,
-    SomeNodes(usize),
+    Full,
+    Empty,
+    Partial(usize),
 }
 
 impl<C> Node<C> {
@@ -249,21 +250,50 @@ pub struct RecursionParams {
     height: Height,
 }
 
+/// The default max number of threads.
+/// This value is used in the case where the number of threads cannot be
+/// determined from the underlying hardware. 4 was chosen as the default because
+/// most modern (circa 2023) architectures will have at least 4 cores.
+const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
+
 /// Private functions for use within this file only.
 impl RecursionParams {
     /// Construct the parameters given only the height of the tree.
     ///
-    /// `x_coord_min` points to the start of the bottom layer.
-    /// `x_coord_max` points to the end of the bottom layer.
-    /// `store_depth` defaults to the min value.
+    /// - `x_coord_min` points to the start of the bottom layer.
+    /// - `x_coord_max` points to the end of the bottom layer.
+    /// - `x_coord_mid` is set to the middle of `x_coord_min` & `x_coord_max`.
+    /// - `y_coord` is set to `height - 1` because the recursion starts from the
+    /// root node.
+    /// - `tread_count` is set to 1 (not 0) to account for the main thread.
+    /// - `max_thread_count` is set based on how much [parallelism] the
+    /// underlying machine is able to offer.
+    /// - `store_depth` defaults to the min value.
+    ///
+    /// [parallelism]: std::thread::available_parallelism
     fn from_tree_height(height: Height) -> Self {
-        // Start from the first node.
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = max_bottom_layer_nodes(&height) - 1;
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
         // y-coords also start from 0, hence the `- 1`.
         let y_coord = height.as_y_coord();
+
+        let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
+        crate::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+            match *opt.borrow() {
+                None =>
+                    warn!("No default parallelism found, defaulting to {}", max_thread_count)
+                ,
+                Some(par) => {
+                    max_thread_count = par;
+                    info!(
+                        "Available parallelism detected: {}. This will be the max number of threads spawned.",
+                        max_thread_count
+                    );
+                }
+            }
+        });
 
         RecursionParams {
             x_coord_min,
@@ -272,8 +302,7 @@ impl RecursionParams {
             y_coord,
             // TODO need to unit test that this number matches actual thread count
             thread_count: Arc::new(Mutex::new(1)),
-            // TODO this should be set based on number of cores but not sure how best to do that
-            max_thread_count: 1,
+            max_thread_count,
             store_depth: MIN_STORE_DEPTH,
             height,
         }
@@ -431,10 +460,10 @@ where
 
     // NOTE this includes the root node.
     let within_store_depth_for_children =
-        params.y_coord - 1 >= params.height.as_raw_int() - params.store_depth;
+        params.y_coord > params.height.as_raw_int() - params.store_depth;
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
-        NumNodes::SomeNodes(index) => {
+        NumNodes::Partial(index) => {
             let right_leaves = leaves.split_off(index + 1);
             let left_leaves = leaves;
 
@@ -490,7 +519,7 @@ where
                 MatchedPair { left, right }
             }
         }
-        NumNodes::AllNodes => {
+        NumNodes::Full => {
             // Go down left child only (there are no leaves living on the right side).
             let left = build_node(
                 params.into_left_child(),
@@ -501,7 +530,7 @@ where
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
-        NumNodes::NoNodes => {
+        NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
             let right = build_node(
                 params.into_right_child(),

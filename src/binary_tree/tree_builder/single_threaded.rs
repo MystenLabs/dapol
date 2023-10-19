@@ -29,7 +29,7 @@ use super::super::{
 };
 use super::TreeBuildError;
 
-static BUG: &'static str = "[Bug in single-threaded builder]";
+const BUG: &str = "[Bug in single-threaded builder]";
 
 // -------------------------------------------------------------------------------------------------
 // Tree build function.
@@ -63,11 +63,12 @@ where
         // Translate InputLeafNode to Node.
         input_leaf_nodes
             .into_iter()
-            .map(|leaf| leaf.to_node())
+            .map(|input_node| input_node.into_node())
             .collect::<Vec<Node<C>>>()
     };
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
             MIN_RECOMMENDED_SPARSITY
@@ -117,7 +118,7 @@ impl<C> MaybeUnmatchedPair<C> {
     ///
     /// If only one of the nodes is not present then it is created as a padding
     /// node.
-    fn to_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
+    fn into_matched_pair<F>(self, new_padding_node_content: &F) -> MatchedPair<C>
     where
         F: Fn(&Coordinate) -> C,
     {
@@ -199,7 +200,7 @@ where
             BUG
         );
 
-        assert!(leaf_nodes.len() != 0, "{} Empty leaf nodes", BUG);
+        assert!(!leaf_nodes.is_empty(), "{} Empty leaf nodes", BUG);
 
         // All y-coords are 0.
         if let Some(node) = leaf_nodes.iter().find(|node| node.coord.y != 0) {
@@ -246,9 +247,8 @@ where
                     Sibling::Right(right_sibling) => {
                         let is_right_sibling_of_prev_node = pairs
                             .last_mut()
-                            .map(|pair| (&pair.left).as_ref())
-                            .flatten()
-                            .is_some_and(|left| right_sibling.is_right_sibling_of(&left));
+                            .and_then(|pair| pair.left.as_ref())
+                            .is_some_and(|left| right_sibling.is_right_sibling_of(left));
 
                         if is_right_sibling_of_prev_node {
                             pairs
@@ -269,7 +269,7 @@ where
             })
             .into_iter()
             // Add padding nodes to unmatched pairs.
-            .map(|pair| pair.to_matched_pair(&new_padding_node_content))
+            .map(|pair| pair.into_matched_pair(&new_padding_node_content))
             // Create parents for the next loop iteration, and add the pairs to the tree store.
             .map(|pair| {
                 let parent = pair.merge();
@@ -294,7 +294,7 @@ where
         .unwrap_or_else(|| panic!("{} Unable to find root node", BUG));
 
     assert!(
-        nodes.len() == 0,
+        nodes.is_empty(),
         "{} Should be no nodes left to process",
         BUG
     );

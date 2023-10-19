@@ -4,7 +4,9 @@
 //! - [single_threaded]
 //! - [multi_threaded]
 //! Both require a vector of leaf nodes (which will live on the bottom layer
-//! of the tree) and the tree height.
+//! of the tree) and the tree height. The vector of leaf nodes has a generic
+//! type for the content of the node, which means the tree builder also has this
+//! generic type, `C`.
 
 use std::fmt::Debug;
 
@@ -15,20 +17,23 @@ pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
-static DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
+const DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
 /// `store_depth` must at least be 1.
-pub static MIN_STORE_DEPTH: u8 = 1;
+pub const MIN_STORE_DEPTH: u8 = 1;
 
 // -------------------------------------------------------------------------------------------------
 // Main structs.
 
-/// Parameters for building a [super][BinaryTree].
+/// Parameters for building a [binary tree].
 ///
 /// `leaf_nodes` is the set of non-padding bottom-layer leaves of the tree.
 /// `store_depth` determines how many nodes placed in the store.
+///
+/// The generic type `C` is for the node content, which is explained further in
+/// [binary tree].
 ///
 /// By default only the non-padding leaf nodes and the root node are placed in
 /// the store. This can be increased using the `store_depth` parameter. If
@@ -36,6 +41,8 @@ pub static MIN_STORE_DEPTH: u8 = 1;
 /// `store_depth == n` then the root node plus the next `n-1` layers from the
 /// root node down are stored. So if `store_depth == height` then all the nodes
 /// are stored.
+///
+/// [binary tree]: super::BinaryTree
 #[derive(Debug)]
 pub struct TreeBuilder<C> {
     height: Option<Height>,
@@ -43,10 +50,10 @@ pub struct TreeBuilder<C> {
     store_depth: Option<u8>,
 }
 
-/// A simpler version of the [Node] struct that is used as input to
-/// the tree builder. Since the node parameters are all assumed to be on the
+/// A simpler version of the [super][Node] struct that is used as input to
+/// the tree builder. Since the input leaf nodes are all assumed to be on the
 /// bottom layer of the tree only the x-coord is required, the y-coord is fixed
-/// and determined by the tree height.
+/// at 0.
 #[derive(Debug, Clone)]
 pub struct InputLeafNode<C> {
     pub content: C,
@@ -70,22 +77,28 @@ where
     }
 
     /// Set the height of the tree.
-    /// Will return an error if `height` is <= the min allowed height.
+    ///
+    /// This value is required and the tree cannot be built without it.
     pub fn with_height(mut self, height: Height) -> Self {
         self.height = Some(height);
         self
     }
 
+    /// Set the leaf nodes of the tree.
+    ///
     /// The leaf nodes are those that correspond to the data that we are trying
     /// to represent in the tree. All leaf nodes are assumed to be on the bottom
     /// layer of the tree. Note the nodes do not have to be pre-sorted, sorting
     /// will occur downstream.
-    /// Will return an error if `leaf_nodes` is empty.
+    ///
+    /// This value is required and the tree cannot be built without it.
     pub fn with_leaf_nodes(mut self, leaf_nodes: Vec<InputLeafNode<C>>) -> Self {
         self.leaf_nodes = Some(leaf_nodes);
         self
     }
 
+    /// Set the store depth.
+    ///
     /// `store_depth` determines how many layers are placed in the store. If
     /// `store_depth == 1` then only the root node is stored and if
     /// `store_depth == 2` then the root node and the next layer down are
@@ -94,12 +107,18 @@ where
     /// The fewer nodes that are place in the store the smaller the serialized
     /// tree file will be, but the more time it will take to generate inclusion
     /// proofs since more nodes may have to be built from scratch.
+    ///
+    /// This value is not required, and will be given a default if not provided.
     pub fn with_store_depth(mut self, store_depth: u8) -> Self {
         self.store_depth = Some(store_depth);
         self
     }
 
     /// High performance build algorithm utilizing parallelization.
+    ///
+    /// Will return an error if:
+    /// 1. `height` not set or is <= the min allowed height.
+    /// 2. `leaf_nodes` is not set or is empty.
     pub fn build_using_multi_threaded_algorithm<F>(
         self,
         new_padding_node_content: F,
@@ -121,6 +140,10 @@ where
     }
 
     /// Regular build algorithm.
+    ///
+    /// Will return an error if:
+    /// 1. `height` not set or is <= the min allowed height.
+    /// 2. `leaf_nodes` is not set or is empty.
     pub fn build_using_single_threaded_algorithm<F>(
         self,
         new_padding_node_content: F,
@@ -141,26 +164,36 @@ where
         )
     }
 
-    /// Use the height of the tree to determine store depth by dividing it by
-    /// the default ratio.
+    /// Private function used internally to retrieve store depth for building.
+    ///
+    /// Default value: use the height of the tree to determine store depth by
+    /// dividing it by the default ratio.
     fn store_depth(&self, height: &Height) -> u8 {
         self.store_depth
             .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO)
     }
 
-    /// Called by children builders to check the bounds of the `height` field.
+    /// Private function used internally to retrieve height for building.
+    /// No default value, returns an error if not set.
     fn height(&self) -> Result<Height, TreeBuildError> {
-        Ok(self.height.clone().ok_or(TreeBuildError::NoHeightProvided)?)
+        self.height.clone().ok_or(TreeBuildError::NoHeightProvided)
     }
 
-    /// Called by children builders to check the bounds of the `leaf_nodes`
-    /// field.
+    /// Private function used internally to retrieve leaf nodes for building.
+    ///
+    /// The following checks are performed:
+    /// - vector is non-empty
+    /// - vector is not longer than the max allowed by the tree height
+    /// - all x-coords of the leaf nodes are within the bounds allowed by the
+    /// tree height
+    ///
+    /// No default value, returns an error if not set.
     fn leaf_nodes(self, height: &Height) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
         use super::{max_bottom_layer_nodes, ErrUnlessTrue};
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
 
-        if leaf_nodes.len() == 0 {
+        if leaf_nodes.is_empty() {
             return Err(TreeBuildError::EmptyLeaves);
         }
 
@@ -182,7 +215,8 @@ where
 
 /// Check that no 2 leaf nodes share the same x-coord.
 /// `leaf_nodes` is expected to be sorted by x-coord.
-fn verify_no_duplicate_leaves<C>(leaf_nodes: &Vec<InputLeafNode<C>>) -> Result<(), TreeBuildError> {
+/// An error is returned if a duplicate is found.
+fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), TreeBuildError> {
     use super::ErrOnSome;
 
     let i = leaf_nodes.iter();

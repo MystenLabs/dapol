@@ -32,9 +32,9 @@ impl From<Key> for [u8; 32] {
 ///
 /// HKDF requires 3 inputs: salt, IKM, info.
 pub fn generate_key(ikm: &[u8], info: &[u8]) -> Key {
-    let hk = Hkdf::<Sha256>::new(None, &ikm);
+    let hk = Hkdf::<Sha256>::new(None, ikm);
     let mut okm = [0u8; 32];
-    hk.expand(&info, &mut okm)
+    hk.expand(info, &mut okm)
         .expect("32 is a valid byte length for Sha256 to output");
 
     Key(okm)

@@ -79,8 +79,7 @@ pub mod test_utils {
                 hasher.update(&right_sibling.value.to_le_bytes());
                 hasher.update(left_sibling.hash.as_bytes());
                 hasher.update(right_sibling.hash.as_bytes());
-                hasher.finalize_as_h256() // TODO double check the output of
-                                          // this thing
+                hasher.finalize_as_h256()
             };
 
             TestContent {

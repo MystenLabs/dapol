@@ -97,8 +97,7 @@ impl EntitiesParser {
         let ext = self
             .file_path
             .extension()
-            .map(|s| s.to_str())
-            .flatten()
+            .and_then(|s| s.to_str())
             .ok_or(EntityParseError::UnknownFileType)?;
 
         let mut entities = Vec::<Entity>::new();
@@ -132,7 +131,7 @@ impl FromStr for FileType {
 // -------------------------------------------------------------------------------------------------
 // Random entities generator.
 
-static STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
+const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
 
 #[time("debug")]
 pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
