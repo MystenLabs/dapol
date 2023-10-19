@@ -21,9 +21,6 @@ use std::io::Read;
 use logging_timer::{time, timer, Level};
 
 use rayon::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::thread;
 
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};

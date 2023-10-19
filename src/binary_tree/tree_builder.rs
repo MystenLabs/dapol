@@ -124,7 +124,7 @@ where
         new_padding_node_content: F,
     ) -> Result<BinaryTree<C>, TreeBuildError>
     where
-        C: Debug + Send + Sync + 'static,
+        C: Debug + Serialize + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         let height = self.height()?;
@@ -149,7 +149,7 @@ where
         new_padding_node_content: F,
     ) -> Result<BinaryTree<C>, TreeBuildError>
     where
-        C: Debug,
+        C: Debug + Serialize,
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
@@ -236,6 +236,7 @@ fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), 
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

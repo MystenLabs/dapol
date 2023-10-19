@@ -20,6 +20,7 @@ use std::fmt::Debug;
 
 use log::warn;
 use logging_timer::stime;
+use serde::Serialize;
 
 use crate::binary_tree::max_bottom_layer_nodes;
 
@@ -49,7 +50,7 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
-    C: Debug + Clone + Mergeable + 'static, // This static is needed for the boxed hashmap.
+    C: Debug + Clone + Serialize + Mergeable + 'static, // This static is needed for the boxed hashmap.
     F: Fn(&Coordinate) -> C,
 {
     use super::verify_no_duplicate_leaves;
@@ -87,11 +88,11 @@ where
 // -------------------------------------------------------------------------------------------------
 // Store.
 
-struct HashMapStore<C> {
+struct HashMapStore<C: Serialize> {
     map: Map<C>,
 }
 
-impl<C: Clone> Store<C> for HashMapStore<C> {
+impl<C: Clone + Serialize> Store<C> for HashMapStore<C> {
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| (*n).clone())
     }
@@ -104,12 +105,12 @@ impl<C: Clone> Store<C> for HashMapStore<C> {
 ///
 /// At least one of the fields is expected to be set. If this is not the case
 /// then it is assumed there is a bug in the code using this struct.
-struct MaybeUnmatchedPair<C> {
+struct MaybeUnmatchedPair<C: Serialize> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
-impl<C> MaybeUnmatchedPair<C> {
+impl<C: Serialize> MaybeUnmatchedPair<C> {
     /// Convert the partially matched pair into a matched pair.
     ///
     /// If both left and right nodes are not present then the function will
@@ -139,7 +140,7 @@ impl<C> MaybeUnmatchedPair<C> {
     }
 }
 
-impl<C> Node<C> {
+impl<C: Serialize> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -186,7 +187,7 @@ pub fn build_node<C, F>(
     new_padding_node_content: &F,
 ) -> (Map<C>, RootNode<C>)
 where
-    C: Debug + Clone + Mergeable,
+    C: Debug + Clone + Serialize + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
     {

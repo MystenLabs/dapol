@@ -31,7 +31,7 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug)]
-pub struct Path<C> {
+pub struct Path<C: Serialize> {
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
 }
@@ -42,12 +42,12 @@ pub struct Path<C> {
 /// A builder pattern is used to construct [Path].
 /// Since a path is uniquely determined by a leaf node all we need is the tree
 /// and the leaf node's x-coord.
-pub struct PathBuilder<'a, C> {
+pub struct PathBuilder<'a, C: Serialize> {
     tree: Option<&'a BinaryTree<C>>,
     leaf_x_coord: Option<u64>,
 }
 
-impl<'a, C> PathBuilder<'a, C> {
+impl<'a, C: Serialize> PathBuilder<'a, C> {
     pub fn new() -> Self {
         PathBuilder {
             tree: None,
@@ -252,7 +252,7 @@ impl<'a, C> PathBuilder<'a, C> {
     }
 }
 
-impl<C> BinaryTree<C> {
+impl<C: Serialize> BinaryTree<C> {
     pub fn path_builder(&self) -> PathBuilder<C> {
         PathBuilder::new().with_tree(self)
     }
@@ -281,7 +281,7 @@ impl<T> Consume<T> for Option<T> {
 // -------------------------------------------------------------------------------------------------
 // Path verification.
 
-impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
+impl<C: Debug + Clone + Serialize + Mergeable + PartialEq> Path<C> {
     /// Verify that the given list of sibling nodes + the base leaf node matches
     /// the given root node.
     ///
@@ -341,11 +341,11 @@ impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Path conversion.
 
-impl<C> Path<C> {
+impl<C: Serialize> Path<C> {
     /// Convert `Path<C>` to `Path<D>`.
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
-    pub fn convert<B: From<C>>(self) -> Path<B> {
+    pub fn convert<B: From<C> + Serialize>(self) -> Path<B> {
         Path {
             siblings: self
                 .siblings
@@ -360,6 +360,7 @@ impl<C> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -396,8 +397,7 @@ pub enum PathError {
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
-struct LeftSiblingRef<'a, C>(&'a Node<C>);
+struct LeftSiblingRef<'a, C: Serialize>(&'a Node<C>);
 
 /// A reference to a right sibling node.
 ///
@@ -405,8 +405,7 @@ struct LeftSiblingRef<'a, C>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
-struct RightSiblingRef<'a, C>(&'a Node<C>);
+struct RightSiblingRef<'a, C: Serialize>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
 ///
@@ -414,15 +413,13 @@ struct RightSiblingRef<'a, C>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
-struct MatchedPairRef<'a, C> {
+struct MatchedPairRef<'a, C: Serialize> {
     left: LeftSiblingRef<'a, C>,
     right: RightSiblingRef<'a, C>,
 }
 
-impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
+impl<'a, C: Mergeable + Serialize> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
-    #[allow(dead_code)]
     fn merge(&self) -> Node<C> {
         Node {
             coord: Coordinate {

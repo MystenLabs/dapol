@@ -17,6 +17,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
+use serde::Serialize;
 use std::marker::PhantomData;
 
 use crate::H256Finalizable;
@@ -33,12 +34,13 @@ use super::HiddenNodeContent;
 /// [crate][binary_tree][`Mergeable`] one needs to define the merge function, which is not generic,
 /// and the merge function in the case of FullNodeContent needs to use a generic hash function.
 /// One way to solve this problem is to have a generic parameter on this struct and a phantom field.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct FullNodeContent<H> {
     pub liability: u64,
     pub blinding_factor: Scalar,
     pub commitment: RistrettoPoint,
     pub hash: H256,
+    #[serde(skip_serializing)]
     _phantom_hash_function: PhantomData<H>,
 }
 

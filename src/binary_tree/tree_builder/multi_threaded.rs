@@ -37,11 +37,12 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{info, warn};
-use logging_timer::stime;
+use log::{debug, info, warn};
+use logging_timer::{executing, stime, stimer, Level};
 
 use dashmap::DashMap;
 use rayon::prelude::*;
+use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -70,7 +71,7 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
-    C: Debug + Clone + Mergeable + Send + Sync + 'static,
+    C: Debug + Serialize + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     use super::verify_no_duplicate_leaves;
@@ -111,6 +112,22 @@ where
         map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
     });
 
+    debug!(
+        "Multi-threaded store size in bytes: {}",
+        std::mem::size_of_val(&*store)
+    );
+
+    let tmr = stimer!(Level::Debug; "Serialization");
+    use std::io::Write;
+    let encoded: Vec<u8> = bincode::serialize(&store.map).unwrap();
+    executing!(tmr, "Done encoding");
+    let mut file = std::fs::File::create("test_store").unwrap();
+    file.write_all(&encoded).unwrap();
+    logging_timer::finish!(
+        tmr,
+        "Done writing file"
+    );
+
     Ok(BinaryTree {
         root,
         store,
@@ -123,11 +140,11 @@ where
 
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
-struct DashMapStore<C> {
+struct DashMapStore<C: Serialize> {
     map: Map<C>,
 }
 
-impl<C: Clone> Store<C> for DashMapStore<C> {
+impl<C: Clone + Serialize> Store<C> for DashMapStore<C> {
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| n.clone())
     }
@@ -142,7 +159,7 @@ impl<C: Clone> Store<C> for DashMapStore<C> {
 /// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
-fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn get_num_nodes_left_of<C: Serialize>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -161,7 +178,7 @@ enum NumNodes {
     Partial(usize),
 }
 
-impl<C> Node<C> {
+impl<C: Serialize> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type `C` is defined, for example.
@@ -175,7 +192,7 @@ impl<C> Node<C> {
     }
 }
 
-impl<C: Mergeable> MatchedPair<C> {
+impl<C: Mergeable + Serialize> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
@@ -396,7 +413,7 @@ pub fn build_node<C, F>(
     map: Arc<Map<C>>,
 ) -> Node<C>
 where
-    C: Debug + Clone + Mergeable + Send + Sync + 'static,
+    C: Debug + Clone + Serialize + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {

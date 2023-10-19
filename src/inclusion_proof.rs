@@ -13,6 +13,7 @@ use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
 use primitive_types::H256;
+use serde::Serialize;
 use std::str::FromStr;
 use std::fmt::Debug;
 use thiserror::Error;
@@ -45,7 +46,7 @@ pub struct InclusionProof<H: Clone> {
     upper_bound_bit_length: u8,
 }
 
-impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
+impl<H: Debug + Clone + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
     ///
     /// `aggregation_factor` is used to determine how many of the range proofs
