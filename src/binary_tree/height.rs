@@ -84,7 +84,7 @@ impl FromStr for Height {
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Height::from_with_err(UnderlyingInt::from_str(s)?)?)
+        Height::from_with_err(UnderlyingInt::from_str(s)?)
     }
 }
 

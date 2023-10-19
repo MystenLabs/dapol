@@ -97,8 +97,7 @@ impl EntitiesParser {
         let ext = self
             .file_path
             .extension()
-            .map(|s| s.to_str())
-            .flatten()
+            .and_then(|s| s.to_str())
             .ok_or(EntityParseError::UnknownFileType)?;
 
         let mut entities = Vec::<Entity>::new();

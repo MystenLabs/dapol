@@ -84,7 +84,7 @@ where
         // Translate InputLeafNode to Node.
         input_leaf_nodes
             .into_par_iter()
-            .map(|leaf| leaf.to_node())
+            .map(|input_node| input_node.into_node())
             .collect::<Vec<Node<C>>>()
     };
 
@@ -138,26 +138,26 @@ impl<C: Clone> Store<C> for DashMapStore<C> {
 /// Returns the index `i` in `nodes` where `nodes[i].coord.x <= x_coord_mid`
 /// but `nodes[i+1].coord.x > x_coord_mid`.
 /// Requires `nodes` to be sorted according to the x-coord field.
-/// If all nodes satisfy `node.coord.x <= mid` then `AllNodes` is returned.
-/// If no nodes satisfy `node.coord.x <= mid` then `NoNodes` is returned.
+/// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
+/// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
 fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
-        .map_or(NumNodes::NoNodes, |index| {
+        .map_or(NumNodes::Empty, |index| {
             if index == nodes.len() - 1 {
-                NumNodes::AllNodes
+                NumNodes::Full
             } else {
-                NumNodes::SomeNodes(index)
+                NumNodes::Partial(index)
             }
         })
 }
 
 enum NumNodes {
-    AllNodes,
-    NoNodes,
-    SomeNodes(usize),
+    Full,
+    Empty,
+    Partial(usize),
 }
 
 impl<C> Node<C> {
@@ -459,10 +459,10 @@ where
 
     // NOTE this includes the root node.
     let within_store_depth_for_children =
-        params.y_coord - 1 >= params.height.as_raw_int() - params.store_depth;
+        params.y_coord > params.height.as_raw_int() - params.store_depth;
 
     let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
-        NumNodes::SomeNodes(index) => {
+        NumNodes::Partial(index) => {
             let right_leaves = leaves.split_off(index + 1);
             let left_leaves = leaves;
 
@@ -518,7 +518,7 @@ where
                 MatchedPair { left, right }
             }
         }
-        NumNodes::AllNodes => {
+        NumNodes::Full => {
             // Go down left child only (there are no leaves living on the right side).
             let left = build_node(
                 params.into_left_child(),
@@ -529,7 +529,7 @@ where
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
             MatchedPair { left, right }
         }
-        NumNodes::NoNodes => {
+        NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
             let right = build_node(
                 params.into_right_child(),

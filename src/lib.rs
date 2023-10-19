@@ -17,7 +17,6 @@ pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 mod cli;
 pub use cli::Cli;
 
-use env_logger;
 use clap_verbosity_flag::{LevelFilter};
 
 #[cfg(test)]
@@ -53,8 +52,8 @@ impl H256Finalizable for blake3::Hasher {
 
 use std::cell::RefCell;
 
-/// Guessing the number of cores.
-/// This variable must NOT be shared between more than 1 thread, it is not
-/// thread-safe.
-/// https://www.sitepoint.com/rust-global-variables/#singlethreadedglobalswithruntimeinitialization
+// Guessing the number of cores.
+// This variable must NOT be shared between more than 1 thread, it is not
+// thread-safe.
+// https://www.sitepoint.com/rust-global-variables/#singlethreadedglobalswithruntimeinitialization
 thread_local!(static DEFAULT_PARALLELISM_APPROX: RefCell<Option<u8>> = RefCell::new(None));

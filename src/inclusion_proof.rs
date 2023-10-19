@@ -164,7 +164,7 @@ impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
                 commitments_for_individual_proofs
                     .iter()
                     .zip(proofs.iter())
-                    .map(|(com, proof)| proof.verify(&com, self.upper_bound_bit_length))
+                    .map(|(com, proof)| proof.verify(com, self.upper_bound_bit_length))
                     .collect::<Result<Vec<_>, _>>()?;
             }
 

@@ -45,9 +45,7 @@ impl From<u64> for Secret {
     fn from(num: u64) -> Self {
         let bytes = num.to_le_bytes();
         let mut arr = [0u8; 32];
-        for i in 0..8 {
-            arr[i] = bytes[i]
-        }
+        arr[..8].copy_from_slice(&bytes[..8]);
         Secret(arr)
     }
 }

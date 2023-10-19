@@ -176,10 +176,7 @@ where
     /// Private function used internally to retrieve height for building.
     /// No default value, returns an error if not set.
     fn height(&self) -> Result<Height, TreeBuildError> {
-        Ok(self
-            .height
-            .clone()
-            .ok_or(TreeBuildError::NoHeightProvided)?)
+        self.height.clone().ok_or(TreeBuildError::NoHeightProvided)
     }
 
     /// Private function used internally to retrieve leaf nodes for building.
@@ -196,7 +193,7 @@ where
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
 
-        if leaf_nodes.len() == 0 {
+        if leaf_nodes.is_empty() {
             return Err(TreeBuildError::EmptyLeaves);
         }
 
@@ -219,7 +216,7 @@ where
 /// Check that no 2 leaf nodes share the same x-coord.
 /// `leaf_nodes` is expected to be sorted by x-coord.
 /// An error is returned if a duplicate is found.
-fn verify_no_duplicate_leaves<C>(leaf_nodes: &Vec<InputLeafNode<C>>) -> Result<(), TreeBuildError> {
+fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), TreeBuildError> {
     use super::ErrOnSome;
 
     let i = leaf_nodes.iter();

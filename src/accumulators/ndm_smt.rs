@@ -167,9 +167,9 @@ impl NdmSmt {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(new_padding_node_content_closure(
-                master_secret_bytes.clone(),
-                salt_b_bytes.clone(),
-                salt_s_bytes.clone(),
+                *master_secret_bytes,
+                *salt_b_bytes,
+                *salt_s_bytes,
             ))?;
 
         // If there are issues wrapping up the concurrency code then it's not
@@ -229,9 +229,9 @@ impl NdmSmt {
         let salt_b_bytes = self.secrets.salt_b.as_bytes();
         let salt_s_bytes = self.secrets.salt_s.as_bytes();
         let new_padding_node_content = new_padding_node_content_closure(
-            master_secret_bytes.clone(),
-            salt_b_bytes.clone(),
-            salt_s_bytes.clone(),
+            *master_secret_bytes,
+            *salt_b_bytes,
+            *salt_s_bytes,
         );
 
         let path = self
@@ -359,7 +359,7 @@ impl RandomXCoordGenerator {
                 while self.used_x_coords.contains_key(existing_x) {
                     existing_x = self.used_x_coords.get(existing_x).unwrap();
                 }
-                existing_x.clone()
+                *existing_x
             }
             None => random_x,
         };
@@ -491,8 +491,7 @@ impl SecretsParser {
         let ext = self
             .file_path
             .extension()
-            .map(|s| s.to_str())
-            .flatten()
+            .and_then(|s| s.to_str())
             .ok_or(SecretsParseError::UnknownFileType)?;
 
         let secrets = match FileType::from_str(ext)? {

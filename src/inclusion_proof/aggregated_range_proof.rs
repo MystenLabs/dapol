@@ -139,10 +139,7 @@ impl AggregatedRangeProof {
             upper_bound_bit_length as usize,
         ) {
             Err(underlying_err) => Err(RangeProofError::BulletproofGenerationError(underlying_err)),
-            Ok((proof, _commitments)) => Ok(AggregatedRangeProof::Padding {
-                proof: proof,
-                input_size,
-            }),
+            Ok((proof, _commitments)) => Ok(AggregatedRangeProof::Padding { proof, input_size }),
         }
     }
 
@@ -180,7 +177,7 @@ impl AggregatedRangeProof {
 
         // We slowly shave off parts of the 2 vectors (from the tail) till there is
         // nothing left.
-        while secrets.len() > 0 {
+        while !secrets.is_empty() {
             if input_size & next_pow_2 > 0 {
                 let bp_gens =
                     BulletproofGens::new(upper_bound_bit_length as usize, next_pow_2 as usize);
@@ -194,7 +191,7 @@ impl AggregatedRangeProof {
                     &blinding_factors.split_off(index),
                     upper_bound_bit_length as usize,
                 )
-                .map_err(|err| RangeProofError::BulletproofGenerationError(err))?;
+                .map_err(RangeProofError::BulletproofGenerationError)?;
 
                 proofs.push((proof, next_pow_2 as usize));
             }
@@ -248,10 +245,9 @@ impl AggregatedRangeProof {
                 proofs,
                 input_size: _,
             } => proofs.iter().try_for_each(|(proof, length)| {
-                let length_usize = *length as usize;
-                let bp_gens = BulletproofGens::new(upper_bound_bit_length as usize, length_usize);
+                let bp_gens = BulletproofGens::new(upper_bound_bit_length as usize, *length);
                 let commitments_slice =
-                    commitments_clone.split_off(commitments.len() - length_usize);
+                    commitments_clone.split_off(commitments.len() - length);
 
                 proof.verify_multiple(
                     &bp_gens,
@@ -262,7 +258,7 @@ impl AggregatedRangeProof {
                 )
             }),
         }
-        .map_err(|err| RangeProofError::BulletproofVerificationError(err))
+        .map_err(RangeProofError::BulletproofVerificationError)
     }
 
     fn get_input_size(&self) -> u8 {
