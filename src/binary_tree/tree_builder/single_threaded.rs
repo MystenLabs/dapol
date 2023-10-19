@@ -67,7 +67,8 @@ where
             .collect::<Vec<Node<C>>>()
     };
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64 {
+    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
             MIN_RECOMMENDED_SPARSITY

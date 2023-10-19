@@ -13,18 +13,17 @@
 //!
 //! Because the tree is sparse not all of the paths to the bottom layer need
 //! to be traversed--only those paths that will end in a bottom-layer leaf
-//! node. At each junction a thread will first
-//! determine if it needs to traverse either the left child, the right child
-//! or both. If both then it will spawn a new thread to traverse the right
-//! child before traversing the left itself, and if only left/right need to be
-//! traversed then it will do so itself without spawning a new thread. Note that
-//! children that do not need traversal are padding nodes, and are constructed
-//! using the closure given by the calling code. Each
-//! thread uses a sorted vector of bottom-layer leaf nodes to determine if a
-//! child needs traversing: the idea is that at each recursive iteration the
-//! vector should contain all the leaf nodes that will live at the bottom of
-//! the sub-tree (no more and no less). The first iteration will have all the
-//! input leaf nodes, and will split the vector between the left & right
+//! node. At each junction a thread will first determine if it needs to traverse
+//! either the left child, the right child or both. If both then it will spawn a
+//! new thread to traverse the right child before traversing the left itself,
+//! and if only left/right need to be traversed then it will do so itself
+//! without spawning a new thread. Note that children that do not need traversal
+//! are padding nodes, and are constructed using the closure given by the
+//! calling code. Each thread uses a sorted vector of bottom-layer leaf nodes to
+//! determine if a child needs traversing: the idea is that at each recursive
+//! iteration the vector should contain all the leaf nodes that will live at the
+//! bottom of the sub-tree (no more and no less). The first iteration will have
+//! all the input leaf nodes, and will split the vector between the left & right
 //! recursive calls, each of which will split the vector to their children, etc.
 //!
 //! Not all of the nodes in the tree are necessarily placed in the store. By
@@ -272,7 +271,6 @@ impl RecursionParams {
     ///
     /// [parallelism]: std::thread::available_parallelism
     fn from_tree_height(height: Height) -> Self {
-        // Start from the first node.
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = max_bottom_layer_nodes(&height) - 1;

@@ -114,7 +114,7 @@ impl NdmSmt {
             let leaf_nodes = entity_coord_tuples
                 .par_iter()
                 .map(|(entity, x_coord)| {
-                    // `w` is the letter used in the DAPOL+ paper
+                    // `w` is the letter used in the DAPOL+ paper.
                     let w: [u8; 32] =
                         generate_key(master_secret_bytes, &x_coord.to_le_bytes()).into();
                     let blinding_factor = generate_key(&w, salt_b_bytes);
@@ -404,10 +404,12 @@ use std::str::FromStr;
 
 /// This coding style is a bit ugly but it is the simplest way to get the
 /// desired outcome, which is to deserialize string values into a byte array.
-/// We can't deserialize automatically to
-/// [crate][secret][Secret] without a custom implementation of the
-/// [serde][Deserialize] trait. Instead we deserialize to [SecretsInput] and
-/// then convert the individual string fields to byte arrays.
+/// We can't deserialize automatically to [a secret] without a custom
+/// implementation of the [deserialize trait]. Instead we deserialize to
+/// [SecretsInput] and then convert the individual string fields to byte arrays.
+///
+/// [a secret] crate::secret::Secret
+/// [deserialize trait] serde::Deserialize
 #[derive(Deserialize)]
 pub struct SecretsInput {
     master_secret: String,

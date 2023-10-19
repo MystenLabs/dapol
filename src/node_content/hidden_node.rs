@@ -142,7 +142,7 @@ impl<H: Digest + H256Finalizable> Mergeable for HiddenNodeContent<H> {
             hasher.update(right_sibling.commitment.compress().as_bytes());
             hasher.update(left_sibling.hash.as_bytes());
             hasher.update(right_sibling.hash.as_bytes());
-            hasher.finalize_as_h256() // TODO do a unit test that compares the output of this to a different piece of code
+            hasher.finalize_as_h256()
         };
 
         HiddenNodeContent {
