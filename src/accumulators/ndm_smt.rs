@@ -67,6 +67,7 @@ impl NdmSmt {
     /// 1. There are more entities than the height allows i.e. more entities
     /// than would fit on the bottom layer.
     /// 2. The tree build fails for some reason.
+    /// 3. There are duplicate entity IDs.
     ///
     /// The function will panic if there is a problem joining onto a spawned
     /// thread, or if concurrent variables are not able to be locked. It's not
@@ -142,26 +143,15 @@ impl NdmSmt {
             (leaf_nodes, entity_coord_tuples)
         };
 
-        // Spawn a new thread to convert the tuples object into a hashmap, while
-        // the main thread goes ahead with the tree build.
-
-        let entity_mapping = Arc::new(Mutex::new(HashMap::new()));
-        let entity_mapping_ref = Arc::clone(&entity_mapping);
-
-        let handle = thread::spawn(move || {
-            let mut my_entity_mapping = entity_mapping_ref.lock().unwrap_or_else(|_| {
-                panic!(
-                    "{} Cannot acquire lock on the entity map",
-                    THREAD_MANAGEMENT_ISSUE
-                )
-            });
-
-            entity_coord_tuples
-                .into_iter()
-                .for_each(|(entity, x_coord)| {
-                    my_entity_mapping.insert(entity.id, x_coord);
-                });
-        });
+        // Create a map of EntityId -> XCoord, return an error if a duplicate
+        // entity ID is found.
+        let mut entity_mapping = HashMap::with_capacity(entity_coord_tuples.len());
+        for (entity, x_coord) in entity_coord_tuples.into_iter() {
+            if entity_mapping.contains_key(&entity.id) {
+                return Err(NdmSmtError::DuplicateEntityIds(entity.id));
+            }
+            entity_mapping.insert(entity.id, x_coord);
+        }
 
         let tree = TreeBuilder::new()
             .with_height(height)
@@ -171,22 +161,6 @@ impl NdmSmt {
                 *salt_b_bytes,
                 *salt_s_bytes,
             ))?;
-
-        // If there are issues wrapping up the concurrency code then it's not
-        // clear how to recover because variables may be in an unknown state,
-        // so rather panic.
-        handle.join().unwrap_or_else(|_| {
-            panic!(
-                "{} Cannot join thread, possibly due to a panic within the thread",
-                THREAD_MANAGEMENT_ISSUE
-            )
-        });
-        let lock = Arc::try_unwrap(entity_mapping).unwrap_or_else(|_| {
-            panic!("{} Lock still has multiple owners", THREAD_MANAGEMENT_ISSUE)
-        });
-        let entity_mapping = lock
-            .into_inner()
-            .unwrap_or_else(|_| panic!("{} Mutex cannot be locked", THREAD_MANAGEMENT_ISSUE));
 
         Ok(NdmSmt {
             tree,
@@ -228,11 +202,8 @@ impl NdmSmt {
         let master_secret_bytes = self.secrets.master_secret.as_bytes();
         let salt_b_bytes = self.secrets.salt_b.as_bytes();
         let salt_s_bytes = self.secrets.salt_s.as_bytes();
-        let new_padding_node_content = new_padding_node_content_closure(
-            *master_secret_bytes,
-            *salt_b_bytes,
-            *salt_s_bytes,
-        );
+        let new_padding_node_content =
+            new_padding_node_content_closure(*master_secret_bytes, *salt_b_bytes, *salt_s_bytes);
 
         let path = self
             .tree
@@ -418,6 +389,9 @@ pub struct SecretsInput {
 }
 
 /// Values required for tree construction and inclusion proof generation.
+///
+/// The names of the secret values are exactly the same as the ones given in the
+/// DAPOL+ paper.
 pub struct Secrets {
     master_secret: Secret,
     salt_b: Secret,
@@ -535,6 +509,8 @@ pub enum NdmSmtError {
     InclusionProofGenerationError(#[from] InclusionProofError),
     #[error("Entity ID not found in the entity mapping")]
     EntityIdNotFound,
+    #[error("Entity ID {0:?} was duplicated")]
+    DuplicateEntityIds(EntityId),
 }
 
 #[derive(Error, Debug)]
@@ -561,6 +537,7 @@ pub enum SecretsParseError {
 // TODO test that the tree error propagates correctly (how do we mock in rust?)
 // TODO we should fuzz on these tests because the code utilizes a random number
 // generator
+// TODO test that duplicate entity IDs gives an error on NdmSmt::new
 #[cfg(test)]
 mod tests {
     mod ndm_smt {

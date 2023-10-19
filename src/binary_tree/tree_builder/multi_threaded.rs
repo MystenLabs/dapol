@@ -99,6 +99,7 @@ where
         );
     }
 
+    // Parallelized build algorithm.
     let root = build_node(
         params,
         leaf_nodes,
