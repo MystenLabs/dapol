@@ -14,8 +14,7 @@ pub use entity::{Entity, EntityId, EntitiesParser, generate_random_entities};
 mod accumulators;
 pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 
-mod cli;
-pub use cli::Cli;
+pub mod cli;
 
 use clap_verbosity_flag::{LevelFilter};
 

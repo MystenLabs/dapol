@@ -113,22 +113,6 @@ where
         map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
     });
 
-    debug!(
-        "Multi-threaded store size in bytes: {}",
-        std::mem::size_of_val(&*store)
-    );
-
-    let tmr = stimer!(Level::Debug; "Serialization");
-    use std::io::Write;
-    let encoded: Vec<u8> = bincode::serialize(&store.map).unwrap();
-    executing!(tmr, "Done encoding");
-    let mut file = std::fs::File::create("test_store").unwrap();
-    file.write_all(&encoded).unwrap();
-    logging_timer::finish!(
-        tmr,
-        "Done writing file"
-    );
-
     Ok(BinaryTree {
         root,
         store,
