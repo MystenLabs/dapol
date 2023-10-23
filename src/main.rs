@@ -1,5 +1,6 @@
 use clap::Parser;
 use log::error;
+use logging_timer::{executing, stimer, Level};
 
 use dapol::{
     activate_logging, Cli, EntitiesParser, NdmSmt, Secrets, SecretsParser, generate_random_entities,
@@ -32,10 +33,18 @@ fn main() {
         panic!("This code should not be reachable because the cli arguments are required");
     };
 
-    let ndsmt_res = NdmSmt::new(secrets, height, entities);
+    let ndmsmt_res = NdmSmt::new(secrets, height, entities);
 
-    match ndsmt_res {
-        Ok(_ndmsmt) => {}
+    match ndmsmt_res {
+        Ok(ndmsmt) => {
+            let tmr = stimer!(Level::Debug; "Serialization");
+            use std::io::Write;
+            let encoded: Vec<u8> = bincode::serialize(&ndmsmt).unwrap();
+            executing!(tmr, "Done encoding");
+            let mut file = std::fs::File::create("test_store").unwrap();
+            file.write_all(&encoded).unwrap();
+            logging_timer::finish!(tmr, "Done writing file");
+        }
         Err(err) => {
             error!("{:?} {}", err, err);
         }

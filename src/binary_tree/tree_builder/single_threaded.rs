@@ -88,6 +88,7 @@ where
 // -------------------------------------------------------------------------------------------------
 // Store.
 
+#[derive(Serialize)]
 struct HashMapStore<C: Serialize> {
     map: Map<C>,
 }

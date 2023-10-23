@@ -8,19 +8,22 @@
 //!
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
+use std::{
+    collections::HashMap, convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr,
+};
+
+use serde::{Deserialize, Serialize};
+
 use log::error;
+use logging_timer::{time, timer, Level};
+
+use rayon::prelude::*;
+
 use rand::{
     distributions::{Alphanumeric, DistString, Uniform},
     rngs::ThreadRng,
     thread_rng, Rng,
 };
-use std::collections::HashMap;
-use std::fs::File;
-use std::io::Read;
-
-use logging_timer::{time, timer, Level};
-
-use rayon::prelude::*;
 
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
@@ -40,13 +43,12 @@ use crate::{
 type Hash = blake3::Hasher;
 type Content = FullNodeContent<Hash>;
 
-const THREAD_MANAGEMENT_ISSUE: &str = "[Issue with thread management]";
-
 /// Main struct containing tree object, master secret and the salts.
 ///
 /// The entity mapping structure is required because each entity is randomly
 /// mapped to a leaf node, and this assignment is non-deterministic. The map
 /// keeps track of which entity is assigned to which leaf node.
+#[derive(Serialize)]
 pub struct NdmSmt {
     secrets: Secrets,
     tree: BinaryTree<Content>,
@@ -365,11 +367,6 @@ fn new_padding_node_content_closure(
 // -------------------------------------------------------------------------------------------------
 // Secrets struct & parser.
 
-use serde::Deserialize;
-use std::convert::TryFrom;
-use std::path::PathBuf;
-use std::str::FromStr;
-
 /// This coding style is a bit ugly but it is the simplest way to get the
 /// desired outcome, which is to deserialize string values into a byte array.
 /// We can't deserialize automatically to [a secret] without a custom
@@ -389,6 +386,7 @@ pub struct SecretsInput {
 ///
 /// The names of the secret values are exactly the same as the ones given in the
 /// DAPOL+ paper.
+#[derive(Serialize)]
 pub struct Secrets {
     master_secret: Secret,
     salt_b: Secret,

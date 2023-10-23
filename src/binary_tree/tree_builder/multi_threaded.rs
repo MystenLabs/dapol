@@ -42,9 +42,10 @@ use logging_timer::{executing, stime, stimer, Level};
 
 use dashmap::DashMap;
 use rayon::prelude::*;
-use serde::Serialize;
 use std::sync::{Arc, Mutex};
 use std::thread;
+
+use serde::Serialize;
 
 use super::super::{
     max_bottom_layer_nodes, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node,
@@ -140,6 +141,7 @@ where
 
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
+#[derive(Serialize)]
 struct DashMapStore<C: Serialize> {
     map: Map<C>,
 }

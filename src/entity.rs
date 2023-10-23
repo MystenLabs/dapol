@@ -16,7 +16,7 @@ use rand::{
     distributions::{Alphanumeric, DistString, Uniform},
     thread_rng, Rng,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use std::convert::From;
 use std::path::PathBuf;
@@ -38,7 +38,7 @@ pub struct Entity {
 const ENTITY_ID_MAX_BYTES: usize = 32;
 
 /// Abstract representation of an entity ID.
-#[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize)]
+#[derive(PartialEq, Eq, Hash, Clone, Debug, Deserialize, Serialize)]
 pub struct EntityId(String);
 
 impl FromStr for EntityId {

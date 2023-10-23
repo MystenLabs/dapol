@@ -6,6 +6,8 @@
 use std::convert::From;
 use std::str::FromStr;
 
+use serde::Serialize;
+
 use crate::kdf::Key;
 
 /// The max size of the secret is 256 bits, but this is a soft limit so it
@@ -24,7 +26,7 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types::U256 ] or [num256::Uint256] but those are options for
 /// later need be.
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Secret([u8; 32]);
 
 impl Secret {

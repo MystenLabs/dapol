@@ -20,6 +20,7 @@
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
 
 use std::fmt::Debug;
+use serde::Serialize;
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.
@@ -42,12 +43,12 @@ pub struct Path<C: Serialize> {
 /// A builder pattern is used to construct [Path].
 /// Since a path is uniquely determined by a leaf node all we need is the tree
 /// and the leaf node's x-coord.
-pub struct PathBuilder<'a, C: Serialize> {
+pub struct PathBuilder<'a, C: Clone + Serialize> {
     tree: Option<&'a BinaryTree<C>>,
     leaf_x_coord: Option<u64>,
 }
 
-impl<'a, C: Serialize> PathBuilder<'a, C> {
+impl<'a, C: Clone + Serialize> PathBuilder<'a, C> {
     pub fn new() -> Self {
         PathBuilder {
             tree: None,
@@ -252,7 +253,7 @@ impl<'a, C: Serialize> PathBuilder<'a, C> {
     }
 }
 
-impl<C: Serialize> BinaryTree<C> {
+impl<C: Clone + Serialize> BinaryTree<C> {
     pub fn path_builder(&self) -> PathBuilder<C> {
         PathBuilder::new().with_tree(self)
     }
@@ -360,7 +361,6 @@ impl<C: Serialize> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

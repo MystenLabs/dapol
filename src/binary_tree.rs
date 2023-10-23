@@ -34,8 +34,10 @@
 
 use std::fmt;
 
-mod tree_builder;
 use serde::Serialize;
+use erased_serde::serialize_trait_object;
+
+mod tree_builder;
 pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH};
 
 mod path_builder;
@@ -76,7 +78,8 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 /// according to logic in [tree_builder].
 ///
 /// The generic type `C` is for the content contained within each node.
-pub struct BinaryTree<C: Serialize> {
+#[derive(Serialize)]
+pub struct BinaryTree<C: Clone + Serialize> {
     root: Node<C>,
     store: Box<dyn Store<C>>, /* The box & dyn pattern is needed so that the trait methods can
                                * be determined dynamically at runtime. */
@@ -108,9 +111,12 @@ pub struct Coordinate {
 /// Generic type representing the structure that stores the nodes of the tree.
 /// This trait is necessary to allow both the single- and multi-threaded tree
 /// build algorithms to use a data structure that bests suits them.
-trait Store<C: Clone + Serialize> {
+trait Store<C: Clone + Serialize>: erased_serde::Serialize {
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>>;
 }
+
+// https://stackoverflow.com/questions/50021897/how-to-implement-serdeserialize-for-a-boxed-trait-object
+serialize_trait_object!(<C> Store<C> where C: Clone + Serialize);
 
 /// The generic content type of a [Node] must implement this trait to allow 2
 /// sibling nodes to be combined to make a new parent node.
@@ -326,7 +332,7 @@ impl<C: Serialize> InputLeafNode<C> {
     }
 }
 
-impl<C: fmt::Debug + Serialize> fmt::Debug for BinaryTree<C> {
+impl<C: fmt::Debug + Clone + Serialize> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "root: {:?}, height: {:?}", self.root, self.height)
     }
