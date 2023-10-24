@@ -48,7 +48,7 @@ type Content = FullNodeContent<Hash>;
 /// The entity mapping structure is required because each entity is randomly
 /// mapped to a leaf node, and this assignment is non-deterministic. The map
 /// keeps track of which entity is assigned to which leaf node.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct NdmSmt {
     secrets: Secrets,
     tree: BinaryTree<Content>,
@@ -386,7 +386,7 @@ pub struct SecretsInput {
 ///
 /// The names of the secret values are exactly the same as the ones given in the
 /// DAPOL+ paper.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Secrets {
     master_secret: Secret,
     salt_b: Secret,

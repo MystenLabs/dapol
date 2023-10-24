@@ -9,6 +9,7 @@
 //! generic type, `C`.
 
 use std::fmt::Debug;
+use serde::Serialize;
 
 use super::{BinaryTree, Coordinate, Height, Mergeable, Node};
 
@@ -252,7 +253,6 @@ fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), 
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use serde::Serialize;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

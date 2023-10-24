@@ -37,15 +37,15 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{debug, info, warn};
-use logging_timer::{executing, stime, stimer, Level};
+use log::{info, warn};
+use logging_timer::stime;
 
 use dashmap::DashMap;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::super::{
     max_bottom_layer_nodes, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node,
@@ -125,7 +125,7 @@ where
 
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DashMapStore<C> {
     map: Map<C>,
 }

@@ -20,7 +20,7 @@ use std::fmt::Debug;
 
 use log::warn;
 use logging_timer::stime;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 use crate::binary_tree::max_bottom_layer_nodes;
 
@@ -89,7 +89,7 @@ where
 // -------------------------------------------------------------------------------------------------
 // Store.
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct HashMapStore<C> {
     map: Map<C>,
 }

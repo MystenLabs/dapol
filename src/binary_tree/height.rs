@@ -2,7 +2,7 @@
 
 use clap::builder::{OsStr, Str};
 use log::error;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::convert::From;
 use std::{num::ParseIntError, str::FromStr};
 
@@ -26,7 +26,7 @@ pub type XCoord = u64;
 /// to have for any protocol involving people as the entities.
 pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Height(UnderlyingInt);
 
 impl Height {

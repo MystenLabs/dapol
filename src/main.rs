@@ -48,10 +48,10 @@ fn main() {
             let serialization_path = match serialize.clone() {
                 Some(path_arg) => {
                     // Path is a:
-                    // - existing directory
                     // - non-existing directory
-                    // - file with all dirs created
+                    // - existing directory
                     // - file with some dirs created
+                    // - file with all dirs created
 
                     let mut path = path_arg.into_path().unwrap();
 

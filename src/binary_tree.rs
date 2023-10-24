@@ -33,8 +33,7 @@
 //! `x` coordinate (their `y` coordinate will be 0).
 
 use std::fmt;
-
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 mod tree_builder;
 pub use tree_builder::{
@@ -79,7 +78,7 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 /// according to logic in [tree_builder].
 ///
 /// The generic type `C` is for the content contained within each node.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BinaryTree<C: Clone> {
     root: Node<C>,
     store: Store<C>,
@@ -89,7 +88,7 @@ pub struct BinaryTree<C: Clone> {
 /// Fundamental structure of the tree, each element of the tree is a Node.
 /// The data contained in the node is completely generic, requiring only to have
 /// an associated merge function.
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node<C> {
     pub coord: Coordinate,
     pub content: C,
@@ -102,7 +101,7 @@ pub struct Node<C> {
 ///
 /// `x` is the horizontal index of the [Node] with a range of
 /// `[0, 2^y]`
-#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct Coordinate {
     pub y: u8,
     pub x: height::XCoord,
@@ -114,7 +113,7 @@ pub struct Coordinate {
 /// are [erased_serde] and [typetag] but none support deserialization of generic
 /// traits; for more details see
 /// [this issue](https://github.com/dtolnay/typetag/issues/1).
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub enum Store<C> {
     MultiThreadedStore(multi_threaded::DashMapStore<C>),
     SingleThreadedStore(single_threaded::HashMapStore<C>),
