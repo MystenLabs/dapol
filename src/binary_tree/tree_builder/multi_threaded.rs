@@ -109,13 +109,13 @@ where
         Arc::clone(&store),
     );
 
-    let store = Box::new(DashMapStore {
+    let store = DashMapStore {
         map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
-    });
+    };
 
     Ok(BinaryTree {
         root,
-        store,
+        store: Store::MultiThreadedStore(store),
         height,
     })
 }
@@ -126,12 +126,12 @@ where
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
 #[derive(Serialize)]
-struct DashMapStore<C> {
+pub struct DashMapStore<C> {
     map: Map<C>,
 }
 
-impl<C: Clone + Serialize> Store<C> for DashMapStore<C> {
-    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+impl<C: Clone> DashMapStore<C> {
+    pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| n.clone())
     }
 }

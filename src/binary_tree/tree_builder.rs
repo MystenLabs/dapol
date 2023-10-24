@@ -10,7 +10,7 @@
 
 use std::fmt::Debug;
 
-use super::{BinaryTree, Coordinate, Height, Mergeable};
+use super::{BinaryTree, Coordinate, Height, Mergeable, Node};
 
 pub mod multi_threaded;
 pub mod single_threaded;
@@ -61,7 +61,7 @@ pub struct InputLeafNode<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implementation.
+// Implementations.
 
 impl<C> TreeBuilder<C>
 where
@@ -212,6 +212,22 @@ where
         Ok(leaf_nodes)
     }
 }
+
+impl<C> InputLeafNode<C> {
+    /// Convert the simpler node type to the actual Node type.
+    fn into_node(self) -> Node<C> {
+        Node {
+            content: self.content,
+            coord: Coordinate {
+                x: self.x_coord,
+                y: 0,
+            },
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Helper functions.
 
 /// Check that no 2 leaf nodes share the same x-coord.
 /// `leaf_nodes` is expected to be sorted by x-coord.

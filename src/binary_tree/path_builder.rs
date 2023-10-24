@@ -19,8 +19,8 @@
 
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
 
-use std::fmt::Debug;
 use serde::Serialize;
+use std::fmt::Debug;
 
 // -------------------------------------------------------------------------------------------------
 // Main struct.

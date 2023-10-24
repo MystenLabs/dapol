@@ -533,6 +533,7 @@ pub enum SecretsParseError {
 // TODO we should fuzz on these tests because the code utilizes a random number
 // generator
 // TODO test that duplicate entity IDs gives an error on NdmSmt::new
+// TODO test serialization & deserialization
 #[cfg(test)]
 mod tests {
     mod ndm_smt {
