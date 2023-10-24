@@ -79,7 +79,7 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 ///
 /// The generic type `C` is for the content contained within each node.
 #[derive(Serialize)]
-pub struct BinaryTree<C: Clone + Serialize> {
+pub struct BinaryTree<C: Clone> {
     root: Node<C>,
     store: Box<dyn Store<C>>, /* The box & dyn pattern is needed so that the trait methods can
                                * be determined dynamically at runtime. */
@@ -111,12 +111,12 @@ pub struct Coordinate {
 /// Generic type representing the structure that stores the nodes of the tree.
 /// This trait is necessary to allow both the single- and multi-threaded tree
 /// build algorithms to use a data structure that bests suits them.
-trait Store<C: Clone + Serialize>: erased_serde::Serialize {
+trait Store<C>: erased_serde::Serialize {
     fn get_node(&self, coord: &Coordinate) -> Option<Node<C>>;
 }
 
 // https://stackoverflow.com/questions/50021897/how-to-implement-serdeserialize-for-a-boxed-trait-object
-serialize_trait_object!(<C> Store<C> where C: Clone + Serialize);
+serialize_trait_object!(<C> Store<C>);
 
 /// The generic content type of a [Node] must implement this trait to allow 2
 /// sibling nodes to be combined to make a new parent node.
@@ -127,7 +127,7 @@ pub trait Mergeable {
 // -------------------------------------------------------------------------------------------------
 // Accessor methods.
 
-impl<C: Clone + Serialize> BinaryTree<C> {
+impl<C: Clone> BinaryTree<C> {
     pub fn height(&self) -> &Height {
         &self.height
     }
@@ -263,7 +263,7 @@ impl Coordinate {
     }
 }
 
-impl<C: Serialize> Node<C> {
+impl<C> Node<C> {
     /// Returns left if this node is a left sibling and vice versa for right.
     /// Since we are working with a binary tree we can tell if the node is a
     /// left sibling of the above layer by checking the x_coord modulus 2.
@@ -311,7 +311,7 @@ impl<C: Serialize> Node<C> {
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
-    fn convert<B: From<C> + Serialize>(self) -> Node<B> {
+    fn convert<B: From<C>>(self) -> Node<B> {
         Node {
             content: self.content.into(),
             coord: self.coord,
@@ -319,7 +319,7 @@ impl<C: Serialize> Node<C> {
     }
 }
 
-impl<C: Serialize> InputLeafNode<C> {
+impl<C> InputLeafNode<C> {
     /// Convert the simpler node type to the actual Node type.
     fn into_node(self) -> Node<C> {
         Node {
@@ -332,7 +332,7 @@ impl<C: Serialize> InputLeafNode<C> {
     }
 }
 
-impl<C: fmt::Debug + Clone + Serialize> fmt::Debug for BinaryTree<C> {
+impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "root: {:?}, height: {:?}", self.root, self.height)
     }
@@ -350,19 +350,19 @@ enum NodeOrientation {
 
 /// Used to orient nodes inside a sibling pair so that the compiler can
 /// guarantee a left node is actually a left node.
-enum Sibling<C: Serialize> {
+enum Sibling<C> {
     Left(Node<C>),
     Right(Node<C>),
 }
 
 // TODO we should have a `from` function for this with an error check, just to be extra careful
 /// A pair of sibling nodes.
-struct MatchedPair<C: Serialize> {
+struct MatchedPair<C> {
     left: Node<C>,
     right: Node<C>,
 }
 
-impl<C: Serialize> Sibling<C> {
+impl<C> Sibling<C> {
     /// Move a generic node into the left/right sibling type.
     fn from_node(node: Node<C>) -> Self {
         match node.orientation() {
@@ -372,7 +372,7 @@ impl<C: Serialize> Sibling<C> {
     }
 }
 
-impl<C: Mergeable + Serialize> MatchedPair<C> {
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {

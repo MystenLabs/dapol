@@ -89,7 +89,7 @@ where
 // Store.
 
 #[derive(Serialize)]
-struct HashMapStore<C: Serialize> {
+struct HashMapStore<C> {
     map: Map<C>,
 }
 
@@ -106,12 +106,12 @@ impl<C: Clone + Serialize> Store<C> for HashMapStore<C> {
 ///
 /// At least one of the fields is expected to be set. If this is not the case
 /// then it is assumed there is a bug in the code using this struct.
-struct MaybeUnmatchedPair<C: Serialize> {
+struct MaybeUnmatchedPair<C> {
     left: Option<Node<C>>,
     right: Option<Node<C>>,
 }
 
-impl<C: Serialize> MaybeUnmatchedPair<C> {
+impl<C> MaybeUnmatchedPair<C> {
     /// Convert the partially matched pair into a matched pair.
     ///
     /// If both left and right nodes are not present then the function will
@@ -141,7 +141,7 @@ impl<C: Serialize> MaybeUnmatchedPair<C> {
     }
 }
 
-impl<C: Serialize> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type C is defined, for example.
@@ -188,7 +188,7 @@ pub fn build_node<C, F>(
     new_padding_node_content: &F,
 ) -> (Map<C>, RootNode<C>)
 where
-    C: Debug + Clone + Serialize + Mergeable,
+    C: Debug + Clone + Mergeable,
     F: Fn(&Coordinate) -> C,
 {
     {

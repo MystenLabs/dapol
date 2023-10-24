@@ -43,7 +43,7 @@ pub struct Path<C: Serialize> {
 /// A builder pattern is used to construct [Path].
 /// Since a path is uniquely determined by a leaf node all we need is the tree
 /// and the leaf node's x-coord.
-pub struct PathBuilder<'a, C: Clone + Serialize> {
+pub struct PathBuilder<'a, C: Clone> {
     tree: Option<&'a BinaryTree<C>>,
     leaf_x_coord: Option<u64>,
 }
@@ -397,7 +397,7 @@ pub enum PathError {
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
 /// not needed.
-struct LeftSiblingRef<'a, C: Serialize>(&'a Node<C>);
+struct LeftSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a right sibling node.
 ///
@@ -405,7 +405,7 @@ struct LeftSiblingRef<'a, C: Serialize>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
 /// not needed.
-struct RightSiblingRef<'a, C: Serialize>(&'a Node<C>);
+struct RightSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
 ///
@@ -413,12 +413,12 @@ struct RightSiblingRef<'a, C: Serialize>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
 /// not needed.
-struct MatchedPairRef<'a, C: Serialize> {
+struct MatchedPairRef<'a, C> {
     left: LeftSiblingRef<'a, C>,
     right: RightSiblingRef<'a, C>,
 }
 
-impl<'a, C: Mergeable + Serialize> MatchedPairRef<'a, C> {
+impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
     fn merge(&self) -> Node<C> {
         Node {

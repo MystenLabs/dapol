@@ -126,7 +126,7 @@ where
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
 #[derive(Serialize)]
-struct DashMapStore<C: Serialize> {
+struct DashMapStore<C> {
     map: Map<C>,
 }
 
@@ -145,7 +145,7 @@ impl<C: Clone + Serialize> Store<C> for DashMapStore<C> {
 /// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
-fn get_num_nodes_left_of<C: Serialize>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -164,7 +164,7 @@ enum NumNodes {
     Partial(usize),
 }
 
-impl<C: Serialize> Node<C> {
+impl<C> Node<C> {
     /// New padding node contents are given by a closure. Why a closure? Because
     /// creating a padding node may require context outside of this scope, where
     /// type `C` is defined, for example.
@@ -178,7 +178,7 @@ impl<C: Serialize> Node<C> {
     }
 }
 
-impl<C: Mergeable + Serialize> MatchedPair<C> {
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
@@ -399,7 +399,7 @@ pub fn build_node<C, F>(
     map: Arc<Map<C>>,
 ) -> Node<C>
 where
-    C: Debug + Clone + Serialize + Mergeable + Send + Sync + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {
