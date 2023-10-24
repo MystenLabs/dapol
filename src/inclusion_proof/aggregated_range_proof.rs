@@ -246,8 +246,7 @@ impl AggregatedRangeProof {
                 input_size: _,
             } => proofs.iter().try_for_each(|(proof, length)| {
                 let bp_gens = BulletproofGens::new(upper_bound_bit_length as usize, *length);
-                let commitments_slice =
-                    commitments_clone.split_off(commitments.len() - length);
+                let commitments_slice = commitments_clone.split_off(commitments.len() - length);
 
                 proof.verify_multiple(
                     &bp_gens,
