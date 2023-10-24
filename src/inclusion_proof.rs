@@ -460,6 +460,8 @@ mod tests {
     // https://asecuritysite.com/hash/blake3
     #[test]
     fn verify_hasher() {
+        use std::str::FromStr;
+
         let mut hasher = Hash::new();
         hasher.update("dapol-PoR".as_bytes());
         let hash = hasher.finalize_as_h256();
@@ -474,35 +476,3 @@ mod tests {
     // mock the error responses rather than triggering them from the code in the
     // lower layers)
 }
-
-// -------------------------------------------------------------------------------------------------
-// This was an attempt at making this struct more generic but it's actually just
-// over-complicating the code for no reason
-
-// impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
-//     pub fn generate<B, F, G>(
-//         path: Path<B>,
-//         secret_extractor: F,
-//         blinding_extractor: G,
-//     ) -> Result<Self, InclusionProofError>
-//     where
-//         C: From<B>,
-//         B: Mergeable + Clone + PartialEq + Debug,
-//         F: FnMut(&Node<B>) -> u64,
-//         G: FnMut(&Node<B>) -> Scalar,
-//     {
-//         let aggregation_factor = 2usize;
-
-//         let nodes = path.get_nodes()?;
-//         let secrets: Vec<u64> = nodes.iter().map(secret_extractor).collect();
-//         let blindings: Vec<Scalar> =
-// nodes.iter().map(blinding_extractor).collect();         let range_proof =
-//             RangeProofPadding::generate_proof(&secrets, &blindings,
-// aggregation_factor);
-
-//         Ok(InclusionProof {
-//             path: path.convert::<C>(),
-//             range_proof,
-//         })
-//     }
-// }

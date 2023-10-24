@@ -51,7 +51,7 @@ pub mod test_utils {
     use super::super::*;
     use primitive_types::H256;
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq, Serialize)]
     pub struct TestContent {
         pub value: u32,
         pub hash: H256,

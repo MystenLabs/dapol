@@ -216,7 +216,7 @@ where
 
 impl<C> InputLeafNode<C> {
     /// Convert the simpler node type to the actual Node type.
-    fn into_node(self) -> Node<C> {
+    pub fn into_node(self) -> Node<C> {
         Node {
             content: self.content,
             coord: Coordinate {
