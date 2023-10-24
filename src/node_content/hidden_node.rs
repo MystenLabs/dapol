@@ -6,6 +6,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use digest::Digest;
 use primitive_types::H256;
+use serde::{Serialize, Deserialize};
 use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
@@ -21,10 +22,11 @@ use super::FullNodeContent;
 /// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
 /// and the merge function in this case needs to use a generic hash function. One way to
 /// solve this is to have a generic parameter on this struct and a phantom field.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HiddenNodeContent<H> {
     pub commitment: RistrettoPoint,
     pub hash: H256,
+    #[serde(skip_serializing, skip_deserializing)]
     _phantom_hash_function: PhantomData<H>,
 }
 

@@ -20,6 +20,7 @@ use std::fmt::Debug;
 
 use log::warn;
 use logging_timer::stime;
+use serde::{Serialize, Deserialize};
 
 use crate::binary_tree::max_bottom_layer_nodes;
 
@@ -49,7 +50,8 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
-    C: Debug + Clone + Mergeable + 'static, // This static is needed for the boxed hashmap.
+    C: Debug + Clone + Mergeable + 'static, /* This static is needed for the boxed
+                                                         * hashmap. */
     F: Fn(&Coordinate) -> C,
 {
     use super::verify_no_duplicate_leaves;
@@ -79,7 +81,7 @@ where
 
     Ok(BinaryTree {
         root,
-        store: Box::new(HashMapStore { map }),
+        store: Store::SingleThreadedStore(HashMapStore { map }),
         height,
     })
 }
@@ -87,12 +89,13 @@ where
 // -------------------------------------------------------------------------------------------------
 // Store.
 
-struct HashMapStore<C> {
+#[derive(Serialize, Deserialize)]
+pub struct HashMapStore<C> {
     map: Map<C>,
 }
 
-impl<C: Clone> Store<C> for HashMapStore<C> {
-    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+impl<C: Clone> HashMapStore<C> {
+    pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| (*n).clone())
     }
 }

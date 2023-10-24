@@ -5,7 +5,7 @@
 //! contents are to be supported then new inclusion proof structs and methods
 //! will need to be written.
 
-use crate::binary_tree::{Coordinate, Node, Path, PathError, Height};
+use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::H256Finalizable;
 
@@ -13,7 +13,6 @@ use bulletproofs::ProofError;
 use digest::Digest;
 use percentage::PercentageInteger;
 use primitive_types::H256;
-use std::str::FromStr;
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -45,7 +44,7 @@ pub struct InclusionProof<H: Clone> {
     upper_bound_bit_length: u8,
 }
 
-impl<H: Clone + Debug + Digest + H256Finalizable> InclusionProof<H> {
+impl<H: Debug + Clone + Digest + H256Finalizable> InclusionProof<H> {
     /// Generate an inclusion proof from a tree path.
     ///
     /// `aggregation_factor` is used to determine how many of the range proofs
@@ -461,45 +460,19 @@ mod tests {
     // https://asecuritysite.com/hash/blake3
     #[test]
     fn verify_hasher() {
+        use std::str::FromStr;
+
         let mut hasher = Hash::new();
         hasher.update("dapol-PoR".as_bytes());
         let hash = hasher.finalize_as_h256();
-        assert_eq!(hash, H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850").unwrap());
+        assert_eq!(
+            hash,
+            H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850")
+                .unwrap()
+        );
     }
-    
+
     // TODO test correct error translation from lower layers (probably should
     // mock the error responses rather than triggering them from the code in the
     // lower layers)
 }
-
-// -------------------------------------------------------------------------------------------------
-// This was an attempt at making this struct more generic but it's actually just
-// over-complicating the code for no reason
-
-// impl<C: Mergeable + Clone + PartialEq + Debug> InclusionProof<C> {
-//     pub fn generate<B, F, G>(
-//         path: Path<B>,
-//         secret_extractor: F,
-//         blinding_extractor: G,
-//     ) -> Result<Self, InclusionProofError>
-//     where
-//         C: From<B>,
-//         B: Mergeable + Clone + PartialEq + Debug,
-//         F: FnMut(&Node<B>) -> u64,
-//         G: FnMut(&Node<B>) -> Scalar,
-//     {
-//         let aggregation_factor = 2usize;
-
-//         let nodes = path.get_nodes()?;
-//         let secrets: Vec<u64> = nodes.iter().map(secret_extractor).collect();
-//         let blindings: Vec<Scalar> =
-// nodes.iter().map(blinding_extractor).collect();         let range_proof =
-//             RangeProofPadding::generate_proof(&secrets, &blindings,
-// aggregation_factor);
-
-//         Ok(InclusionProof {
-//             path: path.convert::<C>(),
-//             range_proof,
-//         })
-//     }
-// }

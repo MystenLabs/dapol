@@ -33,9 +33,12 @@
 //! `x` coordinate (their `y` coordinate will be 0).
 
 use std::fmt;
+use serde::{Serialize, Deserialize};
 
 mod tree_builder;
-pub use tree_builder::{InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH};
+pub use tree_builder::{
+    multi_threaded, single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
+};
 
 mod path_builder;
 pub use path_builder::{Path, PathBuildError, PathError};
@@ -75,17 +78,17 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 /// according to logic in [tree_builder].
 ///
 /// The generic type `C` is for the content contained within each node.
+#[derive(Serialize, Deserialize)]
 pub struct BinaryTree<C> {
     root: Node<C>,
-    store: Box<dyn Store<C>>, /* The box & dyn pattern is needed so that the trait methods can
-                               * be determined dynamically at runtime. */
+    store: Store<C>,
     height: Height,
 }
 
 /// Fundamental structure of the tree, each element of the tree is a Node.
 /// The data contained in the node is completely generic, requiring only to have
 /// an associated merge function.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Node<C> {
     pub coord: Coordinate,
     pub content: C,
@@ -98,17 +101,22 @@ pub struct Node<C> {
 ///
 /// `x` is the horizontal index of the [Node] with a range of
 /// `[0, 2^y]`
-#[derive(PartialEq, Eq, Hash, Debug, Clone)]
+#[derive(PartialEq, Eq, Hash, Debug, Clone, Serialize, Deserialize)]
 pub struct Coordinate {
     pub y: u8,
     pub x: height::XCoord,
 }
 
-/// Generic type representing the structure that stores the nodes of the tree.
-/// This trait is necessary to allow both the single- and multi-threaded tree
-/// build algorithms to use a data structure that bests suits them.
-trait Store<C: Clone> {
-    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>>;
+/// Enum representing the different types of stores. Ideally this should be a
+/// trait and [BinaryTree] would use the Box + dyn pattern for the store field
+/// but this pattern cannot be deserialized. The best tools available to do this
+/// are [erased_serde] and [typetag] but none support deserialization of generic
+/// traits; for more details see
+/// [this issue](https://github.com/dtolnay/typetag/issues/1).
+#[derive(Serialize, Deserialize)]
+pub enum Store<C> {
+    MultiThreadedStore(multi_threaded::DashMapStore<C>),
+    SingleThreadedStore(single_threaded::HashMapStore<C>),
 }
 
 /// The generic content type of a [Node] must implement this trait to allow 2
@@ -168,7 +176,8 @@ impl<C: Clone> BinaryTree<C> {
 // Implementations.
 
 impl Coordinate {
-    // TODO 256 bits is not the min space required, 8 + 64 = 72 bits is. So we could decrease the length of the returned byte array.
+    // TODO 256 bits is not the min space required, 8 + 64 = 72 bits is. So we could
+    // decrease the length of the returned byte array.
     /// Copy internal data and return as bytes.
     ///
     /// [Coordinate] is encoded into a 256-bit storage space, using a byte
@@ -312,20 +321,17 @@ impl<C> Node<C> {
     }
 }
 
-impl<C> InputLeafNode<C> {
-    /// Convert the simpler node type to the actual Node type.
-    fn into_node(self) -> Node<C> {
-        Node {
-            content: self.content,
-            coord: Coordinate {
-                x: self.x_coord,
-                y: 0,
-            },
+impl<C: Clone> Store<C> {
+    /// Simply delegate the call to the wrapped store.
+    fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
+        match self {
+            Store::MultiThreadedStore(store) => store.get_node(coord),
+            Store::SingleThreadedStore(store) => store.get_node(coord),
         }
     }
 }
 
-impl<C: fmt::Debug> fmt::Debug for BinaryTree<C> {
+impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "root: {:?}, height: {:?}", self.root, self.height)
     }
@@ -348,7 +354,8 @@ enum Sibling<C> {
     Right(Node<C>),
 }
 
-// TODO we should have a `from` function for this with an error check, just to be extra careful
+// TODO we should have a `from` function for this with an error check, just to
+// be extra careful
 /// A pair of sibling nodes.
 struct MatchedPair<C> {
     left: Node<C>,
@@ -533,7 +540,8 @@ mod tests {
         assert_eq!(content, node.content);
     }
 
-    // TODO fuzz on the x-coord, we just need to make sure the value is even or odd depending on the case
+    // TODO fuzz on the x-coord, we just need to make sure the value is even or odd
+    // depending on the case
     #[test]
     fn sibling_from_node_works() {
         let height = Height::from(8);
@@ -581,7 +589,7 @@ mod tests {
 
     #[test]
     fn subtree_bounds_works() {
-        let coord = Coordinate{x: 2, y: 2};
+        let coord = Coordinate { x: 2, y: 2 };
         let (lower, upper) = coord.subtree_x_coord_bounds();
         assert_eq!(lower, 8, "Incorrect lower x-coord bound for subtree");
         assert_eq!(upper, 11, "Incorrect upper x-coord bound for subtree");

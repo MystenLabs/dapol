@@ -9,8 +9,9 @@
 //! generic type, `C`.
 
 use std::fmt::Debug;
+use serde::Serialize;
 
-use super::{BinaryTree, Coordinate, Height, Mergeable};
+use super::{BinaryTree, Coordinate, Height, Mergeable, Node};
 
 pub mod multi_threaded;
 pub mod single_threaded;
@@ -61,7 +62,7 @@ pub struct InputLeafNode<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Implementation.
+// Implementations.
 
 impl<C> TreeBuilder<C>
 where
@@ -124,7 +125,7 @@ where
         new_padding_node_content: F,
     ) -> Result<BinaryTree<C>, TreeBuildError>
     where
-        C: Debug + Send + Sync + 'static,
+        C: Debug + Serialize + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         let height = self.height()?;
@@ -149,7 +150,7 @@ where
         new_padding_node_content: F,
     ) -> Result<BinaryTree<C>, TreeBuildError>
     where
-        C: Debug,
+        C: Debug + Serialize,
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
@@ -212,6 +213,22 @@ where
         Ok(leaf_nodes)
     }
 }
+
+impl<C> InputLeafNode<C> {
+    /// Convert the simpler node type to the actual Node type.
+    pub fn into_node(self) -> Node<C> {
+        Node {
+            content: self.content,
+            coord: Coordinate {
+                x: self.x_coord,
+                y: 0,
+            },
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Helper functions.
 
 /// Check that no 2 leaf nodes share the same x-coord.
 /// `leaf_nodes` is expected to be sorted by x-coord.

@@ -281,7 +281,7 @@ impl<T> Consume<T> for Option<T> {
 // -------------------------------------------------------------------------------------------------
 // Path verification.
 
-impl<C: Mergeable + Clone + PartialEq + Debug> Path<C> {
+impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
     /// Verify that the given list of sibling nodes + the base leaf node matches
     /// the given root node.
     ///
@@ -396,7 +396,6 @@ pub enum PathError {
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][LeftSibling] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
 struct LeftSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a right sibling node.
@@ -405,7 +404,6 @@ struct LeftSiblingRef<'a, C>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][RightSibling] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
 struct RightSiblingRef<'a, C>(&'a Node<C>);
 
 /// A reference to a pair of left and right sibling nodes.
@@ -414,7 +412,6 @@ struct RightSiblingRef<'a, C>(&'a Node<C>);
 /// underlying node. The purpose of this type is for efficiency gains over
 /// [super][sparse_binary_tree][MatchedPair] when ownership of the Node type is
 /// not needed.
-#[allow(dead_code)]
 struct MatchedPairRef<'a, C> {
     left: LeftSiblingRef<'a, C>,
     right: RightSiblingRef<'a, C>,
@@ -422,7 +419,6 @@ struct MatchedPairRef<'a, C> {
 
 impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
     /// Create a parent node by merging the 2 nodes in the pair.
-    #[allow(dead_code)]
     fn merge(&self) -> Node<C> {
         Node {
             coord: Coordinate {
