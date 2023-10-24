@@ -57,8 +57,14 @@ fn main() {
 
                     if let Some(ext) = path.extension() {
                         if ext != SERIALIZED_TREE_EXTENSION {
-                            error!("Unknown file extension {:?}, expected {}", ext, SERIALIZED_TREE_EXTENSION);
-                            panic!("Unknown file extension {:?}, expected {}", ext, SERIALIZED_TREE_EXTENSION);
+                            error!(
+                                "Unknown file extension {:?}, expected {}",
+                                ext, SERIALIZED_TREE_EXTENSION
+                            );
+                            panic!(
+                                "Unknown file extension {:?}, expected {}",
+                                ext, SERIALIZED_TREE_EXTENSION
+                            );
                         }
                         if let Some(parent) = path.parent() {
                             if !parent.is_dir() {
@@ -110,7 +116,13 @@ fn main() {
             // ID").unwrap()).unwrap(); println!("{:?}", proof);
         }
         (Commands::FromFile { path }, AccumulatorType::NdmSmt) => {
-            info!("TODO write this");
+            use std::io::BufReader;
+
+            let file = std::fs::File::open(path.to_string()).unwrap();
+            let mut buf_reader = BufReader::new(file);
+            let tmr = stimer!(Level::Debug; "Deserialization");
+            let decoded: NdmSmt = bincode::deserialize_from(buf_reader).unwrap();
+            logging_timer::finish!(tmr, "Done decoding");
         }
         _ => {
             error!("Command is not supported for the given accumulator");

@@ -34,7 +34,7 @@ use std::str::FromStr;
 
 use crate::binary_tree::Height;
 
-pub const SERIALIZED_TREE_EXTENSION: &str = ".dapoltree";
+pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -49,6 +49,7 @@ pub struct Cli {
     pub accumulator: AccumulatorType,
 }
 
+// STENT TODO print out the root when the tree is done building
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Create a new tree from the given parameters.
