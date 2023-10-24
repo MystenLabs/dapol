@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::{ffi::OsString, fs::File};
 
 use log::error;
-use logging_timer::{executing, finish, stimer, Level};
+use logging_timer::{executing, finish, stimer, Level, stime};
 use serde::{de::DeserializeOwned, Serialize};
 
 pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
@@ -23,7 +23,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
     structure: T,
     path: PathBuf,
 ) -> Result<(), ReadWriteError> {
-    let tmr = stimer!(Level::Debug; "Serialization");
+    let tmr = stimer!(Level::Info; "Serialization");
 
     let encoded: Vec<u8> = bincode::serialize(&structure)?;
     executing!(tmr, "Done encoding");
@@ -35,14 +35,11 @@ pub fn serialize_to_bin_file<T: Serialize>(
     Ok(())
 }
 
+#[stime("info")]
 pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T, ReadWriteError> {
     let file = File::open(path)?;
-    let mut buf_reader = BufReader::new(file);
-
-    let tmr = stimer!(Level::Debug; "Deserialization");
+    let buf_reader = BufReader::new(file);
     let decoded: T = bincode::deserialize_from(buf_reader)?;
-    finish!(tmr, "Done decoding");
-
     Ok(decoded)
 }
 
@@ -60,19 +57,25 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
 /// The default file name is `ndm_smt_<timestamp>.dapoltree`.
 pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
+        // If `path` leads to a file.
+
         if ext != SERIALIZED_TREE_EXTENSION {
             return Err(ReadWriteError::UnsupportedTreeExtension(ext.to_os_string()));
         }
 
         if let Some(parent) = path.parent() {
             if !parent.is_dir() {
+                // Create any intermediate, non-existent directories.
                 std::fs::create_dir_all(parent)?;
             }
         }
 
         Ok(path)
     } else {
+        // If `path` is a directory.
+
         if !path.is_dir() {
+            // Create any intermediate, non-existent directories.
             std::fs::create_dir_all(path.clone())?;
         }
 

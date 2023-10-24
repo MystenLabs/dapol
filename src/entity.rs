@@ -19,7 +19,6 @@ use rand::{
 use serde::{Deserialize, Serialize};
 
 use std::convert::From;
-use std::path::PathBuf;
 use std::str::FromStr;
 
 // -------------------------------------------------------------------------------------------------
@@ -72,7 +71,8 @@ impl From<EntityId> for Vec<u8> {
 ///
 /// CSV format: id,liability
 pub struct EntitiesParser {
-    file_path: PathBuf,
+    path_arg: Option<patharg::InputArg>,
+    num_entities: Option<u64>,
 }
 
 /// Supported file types for the parser.
@@ -82,8 +82,18 @@ enum FileType {
 
 impl EntitiesParser {
     /// Constructor.
-    pub fn from_path(file_path: PathBuf) -> Self {
-        EntitiesParser { file_path }
+    /// This is used by the CLI, hence the [patharg] parameter.
+    // TODO make a from_path function for non-cli usage
+    pub fn from_patharg(path_arg: Option<patharg::InputArg>) -> Self {
+        EntitiesParser {
+            path_arg,
+            num_entities: None,
+        }
+    }
+
+    pub fn with_num_entities(mut self, num_entities: Option<u64>) -> Self {
+        self.num_entities = num_entities;
+        self
     }
 
     /// Open and parse the file, returning a vector of entities.
@@ -94,8 +104,12 @@ impl EntitiesParser {
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
     pub fn parse(self) -> Result<Vec<Entity>, EntityParseError> {
-        let ext = self
-            .file_path
+        let path = self
+            .path_arg
+            .and_then(|arg| arg.into_path())
+            .ok_or(EntityParseError::PathNotSet)?;
+
+        let ext = path
             .extension()
             .and_then(|s| s.to_str())
             .ok_or(EntityParseError::UnknownFileType)?;
@@ -104,7 +118,7 @@ impl EntitiesParser {
 
         match FileType::from_str(ext)? {
             FileType::Csv => {
-                let mut reader = csv::Reader::from_path(self.file_path)?;
+                let mut reader = csv::Reader::from_path(path)?;
 
                 for record in reader.deserialize() {
                     let entity: Entity = record?;
@@ -114,6 +128,16 @@ impl EntitiesParser {
         };
 
         Ok(entities)
+    }
+
+    pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntityParseError> {
+        match &self.path_arg {
+            Some(_) => self.parse(),
+            None => Ok(generate_random_entities(
+                self.num_entities
+                    .ok_or(EntityParseError::NumEntitiesNotSet)?,
+            )),
+        }
     }
 }
 
@@ -156,6 +180,10 @@ pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
 
 #[derive(thiserror::Error, Debug)]
 pub enum EntityParseError {
+    #[error("Expected path to be set but found none")]
+    PathNotSet,
+    #[error("Expected num_entities to be set but found none")]
+    NumEntitiesNotSet,
     #[error("Unable to find file extension")]
     UnknownFileType,
     #[error("The file type with extension {ext:?} is not supported")]
@@ -183,6 +211,6 @@ mod tests {
     fn parser_csv_file_happy_case() {
         let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntitiesParser::from_path(path.into()).parse().unwrap();
+        EntitiesParser::from_patharg(path.into()).parse().unwrap();
     }
 }

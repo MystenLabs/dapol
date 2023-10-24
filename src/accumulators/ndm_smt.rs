@@ -9,7 +9,7 @@
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
 use std::{
-    collections::HashMap, convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr,
+    collections::HashMap, convert::TryFrom, fs::File, io::Read, str::FromStr,
 };
 
 use serde::{Deserialize, Serialize};
@@ -410,7 +410,7 @@ enum FileType {
 /// salt_s = "salt_s"
 /// ```
 pub struct SecretsParser {
-    file_path: PathBuf,
+    path_arg: Option<patharg::InputArg>,
 }
 
 const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
@@ -445,20 +445,27 @@ impl TryFrom<SecretsInput> for Secrets {
 
 impl SecretsParser {
     /// Constructor.
-    pub fn from_path(file_path: PathBuf) -> Self {
-        SecretsParser { file_path }
+    /// This is used by the CLI, hence the [patharg] parameter.
+    // TODO make a from_path function for non-cli usage
+    pub fn from_patharg(path_arg: Option<patharg::InputArg>) -> Self {
+        SecretsParser { path_arg }
     }
 
     /// Open and parse the file, returning a [Secrets] struct.
     ///
     /// An error is returned if:
-    /// a) the file cannot be opened
-    /// b) the file cannot be read
-    /// c) the file type is not supported
-    /// d) deserialization of any of the records in the file fails
+    /// 1. The path is None (i.e. was not set).
+    /// 2. The file cannot be opened.
+    /// 3. The file cannot be read.
+    /// 4. The file type is not supported.
+    /// 5. Deserialization of any of the records in the file fails.
     pub fn parse(self) -> Result<Secrets, SecretsParseError> {
-        let ext = self
-            .file_path
+        let path = self
+            .path_arg
+            .and_then(|arg| arg.into_path())
+            .ok_or(SecretsParseError::PathNotSet)?;
+
+        let ext = path
             .extension()
             .and_then(|s| s.to_str())
             .ok_or(SecretsParseError::UnknownFileType)?;
@@ -466,13 +473,20 @@ impl SecretsParser {
         let secrets = match FileType::from_str(ext)? {
             FileType::Toml => {
                 let mut buf = String::new();
-                File::open(self.file_path)?.read_to_string(&mut buf)?;
+                File::open(path)?.read_to_string(&mut buf)?;
                 let secrets: SecretsInput = toml::from_str(&buf).unwrap();
                 Secrets::try_from(secrets)?
             }
         };
 
         Ok(secrets)
+    }
+
+    pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParseError> {
+        match &self.path_arg {
+            Some(_) => self.parse(),
+            None => Ok(Secrets::generate_random()),
+        }
     }
 }
 
@@ -516,6 +530,8 @@ pub struct OutOfBoundsError {
 
 #[derive(Error, Debug)]
 pub enum SecretsParseError {
+    #[error("Expected path to be set but found none")]
+    PathNotSet,
     #[error("Unable to find file extension")]
     UnknownFileType,
     #[error("The file type with extension {ext:?} is not supported")]
