@@ -50,7 +50,7 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
-    C: Debug + Clone + Serialize + Mergeable + 'static, /* This static is needed for the boxed
+    C: Debug + Clone + Mergeable + 'static, /* This static is needed for the boxed
                                                          * hashmap. */
     F: Fn(&Coordinate) -> C,
 {

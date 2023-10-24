@@ -72,7 +72,7 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
-    C: Debug + Serialize + Clone + Mergeable + Send + Sync + 'static,
+    C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     use super::verify_no_duplicate_leaves;

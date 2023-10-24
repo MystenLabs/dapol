@@ -79,7 +79,7 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 ///
 /// The generic type `C` is for the content contained within each node.
 #[derive(Serialize, Deserialize)]
-pub struct BinaryTree<C: Clone> {
+pub struct BinaryTree<C> {
     root: Node<C>,
     store: Store<C>,
     height: Height,

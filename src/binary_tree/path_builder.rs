@@ -19,7 +19,6 @@
 
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
 
-use serde::Serialize;
 use std::fmt::Debug;
 
 // -------------------------------------------------------------------------------------------------
@@ -32,7 +31,7 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug)]
-pub struct Path<C: Serialize> {
+pub struct Path<C> {
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
 }
@@ -43,12 +42,12 @@ pub struct Path<C: Serialize> {
 /// A builder pattern is used to construct [Path].
 /// Since a path is uniquely determined by a leaf node all we need is the tree
 /// and the leaf node's x-coord.
-pub struct PathBuilder<'a, C: Clone> {
+pub struct PathBuilder<'a, C> {
     tree: Option<&'a BinaryTree<C>>,
     leaf_x_coord: Option<u64>,
 }
 
-impl<'a, C: Clone + Serialize> PathBuilder<'a, C> {
+impl<'a, C> PathBuilder<'a, C> {
     pub fn new() -> Self {
         PathBuilder {
             tree: None,
@@ -253,7 +252,7 @@ impl<'a, C: Clone + Serialize> PathBuilder<'a, C> {
     }
 }
 
-impl<C: Clone + Serialize> BinaryTree<C> {
+impl<C> BinaryTree<C> {
     pub fn path_builder(&self) -> PathBuilder<C> {
         PathBuilder::new().with_tree(self)
     }
@@ -282,7 +281,7 @@ impl<T> Consume<T> for Option<T> {
 // -------------------------------------------------------------------------------------------------
 // Path verification.
 
-impl<C: Debug + Clone + Serialize + Mergeable + PartialEq> Path<C> {
+impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
     /// Verify that the given list of sibling nodes + the base leaf node matches
     /// the given root node.
     ///
@@ -342,11 +341,11 @@ impl<C: Debug + Clone + Serialize + Mergeable + PartialEq> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Path conversion.
 
-impl<C: Serialize> Path<C> {
+impl<C> Path<C> {
     /// Convert `Path<C>` to `Path<D>`.
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
-    pub fn convert<B: From<C> + Serialize>(self) -> Path<B> {
+    pub fn convert<B: From<C>>(self) -> Path<B> {
         Path {
             siblings: self
                 .siblings
