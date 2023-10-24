@@ -34,8 +34,6 @@ use std::str::FromStr;
 
 use crate::binary_tree::Height;
 
-pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
-
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Cli {
@@ -45,11 +43,13 @@ pub struct Cli {
     #[command(flatten)]
     pub verbose: Verbosity<WarnLevel>,
 
+    /// Choose an accumulator type for the tree.
     #[arg(short, long, value_enum)]
     pub accumulator: AccumulatorType,
 }
 
 // STENT TODO print out the root when the tree is done building
+// STENT we want a keep-running flag after new or from-file, for doing proofs
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Create a new tree from the given parameters.

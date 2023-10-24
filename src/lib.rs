@@ -15,6 +15,7 @@ mod accumulators;
 pub use accumulators::{NdmSmt, Secrets, SecretsParser};
 
 pub mod cli;
+pub mod read_write_utils;
 
 use clap_verbosity_flag::{LevelFilter};
 

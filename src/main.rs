@@ -6,8 +6,10 @@ use chrono;
 
 use dapol::{
     activate_logging,
-    cli::{AccumulatorType, Cli, Commands, SERIALIZED_TREE_EXTENSION},
-    generate_random_entities, EntitiesParser, NdmSmt, Secrets, SecretsParser,
+    cli::{AccumulatorType, Cli, Commands},
+    generate_random_entities, read_write_utils,
+    read_write_utils::LogOnErr,
+    EntitiesParser, NdmSmt, Secrets, SecretsParser,
 };
 
 fn main() {
@@ -47,68 +49,27 @@ fn main() {
             // for problems with file names etc.
             let serialization_path = match serialize.clone() {
                 Some(path_arg) => {
-                    // Path is a:
-                    // - non-existing directory
-                    // - existing directory
-                    // - file with some dirs created
-                    // - file with all dirs created
+                    let path = read_write_utils::parse_tree_serialization_path(
+                        path_arg.into_path().unwrap(),
+                    )
+                    .log_on_err()
+                    .unwrap();
 
-                    let mut path = path_arg.into_path().unwrap();
-
-                    if let Some(ext) = path.extension() {
-                        if ext != SERIALIZED_TREE_EXTENSION {
-                            error!(
-                                "Unknown file extension {:?}, expected {}",
-                                ext, SERIALIZED_TREE_EXTENSION
-                            );
-                            panic!(
-                                "Unknown file extension {:?}, expected {}",
-                                ext, SERIALIZED_TREE_EXTENSION
-                            );
-                        }
-                        if let Some(parent) = path.parent() {
-                            if !parent.is_dir() {
-                                std::fs::create_dir_all(parent).unwrap();
-                            }
-                        }
-                        Some(path)
-                    } else {
-                        if !path.is_dir() {
-                            std::fs::create_dir_all(path.clone()).unwrap();
-                        }
-                        let mut file_name: String = "ndm_smt_".to_owned();
-                        let now = chrono::offset::Local::now();
-                        file_name.push_str(&now.timestamp().to_string());
-                        file_name.push_str(SERIALIZED_TREE_EXTENSION);
-                        path.push(file_name);
-                        Some(path)
-                    }
+                    Some(path)
                 }
                 None => None,
             };
 
-            let ndmsmt_res = NdmSmt::new(secrets, height, entities);
+            let ndmsmt = NdmSmt::new(secrets, height, entities).log_on_err().unwrap();
 
-            match ndmsmt_res {
-                Ok(ndmsmt) => {
-                    if serialize.is_some() {
-                        use std::io::Write;
-
-                        let tmr = stimer!(Level::Debug; "Serialization");
-                        let encoded: Vec<u8> = bincode::serialize(&ndmsmt).unwrap();
-                        executing!(tmr, "Done encoding");
-                        let mut file = std::fs::File::create(
-                            serialization_path
-                                .expect("Bug in CLI parser: serialization path not set"),
-                        )
-                        .unwrap();
-                        file.write_all(&encoded).unwrap();
-                        logging_timer::finish!(tmr, "Done writing file");
-                    }
-                }
-                Err(err) => {
-                    error!("{:?} {}", err, err);
-                }
+            if serialize.is_some() {
+                read_write_utils::serialize_to_bin_file(
+                    ndmsmt,
+                    serialization_path
+                        .expect("Bug in CLI parser: serialization path not set for ndmsmt"),
+                )
+                .log_on_err()
+                .unwrap();
             }
 
             // let proof =
@@ -116,13 +77,9 @@ fn main() {
             // ID").unwrap()).unwrap(); println!("{:?}", proof);
         }
         (Commands::FromFile { path }, AccumulatorType::NdmSmt) => {
-            use std::io::BufReader;
-
-            let file = std::fs::File::open(path.to_string()).unwrap();
-            let mut buf_reader = BufReader::new(file);
-            let tmr = stimer!(Level::Debug; "Deserialization");
-            let decoded: NdmSmt = bincode::deserialize_from(buf_reader).unwrap();
-            logging_timer::finish!(tmr, "Done decoding");
+            read_write_utils::deserialize_from_bin_file::<NdmSmt>(path.into_path().unwrap())
+                .log_on_err()
+                .unwrap();
         }
         _ => {
             error!("Command is not supported for the given accumulator");
