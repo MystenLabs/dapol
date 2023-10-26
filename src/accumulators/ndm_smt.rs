@@ -8,34 +8,29 @@
 //!
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
-use std::{
-    collections::HashMap, convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr,
-};
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-use log::{error, warn};
-use logging_timer::{time, timer, Level};
+use log::error;
+use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use rand::{
-    distributions::{Alphanumeric, DistString, Uniform},
-    rngs::ThreadRng,
-    thread_rng, Rng,
+use crate::binary_tree::{
+    BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
 };
-
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
-use crate::secret::Secret;
-use crate::{
-    binary_tree::{
-        BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
-    },
-    secret,
-};
+
+mod secrets;
+use secrets::Secrets;
+mod secrets_parser;
+pub use secrets_parser::SecretsParser;
+mod x_coord_generator;
+use x_coord_generator::{OutOfBoundsError, RandomXCoordGenerator};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -238,109 +233,6 @@ impl NdmSmt {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Random shuffle algorithm.
-
-/// Used for generating unique x-coordinate values on the bottom layer of the
-/// tree.
-///
-/// A struct is needed as apposed to just a function because the algorithm used
-/// to generate new values requires keeping a memory of previously used values
-/// so that it can generate new ones that are different from previous ones.
-///
-/// Fields:
-/// - `rng` is a cryptographically secure pseudo-random number generator.
-/// - The `used_x_coords` map keeps track of which x-coords have already been
-/// generated.
-/// - `max_x_coord` is the upper bound on the generated values, 0 being the
-/// lower bound.
-/// - `i` is used to track the current position of the algorithm.
-///
-/// Usage:
-/// After creating the struct the calling code can repeatedly call
-/// `new_unique_x_coord` any number of times in the range `[1, max_x_coord]`.
-/// If the function is called more than `max_x_coord` times an error will be
-/// returned.
-///
-/// The random values are generated using Durstenfeld’s shuffle algorithm
-/// optimized by HashMap. This algorithm wraps the `rng`, efficiently avoiding
-/// collisions. Here is some pseudo code explaining how it works:
-///
-/// ```bash,ignore
-/// if N > max_x_coord throw error
-/// for i in range [0, N]:
-/// - pick random k in range [i, max_x_coord]
-/// - if k in map then set v = map[k]
-///   - while map[v] exists: v = map[v]
-///   - result = v
-/// - else result = k
-/// - set map[k] = i
-/// ```
-///
-/// Assuming `rng` is constant time the above algorithm has time complexity
-/// `O(N)`. Note that the second loop (the while loop) will only execute a
-/// total of `N` times throughout the entire loop cycle of the first loop.
-/// This is because the second loop will only execute if a chain in the map
-/// exists, and the worst case happens when there is 1 long chain containing
-/// all the elements of the map; in this case the second loop will only execute
-/// on 1 of the iterations of the first loop.
-// TODO DOCS the above explanation is not so good, improve it
-struct RandomXCoordGenerator {
-    rng: ThreadRng,
-    used_x_coords: HashMap<u64, u64>,
-    max_x_coord: u64,
-    i: u64,
-}
-
-impl RandomXCoordGenerator {
-    /// Constructor.
-    ///
-    /// `height` is used to determine `max_x_coords`: `2^(height-1)`. This means
-    /// that `max_x_coords` is the total number of available leaf nodes on the
-    /// bottom layer of the tree.
-    fn from(height: &Height) -> Self {
-        use crate::binary_tree::max_bottom_layer_nodes;
-
-        RandomXCoordGenerator {
-            used_x_coords: HashMap::<u64, u64>::new(),
-            max_x_coord: max_bottom_layer_nodes(height),
-            rng: thread_rng(),
-            i: 0,
-        }
-    }
-
-    /// Generate a new unique random x-coord using Durstenfeld’s shuffle
-    /// algorithm optimized by HashMap.
-    ///
-    /// An error is returned if this function is called more than `max_x_coord`
-    /// times.
-    fn new_unique_x_coord(&mut self) -> Result<u64, OutOfBoundsError> {
-        if self.i >= self.max_x_coord {
-            return Err(OutOfBoundsError {
-                max_value: self.max_x_coord,
-            });
-        }
-
-        let range = Uniform::from(self.i..self.max_x_coord);
-        let random_x = self.rng.sample(range);
-
-        let x = match self.used_x_coords.get(&random_x) {
-            Some(mut existing_x) => {
-                // follow the full chain of linked numbers until we find the leaf
-                while self.used_x_coords.contains_key(existing_x) {
-                    existing_x = self.used_x_coords.get(existing_x).unwrap();
-                }
-                *existing_x
-            }
-            None => random_x,
-        };
-
-        self.used_x_coords.insert(random_x, self.i);
-        self.i += 1;
-        Ok(x)
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
 // Helper functions.
 
 /// Create a new closure that generates padding node content using the secret
@@ -365,146 +257,6 @@ fn new_padding_node_content_closure(
 }
 
 // -------------------------------------------------------------------------------------------------
-// Secrets struct & parser.
-// STENT TODO separate Secrets & parser into different sections
-// STENT TODO rename Secrets & parser so that we know it's part of ndmsmt only
-// (or just don't re-export in lib.rs)
-
-/// This coding style is a bit ugly but it is the simplest way to get the
-/// desired outcome, which is to deserialize string values into a byte array.
-/// We can't deserialize automatically to [a secret] without a custom
-/// implementation of the [deserialize trait]. Instead we deserialize to
-/// [SecretsInput] and then convert the individual string fields to byte arrays.
-///
-/// [a secret] crate::secret::Secret
-/// [deserialize trait] serde::Deserialize
-#[derive(Deserialize)]
-pub struct SecretsInput {
-    master_secret: String,
-    salt_b: String,
-    salt_s: String,
-}
-
-/// Values required for tree construction and inclusion proof generation.
-///
-/// The names of the secret values are exactly the same as the ones given in the
-/// DAPOL+ paper.
-#[derive(Serialize, Deserialize)]
-pub struct Secrets {
-    master_secret: Secret,
-    salt_b: Secret,
-    salt_s: Secret,
-}
-
-/// Supported file types for the parser.
-enum FileType {
-    Toml,
-}
-
-/// Parser for files containing secrets.
-///
-/// Supported file types: toml
-/// Note that the file type is inferred from its path extension.
-///
-/// TOML format:
-/// ```toml,ignore
-/// master_secret = "master_secret"
-/// salt_b = "salt_b"
-/// salt_s = "salt_s"
-/// ```
-pub struct SecretsParser {
-    path: Option<PathBuf>,
-}
-
-const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
-
-impl Secrets {
-    #[time("debug", "NdmSmt::Secrets::{}")]
-    pub fn generate_random() -> Self {
-        let mut rng = thread_rng();
-        let master_secret_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
-        let salt_b_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
-        let salt_s_str = Alphanumeric.sample_string(&mut rng, secret::MAX_LENGTH_BYTES);
-
-        Secrets {
-            master_secret: Secret::from_str(&master_secret_str).expect(STRING_CONVERSION_ERR_MSG),
-            salt_b: Secret::from_str(&salt_b_str).expect(STRING_CONVERSION_ERR_MSG),
-            salt_s: Secret::from_str(&salt_s_str).expect(STRING_CONVERSION_ERR_MSG),
-        }
-    }
-}
-
-impl TryFrom<SecretsInput> for Secrets {
-    type Error = SecretsParseError;
-
-    fn try_from(input: SecretsInput) -> Result<Secrets, SecretsParseError> {
-        Ok(Secrets {
-            master_secret: Secret::from_str(&input.master_secret)?,
-            salt_b: Secret::from_str(&input.salt_b)?,
-            salt_s: Secret::from_str(&input.salt_s)?,
-        })
-    }
-}
-
-impl SecretsParser {
-    // STENT TODO is the name misleading here because the parameter is optional?
-    pub fn from_path(path: Option<PathBuf>) -> Self {
-        SecretsParser { path }
-    }
-
-    /// Open and parse the file, returning a [Secrets] struct.
-    ///
-    /// An error is returned if:
-    /// 1. The path is None (i.e. was not set).
-    /// 2. The file cannot be opened.
-    /// 3. The file cannot be read.
-    /// 4. The file type is not supported.
-    /// 5. Deserialization of any of the records in the file fails.
-    pub fn parse(self) -> Result<Secrets, SecretsParseError> {
-        let path = self.path.ok_or(SecretsParseError::PathNotSet)?;
-
-        let ext = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .ok_or(SecretsParseError::UnknownFileType)?;
-
-        let secrets = match FileType::from_str(ext)? {
-            FileType::Toml => {
-                let mut buf = String::new();
-                File::open(path)?.read_to_string(&mut buf)?;
-                let secrets: SecretsInput = toml::from_str(&buf).unwrap();
-                Secrets::try_from(secrets)?
-            }
-        };
-
-        Ok(secrets)
-    }
-
-    pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParseError> {
-        match &self.path {
-            Some(_) => self.parse(),
-            None => {
-                warn!(
-                    "Could not determine path for secrets file, defaulting to randomized secrets"
-                );
-                Ok(Secrets::generate_random())
-            }
-        }
-    }
-}
-
-impl FromStr for FileType {
-    type Err = SecretsParseError;
-
-    fn from_str(ext: &str) -> Result<FileType, Self::Err> {
-        match ext {
-            "toml" => Ok(FileType::Toml),
-            _ => Err(SecretsParseError::UnsupportedFileType { ext: ext.into() }),
-        }
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
 // Errors.
 
 use thiserror::Error;
@@ -523,26 +275,6 @@ pub enum NdmSmtError {
     EntityIdNotFound,
     #[error("Entity ID {0:?} was duplicated")]
     DuplicateEntityIds(EntityId),
-}
-
-#[derive(Error, Debug)]
-#[error("Counter i cannot exceed max value {max_value:?}")]
-pub struct OutOfBoundsError {
-    max_value: u64,
-}
-
-#[derive(Error, Debug)]
-pub enum SecretsParseError {
-    #[error("Expected path to be set but found none")]
-    PathNotSet,
-    #[error("Unable to find file extension")]
-    UnknownFileType,
-    #[error("The file type with extension {ext:?} is not supported")]
-    UnsupportedFileType { ext: String },
-    #[error("Error converting string found in file to Secret")]
-    StringConversionError(#[from] secret::SecretParseError),
-    #[error("Error reading the file")]
-    FileReadError(#[from] std::io::Error),
 }
 
 // -------------------------------------------------------------------------------------------------
