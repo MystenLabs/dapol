@@ -4,13 +4,10 @@ use log::error;
 use dapol::{
     activate_logging,
     cli::{AccumulatorTypeCommand, Cli, Command, TreeBuildCommand},
-    ndm_smt, read_write_utils,
-    read_write_utils::LogOnErr,
-    NdmSmtConfigBuilder,
+    ndm_smt, AccumulatorParser, NdmSmtConfigBuilder,
 };
 
 // STENT TODO fix the unwraps
-// STENT TODO move all this stuff outside of main.rs, and do unit tests
 fn main() {
     let args = Cli::parse();
 
@@ -22,6 +19,8 @@ fn main() {
             gen_proofs,
             keep_alive,
         } => {
+            // TODO the type here will need to change once other accumulators
+            // are supported.
             let accumulator: ndm_smt::NdmSmt = match accumulator_type {
                 AccumulatorTypeCommand::NdmSmt { tree_build_type } => match tree_build_type {
                     TreeBuildCommand::New {
@@ -44,19 +43,13 @@ fn main() {
                         config.parse()
                     }
                     TreeBuildCommand::Deserialize { path } => {
-                        let ndmsmt =
-                            read_write_utils::deserialize_from_bin_file::<ndm_smt::NdmSmt>(
-                                path.into_path().unwrap(),
-                            )
-                            .log_on_err()
-                            .unwrap();
-
-                        ndmsmt
+                        ndm_smt::deserialize(path.into_path().unwrap()).unwrap()
                     }
                 },
                 AccumulatorTypeCommand::FromConfig { file_path } => {
-                    error!("TODO implement");
-                    panic!("");
+                    AccumulatorParser::from_config_fil_path(file_path.into_path())
+                        .parse()
+                        .unwrap()
                 }
             };
 

@@ -54,6 +54,7 @@ impl SecretsParser {
             FileType::Toml => {
                 let mut buf = String::new();
                 File::open(path)?.read_to_string(&mut buf)?;
+                // STENT TODO why unwrap here? Also check entities parser
                 let secrets: SecretsInput = toml::from_str(&buf).unwrap();
                 Secrets::try_from(secrets)?
             }
@@ -91,6 +92,7 @@ impl FromStr for FileType {
     }
 }
 
+// STENT TODO change name so it's "parser" not "parse", same for entity
 #[derive(Error, Debug)]
 pub enum SecretsParseError {
     #[error("Expected path to be set but found none")]
