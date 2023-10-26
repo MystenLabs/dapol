@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug};
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::{ffi::OsString, fs::File};
@@ -35,6 +35,13 @@ pub fn serialize_to_bin_file<T: Serialize>(
     Ok(())
 }
 
+/// Try to deserialize the given file to the specified type.
+///
+/// The file is assumed to be in [bincode] format.
+///
+/// An error is returned if
+/// 1. The file cannot be opened.
+/// 2. The [bincode] deserializer fails.
 #[stime("info")]
 pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T, ReadWriteError> {
     let file = File::open(path)?;
@@ -87,25 +94,6 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
         path.push(file_name);
 
         Ok(path)
-    }
-}
-
-// -------------------------------------------------------------------------------------------------
-// Traits for Result.
-
-// STENT TODO is this the best place for this to live? Maybe lib.rs?
-pub trait LogOnErr {
-    fn log_on_err(self) -> Self;
-}
-
-impl<T, E: Debug + Display> LogOnErr for Result<T, E> {
-    /// Produce an error [log] if self is an Err.
-    fn log_on_err(self) -> Self {
-        match &self {
-            Err(err) => error!("{:?} {}", err, err),
-            Ok(_) => {}
-        }
-        self
     }
 }
 

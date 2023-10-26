@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 use std::marker::PhantomData;
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::H256Finalizable;
+use crate::utils::H256Finalizable;
 use crate::secret::Secret;
 use crate::entity::EntityId;
 

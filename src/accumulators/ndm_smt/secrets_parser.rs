@@ -1,3 +1,17 @@
+//! Parser for files containing NDM-SMT-related secrets.
+//!
+//! Supported file types: toml
+//! Note that the file type is inferred from its path extension.
+//!
+//! TOML format:
+//! ```toml,ignore
+//! master_secret = "master_secret"
+//! salt_b = "salt_b"
+//! salt_s = "salt_s"
+//! ```
+//!
+//! See [super][secrets] for more details about the secret values.
+
 use std::{convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use log::warn;
@@ -6,12 +20,16 @@ use thiserror::Error;
 use super::secrets::{Secrets, SecretsInput};
 use crate::secret::SecretParseError;
 
+/// Parser requires a valid path to a file.
 pub struct SecretsParser {
     path: Option<PathBuf>,
 }
 
 impl SecretsParser {
-    // STENT TODO is the name misleading here because the parameter is optional?
+    /// Constructor.
+    ///
+    /// `Option` is used to wrap the parameter to make the code work more
+    /// seamlessly with the config builders in [super][super][accumulators].
     pub fn from_path(path: Option<PathBuf>) -> Self {
         SecretsParser { path }
     }

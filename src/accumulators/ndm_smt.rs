@@ -9,6 +9,7 @@
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,20 +18,19 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use crate::binary_tree::{
-    BinaryTree, Coordinate, Height, InputLeafNode, PathBuildError, TreeBuildError, TreeBuilder,
-};
+use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
 use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
+use crate::utils;
 
 mod secrets;
 use secrets::Secrets;
 mod secrets_parser;
 pub use secrets_parser::SecretsParser;
 mod x_coord_generator;
-use x_coord_generator::{OutOfBoundsError, RandomXCoordGenerator};
+use x_coord_generator::RandomXCoordGenerator;
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -76,7 +76,7 @@ impl NdmSmt {
     ) -> Result<Self, NdmSmtError> {
         // This is used to determine the number of threads to spawn in the
         // multi-threaded builder.
-        crate::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+        crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
             *opt.borrow_mut() = std::thread::available_parallelism()
                 .map_err(|err| {
                     error!("Problem accessing machine parallelism: {}", err);
@@ -256,6 +256,21 @@ fn new_padding_node_content_closure(
     }
 }
 
+/// Try deserialize an NDM-SMT from the given file path.
+///
+/// The file is assumed to be in [bincode] format.
+///
+/// An error is logged and returned if
+/// 1. The file cannot be opened.
+/// 2. The [bincode] deserializer fails.
+pub fn deserialize(path: PathBuf) -> Result<NdmSmt, NdmSmtError> {
+    use crate::read_write_utils::deserialize_from_bin_file;
+    use crate::utils::LogOnErr;
+
+    let deserialized = deserialize_from_bin_file::<NdmSmt>(path).log_on_err()?;
+    Ok(deserialized)
+}
+
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
@@ -264,17 +279,19 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
-    TreeError(#[from] TreeBuildError),
+    TreeError(#[from] crate::binary_tree::TreeBuildError),
     #[error("Number of entities cannot be bigger than 2^(height-1)")]
-    HeightTooSmall(#[from] OutOfBoundsError),
+    HeightTooSmall(#[from] x_coord_generator::OutOfBoundsError),
     #[error("Inclusion proof generation failed when trying to build the path in the tree")]
-    InclusionProofPathGenerationError(#[from] PathBuildError),
+    InclusionProofPathGenerationError(#[from] crate::binary_tree::PathBuildError),
     #[error("Inclusion proof generation failed")]
-    InclusionProofGenerationError(#[from] InclusionProofError),
+    InclusionProofGenerationError(#[from] crate::inclusion_proof::InclusionProofError),
     #[error("Entity ID not found in the entity mapping")]
     EntityIdNotFound,
     #[error("Entity ID {0:?} was duplicated")]
     DuplicateEntityIds(EntityId),
+    #[error("Error deserializing file")]
+    DeserializationError(#[from] crate::read_write_utils::ReadWriteError),
 }
 
 // -------------------------------------------------------------------------------------------------

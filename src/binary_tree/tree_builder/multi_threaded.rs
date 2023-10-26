@@ -283,7 +283,7 @@ impl RecursionParams {
         let y_coord = height.as_y_coord();
 
         let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
-        crate::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+        crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
             match *opt.borrow() {
                 None =>
                     warn!("No default parallelism found, defaulting to {}", max_thread_count)

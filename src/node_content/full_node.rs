@@ -20,7 +20,7 @@ use primitive_types::H256;
 use serde::{Serialize, Deserialize};
 use std::marker::PhantomData;
 
-use crate::H256Finalizable;
+use crate::utils::H256Finalizable;
 
 use super::HiddenNodeContent;
 
