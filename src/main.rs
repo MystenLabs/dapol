@@ -4,7 +4,7 @@ use log::error;
 use dapol::{
     activate_logging,
     cli::{AccumulatorTypeCommand, Cli, Command, TreeBuildCommand},
-    ndm_smt, AccumulatorParser, NdmSmtConfigBuilder,
+    ndm_smt, AccumulatorParser,
 };
 
 // STENT TODO fix the unwraps
@@ -29,7 +29,7 @@ fn main() {
                         entity_source,
                         serialize,
                     } => {
-                        let config = NdmSmtConfigBuilder::default()
+                        let config = ndm_smt::NdmSmtConfigBuilder::default()
                             .height(Some(height))
                             .secrets_file_path(secrets_file.and_then(|arg| arg.into_path()))
                             .serialization_path(serialize.and_then(|arg| arg.into_path()))

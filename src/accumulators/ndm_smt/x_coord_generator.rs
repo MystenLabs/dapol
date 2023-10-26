@@ -47,11 +47,7 @@ use std::collections::HashMap;
 
 use thiserror::Error;
 
-use rand::{
-    distributions::{Uniform},
-    rngs::ThreadRng,
-    thread_rng, Rng,
-};
+use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 
 use crate::binary_tree::Height;
 

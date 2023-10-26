@@ -27,10 +27,15 @@ use crate::utils;
 
 mod secrets;
 use secrets::Secrets;
+
 mod secrets_parser;
 pub use secrets_parser::SecretsParser;
+
 mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;
+
+mod config;
+pub use config::{NdmSmtConfig, NdmSmtConfigBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
