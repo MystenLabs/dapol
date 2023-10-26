@@ -42,20 +42,19 @@ impl SecretsParser {
     /// 3. The file cannot be read.
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
-    pub fn parse(self) -> Result<Secrets, SecretsParseError> {
-        let path = self.path.ok_or(SecretsParseError::PathNotSet)?;
+    pub fn parse(self) -> Result<Secrets, SecretsParserError> {
+        let path = self.path.ok_or(SecretsParserError::PathNotSet)?;
 
         let ext = path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(SecretsParseError::UnknownFileType)?;
+            .ok_or(SecretsParserError::UnknownFileType)?;
 
         let secrets = match FileType::from_str(ext)? {
             FileType::Toml => {
                 let mut buf = String::new();
                 File::open(path)?.read_to_string(&mut buf)?;
-                // STENT TODO why unwrap here? Also check entities parser
-                let secrets: SecretsInput = toml::from_str(&buf).unwrap();
+                let secrets: SecretsInput = toml::from_str(&buf)?;
                 Secrets::try_from(secrets)?
             }
         };
@@ -63,7 +62,7 @@ impl SecretsParser {
         Ok(secrets)
     }
 
-    pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParseError> {
+    pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParserError> {
         match &self.path {
             Some(_) => self.parse(),
             None => {
@@ -82,19 +81,18 @@ enum FileType {
 }
 
 impl FromStr for FileType {
-    type Err = SecretsParseError;
+    type Err = SecretsParserError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "toml" => Ok(FileType::Toml),
-            _ => Err(SecretsParseError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(SecretsParserError::UnsupportedFileType { ext: ext.into() }),
         }
     }
 }
 
-// STENT TODO change name so it's "parser" not "parse", same for entity
 #[derive(Error, Debug)]
-pub enum SecretsParseError {
+pub enum SecretsParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,
     #[error("Unable to find file extension")]
@@ -105,4 +103,6 @@ pub enum SecretsParseError {
     StringConversionError(#[from] SecretParseError),
     #[error("Error reading the file")]
     FileReadError(#[from] std::io::Error),
+    #[error("Deserialization process failed")]
+    DeserializationError(#[from] toml::de::Error),
 }

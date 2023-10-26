@@ -17,6 +17,7 @@
 //! [super][tree_builder][multi_threaded] and
 //! [super][tree_builder][single_threaded].
 
+use crate::utils::Consume;
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
 
 use std::fmt::Debug;
@@ -255,26 +256,6 @@ impl<'a, C> PathBuilder<'a, C> {
 impl<C> BinaryTree<C> {
     pub fn path_builder(&self) -> PathBuilder<C> {
         PathBuilder::new().with_tree(self)
-    }
-}
-
-trait Consume<T> {
-    fn consume<F>(self, f: F)
-    where
-        F: FnOnce(T);
-}
-
-impl<T> Consume<T> for Option<T> {
-    /// If `None` then do nothing and return nothing. If `Some` then call the
-    /// given function `f` with the value `T` but do not return anything.
-    fn consume<F>(self, f: F)
-    where
-        F: FnOnce(T),
-    {
-        match self {
-            None => {}
-            Some(x) => f(x),
-        }
     }
 }
 

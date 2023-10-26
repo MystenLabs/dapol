@@ -62,7 +62,7 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
 /// extension is checked.
 ///
 /// The default file name is `ndm_smt_<timestamp>.dapoltree`.
-pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
+pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
         // If `path` leads to a file.
 
@@ -86,8 +86,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
             std::fs::create_dir_all(path.clone())?;
         }
 
-        // STENT TODO we need this tree name to be generic
-        let mut file_name: String = "ndm_smt_".to_owned();
+        let mut file_name: String = file_prefix.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
         file_name.push_str(SERIALIZED_TREE_EXTENSION);

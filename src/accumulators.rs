@@ -51,8 +51,7 @@ impl AccumulatorParser {
             FileType::Toml => {
                 let mut buf = String::new();
                 File::open(config_file_path)?.read_to_string(&mut buf)?;
-                // STENT TODO why unwrap here?
-                let config: AccumulatorConfig = toml::from_str(&buf).unwrap();
+                let config: AccumulatorConfig = toml::from_str(&buf)?;
                 config
             }
         };
@@ -90,8 +89,8 @@ pub enum AccumulatorParserError {
     UnknownFileType,
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
-    // #[error("Error converting string found in file to Secret")]
-    // StringConversionError(#[from] SecretParseError),
     #[error("Error reading the file")]
     FileReadError(#[from] std::io::Error),
+    #[error("Deserialization process failed")]
+    DeserializationError(#[from] toml::de::Error),
 }

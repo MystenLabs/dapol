@@ -27,7 +27,7 @@ impl H256Finalizable for blake3::Hasher {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Traits for Result.
+// Traits for Option & Result.
 
 use log::error;
 use std::fmt::{Debug, Display};
@@ -46,6 +46,27 @@ impl<T, E: Debug + Display> LogOnErr for Result<T, E> {
         self
     }
 }
+
+pub trait Consume<T> {
+    fn consume<F>(self, f: F)
+    where
+        F: FnOnce(T);
+}
+
+impl<T> Consume<T> for Option<T> {
+    /// If `None` then do nothing and return nothing. If `Some` then call the
+    /// given function `f` with the value `T` but do not return anything.
+    fn consume<F>(self, f: F)
+    where
+        F: FnOnce(T),
+    {
+        match self {
+            None => {}
+            Some(x) => f(x),
+        }
+    }
+}
+
 
 // -------------------------------------------------------------------------------------------------
 // Global variables.

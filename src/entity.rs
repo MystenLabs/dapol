@@ -41,13 +41,13 @@ const ENTITY_ID_MAX_BYTES: usize = 32;
 pub struct EntityId(String);
 
 impl FromStr for EntityId {
-    type Err = EntityParseError;
+    type Err = EntityParserError;
 
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() > ENTITY_ID_MAX_BYTES {
-            Err(EntityParseError::EntityIdTooLongError { id: s.into() })
+            Err(EntityParserError::EntityIdTooLongError { id: s.into() })
         } else {
             Ok(EntityId(s.into()))
         }
@@ -105,13 +105,13 @@ impl EntitiesParser {
     /// a) the file cannot be opened
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
-    pub fn parse(self) -> Result<Vec<Entity>, EntityParseError> {
-        let path = self.path.ok_or(EntityParseError::PathNotSet)?;
+    pub fn parse(self) -> Result<Vec<Entity>, EntityParserError> {
+        let path = self.path.ok_or(EntityParserError::PathNotSet)?;
 
         let ext = path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(EntityParseError::UnknownFileType)?;
+            .ok_or(EntityParserError::UnknownFileType)?;
 
         let mut entities = Vec::<Entity>::new();
 
@@ -129,24 +129,24 @@ impl EntitiesParser {
         Ok(entities)
     }
 
-    pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntityParseError> {
+    pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntityParserError> {
         match &self.path {
             Some(_) => self.parse(),
             None => Ok(generate_random_entities(
                 self.num_entities
-                    .ok_or(EntityParseError::NumEntitiesNotSet)?,
+                    .ok_or(EntityParserError::NumEntitiesNotSet)?,
             )),
         }
     }
 }
 
 impl FromStr for FileType {
-    type Err = EntityParseError;
+    type Err = EntityParserError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "csv" => Ok(FileType::Csv),
-            _ => Err(EntityParseError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(EntityParserError::UnsupportedFileType { ext: ext.into() }),
         }
     }
 }
@@ -178,7 +178,7 @@ pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
 // Errors.
 
 #[derive(thiserror::Error, Debug)]
-pub enum EntityParseError {
+pub enum EntityParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,
     #[error("Expected num_entities to be set but found none")]

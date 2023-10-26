@@ -25,7 +25,6 @@ use rand::{
 ///
 /// The names of the secret values are exactly the same as the ones given in the
 /// DAPOL+ paper.
-// STENT TODO why is the deserialize trait here?
 #[derive(Serialize, Deserialize)]
 pub struct Secrets {
     pub master_secret: Secret,
@@ -34,14 +33,13 @@ pub struct Secrets {
 }
 
 /// This coding style is a bit ugly but it is the simplest way to get the
-/// desired outcome, which is to deserialize string values into a byte array.
+/// desired outcome, which is to deserialize toml values into a byte array.
 /// We can't deserialize automatically to [a secret] without a custom
 /// implementation of the [deserialize trait]. Instead we deserialize to
 /// [SecretsInput] and then convert the individual string fields to byte arrays.
 ///
 /// [a secret] crate::secret::Secret
 /// [deserialize trait] serde::Deserialize
-// STENT TODO do we really need this?
 #[derive(Deserialize)]
 pub struct SecretsInput {
     master_secret: String,
@@ -68,7 +66,7 @@ impl Secrets {
 }
 
 impl TryFrom<SecretsInput> for Secrets {
-    type Error = super::secrets_parser::SecretsParseError;
+    type Error = super::secrets_parser::SecretsParserError;
 
     fn try_from(input: SecretsInput) -> Result<Secrets, Self::Error> {
         Ok(Secrets {

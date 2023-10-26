@@ -8,9 +8,11 @@ use serde::Deserialize;
 use crate::binary_tree::Height;
 use crate::entity::EntitiesParser;
 use crate::read_write_utils::{parse_tree_serialization_path, serialize_to_bin_file};
-use crate::utils::LogOnErr;
+use crate::utils::{Consume, LogOnErr};
 
 use super::{NdmSmt, SecretsParser};
+
+const FILE_PREFIX: &str = "ndm_smt_";
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -44,7 +46,7 @@ impl NdmSmtConfig {
         // repeated for problems with file names etc.
         let serialization_path = match self.serialization_path.clone() {
             Some(path) => {
-                let path = parse_tree_serialization_path(path).log_on_err().unwrap();
+                let path = parse_tree_serialization_path(path, FILE_PREFIX).log_on_err().unwrap();
 
                 Some(path)
             }
@@ -53,8 +55,9 @@ impl NdmSmtConfig {
 
         let ndmsmt = NdmSmt::new(secrets, height, entities).log_on_err().unwrap();
 
-        // STENT TODO make this consume rather than map
-        serialization_path.map(|path| serialize_to_bin_file(&ndmsmt, path).log_on_err().err());
+        serialization_path.consume(|path| {
+            serialize_to_bin_file(&ndmsmt, path).log_on_err();
+        });
 
         // STENT TODO log out all the above info
 
