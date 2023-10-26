@@ -9,12 +9,12 @@
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
 use std::{
-    collections::HashMap, convert::TryFrom, fs::File, io::Read, str::FromStr,
+    collections::HashMap, convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr,
 };
 
 use serde::{Deserialize, Serialize};
 
-use log::error;
+use log::{error, warn};
 use logging_timer::{time, timer, Level};
 
 use rayon::prelude::*;
@@ -223,7 +223,7 @@ impl NdmSmt {
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
     ///   real-world cases)
-    pub fn generate_inclusion_proof(
+    fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {
@@ -366,6 +366,9 @@ fn new_padding_node_content_closure(
 
 // -------------------------------------------------------------------------------------------------
 // Secrets struct & parser.
+// STENT TODO separate Secrets & parser into different sections
+// STENT TODO rename Secrets & parser so that we know it's part of ndmsmt only
+// (or just don't re-export in lib.rs)
 
 /// This coding style is a bit ugly but it is the simplest way to get the
 /// desired outcome, which is to deserialize string values into a byte array.
@@ -410,7 +413,7 @@ enum FileType {
 /// salt_s = "salt_s"
 /// ```
 pub struct SecretsParser {
-    path_arg: Option<patharg::InputArg>,
+    path: Option<PathBuf>,
 }
 
 const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
@@ -444,11 +447,9 @@ impl TryFrom<SecretsInput> for Secrets {
 }
 
 impl SecretsParser {
-    /// Constructor.
-    /// This is used by the CLI, hence the [patharg] parameter.
-    // TODO make a from_path function for non-cli usage
-    pub fn from_patharg(path_arg: Option<patharg::InputArg>) -> Self {
-        SecretsParser { path_arg }
+    // STENT TODO is the name misleading here because the parameter is optional?
+    pub fn from_path(path: Option<PathBuf>) -> Self {
+        SecretsParser { path }
     }
 
     /// Open and parse the file, returning a [Secrets] struct.
@@ -460,10 +461,7 @@ impl SecretsParser {
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
     pub fn parse(self) -> Result<Secrets, SecretsParseError> {
-        let path = self
-            .path_arg
-            .and_then(|arg| arg.into_path())
-            .ok_or(SecretsParseError::PathNotSet)?;
+        let path = self.path.ok_or(SecretsParseError::PathNotSet)?;
 
         let ext = path
             .extension()
@@ -483,9 +481,14 @@ impl SecretsParser {
     }
 
     pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParseError> {
-        match &self.path_arg {
+        match &self.path {
             Some(_) => self.parse(),
-            None => Ok(Secrets::generate_random()),
+            None => {
+                warn!(
+                    "Could not determine path for secrets file, defaulting to randomized secrets"
+                );
+                Ok(Secrets::generate_random())
+            }
         }
     }
 }

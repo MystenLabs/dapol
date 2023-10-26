@@ -1,0 +1,25 @@
+# Accumulator type of the tree.
+# This value determines what other values are required.
+accumulator_type = "ndm-smt"
+
+# Height of the tree.
+# If the height is not set the default height will be used.
+height = 32
+
+# Path to the secrets file.
+# If not present the secrets will be generated randomly.
+secrets_file_path = "./secrets_example.toml"
+
+# Can be a file or directory (default file name given in this case)
+# If not present then no serialization is done.
+serialization_path = "./tree.dapoltree"
+
+# At least one of file_path & generate_random must be present.
+# If both are given then file_path is prioritized.
+[entities]
+
+# Path to a file containing a list of entity IDs and their liabilities.
+file_path = "./entities_example.csv"
+
+# Generate the given number of entities, with random IDs & liabilities.
+generate_random = 4

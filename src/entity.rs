@@ -18,7 +18,7 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 
-use std::convert::From;
+use std::{convert::From, path::PathBuf};
 use std::str::FromStr;
 
 // -------------------------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ impl From<EntityId> for Vec<u8> {
 ///
 /// CSV format: id,liability
 pub struct EntitiesParser {
-    path_arg: Option<patharg::InputArg>,
+    path: Option<PathBuf>,
     num_entities: Option<u64>,
 }
 
@@ -81,14 +81,16 @@ enum FileType {
 }
 
 impl EntitiesParser {
-    /// Constructor.
-    /// This is used by the CLI, hence the [patharg] parameter.
-    // TODO make a from_path function for non-cli usage
-    pub fn from_patharg(path_arg: Option<patharg::InputArg>) -> Self {
+    pub fn new () -> Self {
         EntitiesParser {
-            path_arg,
+            path: None,
             num_entities: None,
         }
+    }
+
+    pub fn with_path(mut self, path: Option<PathBuf>) -> Self {
+        self.path = path;
+        self
     }
 
     pub fn with_num_entities(mut self, num_entities: Option<u64>) -> Self {
@@ -104,10 +106,7 @@ impl EntitiesParser {
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
     pub fn parse(self) -> Result<Vec<Entity>, EntityParseError> {
-        let path = self
-            .path_arg
-            .and_then(|arg| arg.into_path())
-            .ok_or(EntityParseError::PathNotSet)?;
+        let path = self.path.ok_or(EntityParseError::PathNotSet)?;
 
         let ext = path
             .extension()
@@ -131,7 +130,7 @@ impl EntitiesParser {
     }
 
     pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntityParseError> {
-        match &self.path_arg {
+        match &self.path {
             Some(_) => self.parse(),
             None => Ok(generate_random_entities(
                 self.num_entities

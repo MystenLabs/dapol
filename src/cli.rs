@@ -58,7 +58,7 @@ pub enum Command {
     BuildTree {
         /// Choose the accumulator type for the tree.
         #[command(subcommand)]
-        acc: AccumulatorTypeCommand,
+        accumulator_type: AccumulatorTypeCommand,
 
         /// Generate inclusion proofs for the provided entity IDs, after
         /// building the tree (TODO not implemented yet).

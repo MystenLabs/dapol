@@ -1,6 +1,8 @@
+// STENT TODO think more about how we expose all these things
+
 mod binary_tree;
-mod node_content;
 mod kdf;
+mod node_content;
 
 mod secret;
 pub use secret::Secret;
@@ -9,15 +11,15 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod entity;
-pub use entity::{Entity, EntityId, EntitiesParser, generate_random_entities};
+pub use entity::{generate_random_entities, EntitiesParser, Entity, EntityId};
 
 mod accumulators;
-pub use accumulators::{NdmSmt, Secrets, SecretsParser};
+pub use accumulators::{ndm_smt, AccumulatorConfig, NdmSmtConfigBuilder};
 
 pub mod cli;
 pub mod read_write_utils;
 
-use clap_verbosity_flag::{LevelFilter};
+use clap_verbosity_flag::LevelFilter;
 
 #[cfg(test)]
 mod test_utils;
@@ -45,7 +47,6 @@ impl H256Finalizable for blake3::Hasher {
         H256(bytes)
     }
 }
-
 
 // -------------------------------------------------------------------------------------------------
 // Global variables.

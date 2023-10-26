@@ -20,7 +20,7 @@ pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 ///
 /// Turning on debug-level logs will show timing.
 pub fn serialize_to_bin_file<T: Serialize>(
-    structure: T,
+    structure: &T,
     path: PathBuf,
 ) -> Result<(), ReadWriteError> {
     let tmr = stimer!(Level::Info; "Serialization");
@@ -93,6 +93,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
 // -------------------------------------------------------------------------------------------------
 // Traits for Result.
 
+// STENT TODO is this the best place for this to live? Maybe lib.rs?
 pub trait LogOnErr {
     fn log_on_err(self) -> Self;
 }
