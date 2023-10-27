@@ -13,7 +13,7 @@ use crate::percentage::PercentageInteger;
 use bulletproofs::ProofError;
 use digest::Digest;
 use primitive_types::H256;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -36,7 +36,7 @@ use aggregated_range_proof::AggregatedRangeProof;
 /// The Bulletproofs protocol allows aggregating multiple range proofs into 1
 /// proof, which is more efficient to produce & verify than doing them
 /// individually. Both aggregated and individual range proofs are supported.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof<H: Clone> {
     path: Path<HiddenNodeContent<H>>,
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
@@ -205,7 +205,7 @@ impl<H: Debug + Clone + Digest + H256Finalizable> InclusionProof<H> {
 /// Number: the exact number of nodes to be used in the aggregated proof. Note
 /// that if this number is `> tree_height` it is treated as if it was equal to
 /// `tree_height`.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub enum AggregationFactor {
     Divisor(u8),
     Percent(PercentageInteger),

@@ -32,9 +32,9 @@
 extern crate num;
 
 use num::{Num, NumCast};
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct PercentageInteger {
     value: u8,
 }

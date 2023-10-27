@@ -31,7 +31,7 @@ use std::fmt::Debug;
 /// node's path. The siblings are ordered from bottom layer (first) to root node
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Path<C> {
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
@@ -341,7 +341,7 @@ impl<C> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
