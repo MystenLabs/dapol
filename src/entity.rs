@@ -11,6 +11,7 @@
 //!
 //! The entity struct has only 2 fields: ID and liability.
 
+use log::info;
 use logging_timer::time;
 use rand::{
     distributions::{Alphanumeric, DistString, Uniform},
@@ -18,9 +19,8 @@ use rand::{
 };
 use serde::{Deserialize, Serialize};
 
-use std::convert::From;
-use std::path::PathBuf;
 use std::str::FromStr;
+use std::{convert::From, path::PathBuf};
 
 // -------------------------------------------------------------------------------------------------
 // Main structs & implementations.
@@ -42,13 +42,13 @@ const ENTITY_ID_MAX_BYTES: usize = 32;
 pub struct EntityId(String);
 
 impl FromStr for EntityId {
-    type Err = EntityParseError;
+    type Err = EntityParserError;
 
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() > ENTITY_ID_MAX_BYTES {
-            Err(EntityParseError::EntityIdTooLongError { id: s.into() })
+            Err(EntityParserError::EntityIdTooLongError { id: s.into() })
         } else {
             Ok(EntityId(s.into()))
         }
@@ -65,14 +65,16 @@ impl From<EntityId> for Vec<u8> {
 // -------------------------------------------------------------------------------------------------
 // Entity parser.
 
-/// Parser for files containing many entity records.
+/// Parser for files containing a list of entity records.
 ///
 /// Supported file types: csv
 /// Note that the file type is inferred from its path extension.
 ///
-/// CSV format: id,liability
+/// Formatting:
+/// CSV: `id,liability`
 pub struct EntitiesParser {
-    file_path: PathBuf,
+    path: Option<PathBuf>,
+    num_entities: Option<u64>,
 }
 
 /// Supported file types for the parser.
@@ -81,9 +83,21 @@ enum FileType {
 }
 
 impl EntitiesParser {
-    /// Constructor.
-    pub fn from_path(file_path: PathBuf) -> Self {
-        EntitiesParser { file_path }
+    pub fn new() -> Self {
+        EntitiesParser {
+            path: None,
+            num_entities: None,
+        }
+    }
+
+    pub fn with_path(mut self, path: Option<PathBuf>) -> Self {
+        self.path = path;
+        self
+    }
+
+    pub fn with_num_entities(mut self, num_entities: Option<u64>) -> Self {
+        self.num_entities = num_entities;
+        self
     }
 
     /// Open and parse the file, returning a vector of entities.
@@ -93,18 +107,24 @@ impl EntitiesParser {
     /// a) the file cannot be opened
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
-    pub fn parse(self) -> Result<Vec<Entity>, EntityParseError> {
-        let ext = self
-            .file_path
+    pub fn parse(self) -> Result<Vec<Entity>, EntityParserError> {
+        info!(
+            "Attempting to parse {:?} as a file containing a list of entity IDs and liabilities",
+            &self.path
+        );
+
+        let path = self.path.ok_or(EntityParserError::PathNotSet)?;
+
+        let ext = path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(EntityParseError::UnknownFileType)?;
+            .ok_or(EntityParserError::UnknownFileType)?;
 
         let mut entities = Vec::<Entity>::new();
 
         match FileType::from_str(ext)? {
             FileType::Csv => {
-                let mut reader = csv::Reader::from_path(self.file_path)?;
+                let mut reader = csv::Reader::from_path(path)?;
 
                 for record in reader.deserialize() {
                     let entity: Entity = record?;
@@ -115,15 +135,35 @@ impl EntitiesParser {
 
         Ok(entities)
     }
+
+    /// If a file path is present then parse the file, otherwise generate
+    /// entity records randomly. The number of entity records generated must
+    /// be provided.
+    ///
+    /// Errors are returned if:
+    /// a) a file is present and [parse] gives an error
+    /// b) neither a file nor a number of entities are present
+    pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntityParserError> {
+        match &self.path {
+            Some(_) => self.parse(),
+            None => {
+                info!("No entity file provided, defaulting to generating random entities");
+                Ok(generate_random_entities(
+                    self.num_entities
+                        .ok_or(EntityParserError::NumEntitiesNotSet)?,
+                ))
+            }
+        }
+    }
 }
 
 impl FromStr for FileType {
-    type Err = EntityParseError;
+    type Err = EntityParserError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "csv" => Ok(FileType::Csv),
-            _ => Err(EntityParseError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(EntityParserError::UnsupportedFileType { ext: ext.into() }),
         }
     }
 }
@@ -133,6 +173,7 @@ impl FromStr for FileType {
 
 const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
 
+/// TODO DOCS
 #[time("debug")]
 pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
     let mut rng = thread_rng();
@@ -155,7 +196,11 @@ pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
 // Errors.
 
 #[derive(thiserror::Error, Debug)]
-pub enum EntityParseError {
+pub enum EntityParserError {
+    #[error("Expected path to be set but found none")]
+    PathNotSet,
+    #[error("Expected num_entities to be set but found none")]
+    NumEntitiesNotSet,
     #[error("Unable to find file extension")]
     UnknownFileType,
     #[error("The file type with extension {ext:?} is not supported")]
@@ -183,6 +228,6 @@ mod tests {
     fn parser_csv_file_happy_case() {
         let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntitiesParser::from_path(path.into()).parse().unwrap();
+        EntitiesParser::new().with_path(path.into()).parse().unwrap();
     }
 }
