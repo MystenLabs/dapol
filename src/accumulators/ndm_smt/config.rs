@@ -34,16 +34,16 @@
 //! Example how to use the builder:
 //! ```
 //! use std::path::PathBuf;
-//! use crate::binary_tree::Height;
-//! use crate::accumulators::ndm_smt;
+//! use dapol::Height;
+//! use dapol::ndm_smt;
 //!
-//! let height = Height::default();
+//! let height = Height::from(8);
 //!
 //! let config = ndm_smt::NdmSmtConfigBuilder::default()
-//!     .height(Some(height))
-//!     .secrets_file_path(PathBuf::from("./secrets.toml"))
+//!     .height(height)
+//!     .secrets_file_path(PathBuf::from("./secrets_example.toml"))
 //!     .serialization_path(PathBuf::from("./ndm_smt.dapoltree"))
-//!     .entities_path(PathBuf::from("./entities.csv"))
+//!     .entities_path(PathBuf::from("./entities_example.csv"))
 //!     .build()
 //!     .unwrap();
 //! ```
@@ -65,9 +65,13 @@ const FILE_PREFIX: &str = "ndm_smt_";
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
+    #[builder(setter(name = "height_opt"))]
     height: Option<Height>,
+    #[builder(setter(name = "secrets_file_path_opt"))]
     secrets_file_path: Option<PathBuf>,
+    #[builder(setter(name = "serialization_path_opt"))]
     serialization_path: Option<PathBuf>,
+    #[builder(private)]
     entities: EntityConfig,
 }
 
@@ -124,7 +128,19 @@ impl NdmSmtConfig {
 }
 
 impl NdmSmtConfigBuilder {
-    pub fn entities_path(&mut self, path: Option<PathBuf>) -> &mut Self {
+    pub fn height(&mut self, height: Height) -> &mut Self {
+        self.height_opt(Some(height))
+    }
+
+    pub fn serialization_path(&mut self, path: PathBuf) -> &mut Self {
+        self.serialization_path_opt(Some(path))
+    }
+
+    pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
+        self.secrets_file_path_opt(Some(path))
+    }
+
+    pub fn entities_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
@@ -137,7 +153,11 @@ impl NdmSmtConfigBuilder {
         self
     }
 
-    pub fn num_entities(&mut self, num_entites: Option<u64>) -> &mut Self {
+    pub fn entities_path(&mut self, path: PathBuf) -> &mut Self {
+        self.entities_path_opt(Some(path))
+    }
+
+    pub fn num_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
@@ -148,5 +168,9 @@ impl NdmSmtConfigBuilder {
             Some(entities) => entities.generate_random = num_entites,
         }
         self
+    }
+
+    pub fn num_entities(&mut self, num_entites: u64) -> &mut Self {
+        self.num_entities_opt(Some(num_entites))
     }
 }

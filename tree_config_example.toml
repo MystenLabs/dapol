@@ -4,7 +4,7 @@ accumulator_type = "ndm-smt"
 
 # Height of the tree.
 # If the height is not set the default height will be used.
-height = 32
+height = 16
 
 # Path to the secrets file.
 # If not present the secrets will be generated randomly.

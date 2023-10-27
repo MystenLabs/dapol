@@ -110,5 +110,5 @@ impl RandomXCoordGenerator {
 #[derive(Error, Debug)]
 #[error("Counter i cannot exceed max value {max_value:?}")]
 pub struct OutOfBoundsError {
-    max_value: u64,
+    pub max_value: u64,
 }

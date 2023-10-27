@@ -17,9 +17,9 @@
 //! Example how to use the parser:
 //! ```
 //! use std::path::PathBuf;
-//! use crate::accumulators::AccumulatorParser;
+//! use dapol::AccumulatorParser;
 //!
-//! let path = PathBuf::from("./config.toml");
+//! let path = PathBuf::from("./tree_config_example.toml");
 //!
 //! let accumulator = AccumulatorParser::from_config_fil_path(path)
 //!     .parse()
@@ -50,10 +50,14 @@ impl AccumulatorParser {
     ///
     /// `Option` is used to wrap the parameter to make the code work more
     /// seamlessly with the config builders in [super][super][accumulators].
-    pub fn from_config_fil_path(path: Option<PathBuf>) -> Self {
+    pub fn from_config_fil_path_opt(path: Option<PathBuf>) -> Self {
         AccumulatorParser {
             config_file_path: path,
         }
+    }
+
+    pub fn from_config_fil_path(path: PathBuf) -> Self {
+        Self::from_config_fil_path_opt(Some(path))
     }
 
     /// Open and parse the config file, then try to create an accumulator

@@ -288,7 +288,7 @@ mod tests {
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
 
-    use crate::test_utils::{assert_err, assert_err_simple};
+    use crate::utils::test_utils::{assert_err, assert_err_simple};
 
     use primitive_types::H256;
     use rand::{thread_rng, Rng};

@@ -1,8 +1,10 @@
 // STENT TODO think more about how we expose all these things
 
-mod binary_tree;
 mod kdf;
 mod node_content;
+
+mod binary_tree;
+pub use binary_tree::Height;
 
 mod secret;
 // STENT TODO not sure we need this exposed

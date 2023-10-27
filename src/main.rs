@@ -30,13 +30,13 @@ fn main() {
                         serialize,
                     } => {
                         let config = ndm_smt::NdmSmtConfigBuilder::default()
-                            .height(Some(height))
-                            .secrets_file_path(secrets_file.and_then(|arg| arg.into_path()))
-                            .serialization_path(serialize.and_then(|arg| arg.into_path()))
-                            .entities_path(
+                            .height(height)
+                            .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
+                            .serialization_path_opt(serialize.and_then(|arg| arg.into_path()))
+                            .entities_path_opt(
                                 entity_source.entities_file.and_then(|arg| arg.into_path()),
                             )
-                            .num_entities(entity_source.random_entities)
+                            .num_entities_opt(entity_source.random_entities)
                             .build()
                             .unwrap();
 
@@ -47,7 +47,7 @@ fn main() {
                     }
                 },
                 AccumulatorTypeCommand::FromConfig { file_path } => {
-                    AccumulatorParser::from_config_fil_path(file_path.into_path())
+                    AccumulatorParser::from_config_fil_path_opt(file_path.into_path())
                         .parse()
                         .unwrap()
                 }

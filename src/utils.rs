@@ -99,7 +99,7 @@ impl<T> IfNoneThen<T> for Option<T> {
     {
         match &self {
             None => f(),
-            Some(x) => {},
+            Some(_) => {},
         }
         self
     }

@@ -23,7 +23,6 @@ use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{AggregationFactor, InclusionProof};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
-use crate::utils;
 
 mod secrets;
 use secrets::Secrets;
@@ -310,9 +309,10 @@ pub enum NdmSmtError {
 #[cfg(test)]
 mod tests {
     mod ndm_smt {
+        use std::str::FromStr;
         use super::super::*;
         use crate::binary_tree::Height;
-        use std::str::FromStr;
+        use crate::secret::Secret;
 
         #[test]
         fn constructor_works() {
@@ -338,7 +338,7 @@ mod tests {
     mod random_x_coord_generator {
         use std::collections::HashSet;
 
-        use super::super::{OutOfBoundsError, RandomXCoordGenerator};
+        use super::super::x_coord_generator::{OutOfBoundsError, RandomXCoordGenerator};
         use crate::binary_tree::{max_bottom_layer_nodes, Height};
 
         #[test]
@@ -372,7 +372,7 @@ mod tests {
 
         #[test]
         fn new_unique_value_fails_for_large_i() {
-            use crate::test_utils::assert_err;
+            use crate::utils::test_utils::assert_err;
 
             let height = Height::from(4u8);
             let mut rxcg = RandomXCoordGenerator::from(&height);

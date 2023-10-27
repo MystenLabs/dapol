@@ -228,6 +228,6 @@ mod tests {
     fn parser_csv_file_happy_case() {
         let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntitiesParser::from_path(path.into()).parse().unwrap();
+        EntitiesParser::new().with_path(path.into()).parse().unwrap();
     }
 }
