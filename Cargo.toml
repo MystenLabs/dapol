@@ -18,7 +18,7 @@ blake2 = "0.9.0"
 # current
 
 primitive-types = { version = "0.12.1", features = ["serde"] } # H256 & U256 (I think parity uses this so maybe we just use that crate instead)
-percentage = "0.1.0"
+num = "0.4.1"
 
 # crypto
 rand = "0.8.5"

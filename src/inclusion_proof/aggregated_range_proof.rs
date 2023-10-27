@@ -38,13 +38,14 @@
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
+use serde::Serialize;
 
 use super::RangeProofError;
 
 /// `input_size` is u8 because it will be directly related to the length of a
 /// tree path, which is equal to the height of the tree, which is also stored as
 /// u8.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum AggregatedRangeProof {
     Padding {
         proof: RangeProof,

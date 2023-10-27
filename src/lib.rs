@@ -2,6 +2,7 @@
 
 mod kdf;
 mod node_content;
+mod percentage;
 
 mod binary_tree;
 pub use binary_tree::Height;

@@ -13,10 +13,11 @@
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
+use serde::Serialize;
 
 use super::RangeProofError;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct IndividualRangeProof(RangeProof);
 
 /// Maximum number of parties that can produce an aggregated proof.
