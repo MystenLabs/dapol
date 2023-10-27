@@ -32,8 +32,8 @@
 //! `max(y)+1`. The inputted leaves used to construct the tree must contain the
 //! `x` coordinate (their `y` coordinate will be 0).
 
+use serde::{Deserialize, Serialize};
 use std::fmt;
-use serde::{Serialize, Deserialize};
 
 mod tree_builder;
 pub use tree_builder::{
@@ -45,10 +45,11 @@ pub use path_builder::{Path, PathBuildError, PathError};
 
 mod utils;
 pub use utils::max_bottom_layer_nodes;
-use utils::{ErrOnSome, ErrUnlessTrue};
 
 mod height;
 pub use height::{Height, MAX_HEIGHT, MIN_HEIGHT};
+
+use crate::utils::ErrOnSome;
 
 /// Minimum recommended empty-space-to-leaf-node ratio.
 ///

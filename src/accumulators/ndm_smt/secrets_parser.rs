@@ -14,7 +14,7 @@
 
 use std::{convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr};
 
-use log::warn;
+use log::{warn, info};
 use thiserror::Error;
 
 use super::secrets::{Secrets, SecretsInput};
@@ -43,6 +43,11 @@ impl SecretsParser {
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
     pub fn parse(self) -> Result<Secrets, SecretsParserError> {
+        info!(
+            "Attempting to parse {:?} as a file containing NDM-SMT secrets",
+            &self.path
+        );
+
         let path = self.path.ok_or(SecretsParserError::PathNotSet)?;
 
         let ext = path

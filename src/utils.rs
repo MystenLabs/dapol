@@ -35,7 +35,6 @@ use std::fmt::{Debug, Display};
 pub trait LogOnErr {
     fn log_on_err(self) -> Self;
 }
-
 impl<T, E: Debug + Display> LogOnErr for Result<T, E> {
     /// Produce an error [log] if self is an Err.
     fn log_on_err(self) -> Self {
@@ -52,7 +51,6 @@ pub trait Consume<T> {
     where
         F: FnOnce(T);
 }
-
 impl<T> Consume<T> for Option<T> {
     /// If `None` then do nothing and return nothing. If `Some` then call the
     /// given function `f` with the value `T` but do not return anything.
@@ -67,6 +65,72 @@ impl<T> Consume<T> for Option<T> {
     }
 }
 
+pub trait IfSomeThen<T> {
+    fn if_some_then<F>(self, f: F) -> Option<T>
+    where
+        F: FnOnce(&T);
+}
+impl<T> IfSomeThen<T> for Option<T> {
+    /// If Some then execute the function on the underlying value. Always return
+    /// Option as it was.
+    fn if_some_then<F>(self, f: F) -> Option<T>
+    where
+        F: FnOnce(&T),
+    {
+        match &self {
+            None => {}
+            Some(x) => f(x),
+        }
+        self
+    }
+}
+
+pub trait IfNoneThen<T> {
+    fn if_none_then<F>(self, f: F) -> Option<T>
+    where
+        F: FnOnce();
+}
+impl<T> IfNoneThen<T> for Option<T> {
+    /// If None then execute the function on the underlying value. Always return
+    /// Option as it was.
+    fn if_none_then<F>(self, f: F) -> Option<T>
+    where
+        F: FnOnce(),
+    {
+        match &self {
+            None => f(),
+            Some(x) => {},
+        }
+        self
+    }
+}
+
+pub trait ErrOnSome {
+    fn err_on_some<E>(&self, err: E) -> Result<(), E>;
+}
+impl<T> ErrOnSome for Option<T> {
+    /// Return an error if `Some(_)`, otherwise do nothing.
+    fn err_on_some<E>(&self, err: E) -> Result<(), E> {
+        match self {
+            None => Ok(()),
+            Some(_) => Err(err),
+        }
+    }
+}
+
+pub trait ErrUnlessTrue {
+    fn err_unless_true<E>(&self, err: E) -> Result<(), E>;
+}
+impl ErrUnlessTrue for Option<bool> {
+    /// Return an error if `None` or `Some(false)`, otherwise do nothing.
+    fn err_unless_true<E>(&self, err: E) -> Result<(), E> {
+        match self {
+            None => Err(err),
+            Some(false) => Err(err),
+            Some(true) => Ok(()),
+        }
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 // Global variables.

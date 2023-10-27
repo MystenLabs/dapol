@@ -1,3 +1,31 @@
+//! Accumulator config and parser.
+//!
+//! This is the top-most file in the hierarchy of the dapol crate. An
+//! accumulator is required to build a binary tree, and determines how the
+//! binary tree is constructed. The are different types of accumulators, which
+//! can all be found under this module. Each accumulator has different
+//! configuration requirements, which are detailed in each of the sub-modules.
+//!
+//! Currently only TOML files are supported for config files. The only
+//! config requirement at this level (not including the specific accumulator
+//! config) is the accumulator type:
+//!
+//! ```toml,ignore
+//! accumulator_type = "ndm-smt"
+//! ```
+//!
+//! Example how to use the parser:
+//! ```
+//! use std::path::PathBuf;
+//! use crate::accumulators::AccumulatorParser;
+//!
+//! let path = PathBuf::from("./config.toml");
+//!
+//! let accumulator = AccumulatorParser::from_config_fil_path(path)
+//!     .parse()
+//!     .unwrap();
+//! ```
+
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use serde::Deserialize;

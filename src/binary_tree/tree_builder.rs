@@ -8,8 +8,8 @@
 //! type for the content of the node, which means the tree builder also has this
 //! generic type, `C`.
 
-use std::fmt::Debug;
 use serde::Serialize;
+use std::fmt::Debug;
 
 use super::{BinaryTree, Coordinate, Height, Mergeable, Node};
 
@@ -190,7 +190,8 @@ where
     ///
     /// No default value, returns an error if not set.
     fn leaf_nodes(self, height: &Height) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
-        use super::{max_bottom_layer_nodes, ErrUnlessTrue};
+        use super::max_bottom_layer_nodes;
+        use crate::utils::ErrUnlessTrue;
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
 
