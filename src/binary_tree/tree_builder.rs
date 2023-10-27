@@ -254,9 +254,8 @@ fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), 
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum TreeBuildError {
     #[error("The builder must be given leaf nodes before building")]
     NoLeafNodesProvided,

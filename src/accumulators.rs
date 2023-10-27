@@ -27,9 +27,7 @@
 //! ```
 
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
-
 use serde::Deserialize;
-use thiserror::Error;
 
 pub mod ndm_smt;
 
@@ -113,7 +111,7 @@ impl FromStr for FileType {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum AccumulatorParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,

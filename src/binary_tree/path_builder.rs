@@ -342,9 +342,8 @@ impl<C> Path<C> {
 // Errors.
 
 use serde::{Serialize, Deserialize};
-use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PathBuildError {
     #[error("The builder must be given a padding node generator function before building")]
     NoPaddingNodeContentGeneratorProvided,
@@ -356,7 +355,7 @@ pub enum PathBuildError {
     LeafNodeNotFound { coord: Coordinate },
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PathError {
     #[error("Calculated root content does not match provided root content")]
     RootMismatch,

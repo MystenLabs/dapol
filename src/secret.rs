@@ -78,9 +78,7 @@ impl From<Secret> for [u8; 32] {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
-
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum SecretParseError {
     #[error("The given string has more than the max allowed bytes of {MAX_LENGTH_BYTES}")]
     StringTooLongError,

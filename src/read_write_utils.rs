@@ -99,9 +99,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Re
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ReadWriteError {
     #[error("Problem serializing with bincode")]
     SerializationError(#[from] bincode::Error),

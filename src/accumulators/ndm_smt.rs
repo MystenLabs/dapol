@@ -278,9 +278,7 @@ pub fn deserialize(path: PathBuf) -> Result<NdmSmt, NdmSmtError> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
     TreeError(#[from] crate::binary_tree::TreeBuildError),
