@@ -15,8 +15,7 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod entity;
-// STENT TODO not sure we need any of these exposed
-pub use entity::{generate_random_entities, EntitiesParser, Entity, EntityId};
+pub use entity::{EntitiesParser, Entity, EntityId};
 
 mod accumulators;
 pub use accumulators::{ndm_smt, AccumulatorParser};
