@@ -222,7 +222,7 @@ impl NdmSmt {
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
     ///   real-world cases)
-    fn generate_inclusion_proof(
+    pub fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
     ) -> Result<InclusionProof<Hash>, NdmSmtError> {

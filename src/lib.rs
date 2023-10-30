@@ -15,7 +15,9 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod entity;
-pub use entity::{EntitiesParser, Entity, EntityId};
+pub use entity::{
+    EntitiesParser, EntitiesParserError, Entity, EntityId, EntityIdsParser, EntityIdsParserError,
+};
 
 mod accumulators;
 pub use accumulators::{ndm_smt, AccumulatorParser};

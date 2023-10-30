@@ -171,7 +171,7 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
         let parent_blinding_factor = left_sibling.blinding_factor + right_sibling.blinding_factor;
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
-        // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
+        // `hash = H(left.com | right.com | left.hash | right.hash`
         let parent_hash = {
             let mut hasher = H::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());

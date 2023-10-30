@@ -19,7 +19,7 @@ use super::FullNodeContent;
 /// Main struct containing the Pedersen commitment & hash.
 ///
 /// The hash function needs to be a generic parameter because when implementing
-/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, is not generic
+/// [crate][binary_tree][`Mergeable`] one needs to define the merge function,
 /// and the merge function in this case needs to use a generic hash function. One way to
 /// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -137,7 +137,7 @@ impl<H: Digest + H256Finalizable> Mergeable for HiddenNodeContent<H> {
     fn merge(left_sibling: &Self, right_sibling: &Self) -> Self {
         let parent_commitment = left_sibling.commitment + right_sibling.commitment;
 
-        // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
+        // `hash = H(left.com | right.com | left.hash | right.hash`
         let parent_hash = {
             let mut hasher = H::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
