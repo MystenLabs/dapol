@@ -24,7 +24,7 @@ enum FileType {
 
 impl EntityIdsParser {
     pub fn from_path(path: Option<PathBuf>) -> Self {
-        EntityIdsParser { path: None }
+        EntityIdsParser { path }
     }
 
     /// Open and parse the file, returning a vector of entity IDs.

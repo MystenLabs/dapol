@@ -35,7 +35,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
     Ok(())
 }
 
-/// Try to deserialize the given file to the specified type.
+/// Try to deserialize the given binary file to the specified type.
 ///
 /// The file is assumed to be in [bincode] format.
 ///

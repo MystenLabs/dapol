@@ -433,7 +433,6 @@ mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.last().unwrap().x_coord));
 
-        println!("leaf nodes {:?}", leaf_nodes);
         let res = verify_no_duplicate_leaves(&leaf_nodes);
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -446,7 +445,6 @@ mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
-        println!("leaf nodes {:?}", leaf_nodes);
         let _ = verify_no_duplicate_leaves(&leaf_nodes).unwrap();
     }
 
