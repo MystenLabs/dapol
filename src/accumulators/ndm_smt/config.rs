@@ -82,6 +82,8 @@ pub struct EntityConfig {
 }
 
 impl NdmSmtConfig {
+    /// Try to construct an NDM-SMT from the config.
+    // STENT TODO get rid of these unwraps
     pub fn parse(self) -> NdmSmt {
         let secrets = SecretsParser::from_path(self.secrets_file_path)
             .parse_or_generate_random()

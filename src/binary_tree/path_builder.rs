@@ -31,7 +31,7 @@ use std::fmt::Debug;
 /// node's path. The siblings are ordered from bottom layer (first) to root node
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Path<C> {
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
@@ -108,14 +108,7 @@ impl<'a, C> PathBuilder<'a, C> {
                 });
             }
 
-            if coord.y == 1 {
-                println!(
-                    "    node_builder x range {:?} leaf_nodes len {}",
-                    params.x_coord_range(),
-                    leaf_nodes.len()
-                );
-            }
-
+            // if coord.y == 1 {
             // If the above vector is empty then we know this node needs to be a
             // padding node.
             if leaf_nodes.is_empty() {
@@ -228,20 +221,16 @@ impl<'a, C> PathBuilder<'a, C> {
         let max_y_coord = tree.height().as_y_coord();
         let mut current_coord = leaf_coord;
 
-        println!("before loop in build");
         for _y in 0..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
-            println!("  loop y {} sibling_coord {:?}", _y, sibling_coord);
 
             let sibling = tree
                 .get_node(&sibling_coord)
                 .map(|n| {
-                    println!("    node found in tree {:?}", n);
                     n
                 })
                 .unwrap_or_else(|| node_builder(&sibling_coord, tree));
 
-            println!("  loop sibling {:?}", sibling);
             siblings.push(sibling);
             current_coord = current_coord.parent_coord();
         }
@@ -341,9 +330,9 @@ impl<C> Path<C> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
+use serde::{Serialize, Deserialize};
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PathBuildError {
     #[error("The builder must be given a padding node generator function before building")]
     NoPaddingNodeContentGeneratorProvided,
@@ -355,7 +344,7 @@ pub enum PathBuildError {
     LeafNodeNotFound { coord: Coordinate },
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum PathError {
     #[error("Calculated root content does not match provided root content")]
     RootMismatch,

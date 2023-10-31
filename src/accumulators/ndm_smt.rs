@@ -39,8 +39,7 @@ pub use config::{NdmSmtConfig, NdmSmtConfigBuilder};
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
 
-type Hash = blake3::Hasher;
-type Content = FullNodeContent<Hash>;
+type Content = FullNodeContent;
 
 /// Main struct containing tree object, master secret and the salts.
 ///
@@ -191,7 +190,7 @@ impl NdmSmt {
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
-    ) -> Result<InclusionProof<Hash>, NdmSmtError> {
+    ) -> Result<InclusionProof, NdmSmtError> {
         let leaf_x_coord = self
             .entity_mapping
             .get(entity_id)
@@ -222,10 +221,10 @@ impl NdmSmt {
     /// - `aggregation_factor`: half of all the range proofs are aggregated
     /// - `upper_bound_bit_length`: 64 (which should be plenty enough for most
     ///   real-world cases)
-    fn generate_inclusion_proof(
+    pub fn generate_inclusion_proof(
         &self,
         entity_id: &EntityId,
-    ) -> Result<InclusionProof<Hash>, NdmSmtError> {
+    ) -> Result<InclusionProof, NdmSmtError> {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
         self.generate_inclusion_proof_with_custom_range_proof_params(
@@ -278,9 +277,7 @@ pub fn deserialize(path: PathBuf) -> Result<NdmSmt, NdmSmtError> {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
     TreeError(#[from] crate::binary_tree::TreeBuildError),

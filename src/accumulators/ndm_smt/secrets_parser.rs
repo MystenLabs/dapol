@@ -13,9 +13,7 @@
 //! See [super][secrets] for more details about the secret values.
 
 use std::{convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr};
-
 use log::{warn, info};
-use thiserror::Error;
 
 use super::secrets::{Secrets, SecretsInput};
 use crate::secret::SecretParseError;
@@ -96,7 +94,7 @@ impl FromStr for FileType {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum SecretsParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,

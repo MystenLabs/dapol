@@ -101,9 +101,7 @@ impl Default for Height {
     }
 }
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum HeightError {
     #[error("Input is greater than the upper bound {MAX_HEIGHT:?}")]
     InputTooBig,

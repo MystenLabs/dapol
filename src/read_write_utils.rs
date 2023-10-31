@@ -35,7 +35,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
     Ok(())
 }
 
-/// Try to deserialize the given file to the specified type.
+/// Try to deserialize the given binary file to the specified type.
 ///
 /// The file is assumed to be in [bincode] format.
 ///
@@ -99,9 +99,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Re
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 pub enum ReadWriteError {
     #[error("Problem serializing with bincode")]
     SerializationError(#[from] bincode::Error),

@@ -44,11 +44,7 @@
 // TODO DOCS the above explanation is not so good, improve it
 
 use std::collections::HashMap;
-
-use thiserror::Error;
-
 use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
-
 use crate::binary_tree::Height;
 
 pub struct RandomXCoordGenerator {
@@ -107,7 +103,7 @@ impl RandomXCoordGenerator {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error("Counter i cannot exceed max value {max_value:?}")]
 pub struct OutOfBoundsError {
     pub max_value: u64,

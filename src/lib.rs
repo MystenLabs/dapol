@@ -2,6 +2,7 @@
 
 mod kdf;
 mod node_content;
+mod percentage;
 
 mod binary_tree;
 pub use binary_tree::Height;
@@ -14,8 +15,9 @@ mod inclusion_proof;
 pub use inclusion_proof::{InclusionProof, InclusionProofError};
 
 mod entity;
-// STENT TODO not sure we need any of these exposed
-pub use entity::{generate_random_entities, EntitiesParser, Entity, EntityId};
+pub use entity::{
+    EntitiesParser, EntitiesParserError, Entity, EntityId, EntityIdsParser, EntityIdsParserError,
+};
 
 mod accumulators;
 pub use accumulators::{ndm_smt, AccumulatorParser};
