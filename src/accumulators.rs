@@ -14,6 +14,9 @@
 //! accumulator_type = "ndm-smt"
 //! ```
 //!
+//! The rest of the config details can be found in the submodules:
+//! - [ndm_smt][ndm_smt_config]
+//!
 //! Example how to use the parser:
 //! ```
 //! use std::path::PathBuf;
@@ -26,56 +29,72 @@
 //!     .unwrap();
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
-use serde::Deserialize;
 
 pub mod ndm_smt;
 
+/// Various accumulator types.
+#[derive(Serialize, Deserialize)]
+// STENT TODO create serialization function in the impl
+pub enum Accumulator {
+    NdmSmt(ndm_smt::NdmSmt),
+    // TODO other accumulators..
+}
+
+impl Accumulator {
+    /// Try deserialize an accumulator from the given file path.
+    ///
+    /// The file is assumed to be in [bincode] format.
+    ///
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [bincode] deserializer fails.
+    pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
+        use crate::read_write_utils::deserialize_from_bin_file;
+        use crate::utils::LogOnErr;
+
+        let accumulator: Accumulator = deserialize_from_bin_file(path).log_on_err()?;
+        Ok(accumulator)
+    }
+}
+
+/// Configuration for the various accumulator types.
+///
+/// Currently only TOML files are supported for config files. The only
+/// config requirement at this level (not including the specific accumulator
+/// config) is the accumulator type:
+///
+/// ```toml,ignore
+/// accumulator_type = "ndm-smt"
+/// ```
+///
+/// The rest of the config details can be found in the submodules:
+/// - [ndm_smt][ndm_smt_config]
 #[derive(Deserialize, Debug)]
 #[serde(tag = "accumulator_type", rename_all = "kebab-case")]
+// STENT TODO move to own file
 pub enum AccumulatorConfig {
     NdmSmt(ndm_smt::NdmSmtConfig),
     // TODO other accumulators..
 }
 
-/// Parser requires a valid path to a file.
-pub struct AccumulatorParser {
-    config_file_path: Option<PathBuf>,
-}
+// STENT TODO rename all other builder methods that are 'new' to 'default' since this is what derive_default uses
+// STENT TODO also maybe get rid of the 'with' in the setters
+// STENT TODO move this to its own file
 
-impl AccumulatorParser {
-    /// Constructor.
-    ///
-    /// `Option` is used to wrap the parameter to make the code work more
-    /// seamlessly with the config builders in [super][super][accumulators].
-    pub fn from_config_fil_path_opt(path: Option<PathBuf>) -> Self {
-        AccumulatorParser {
-            config_file_path: path,
-        }
-    }
-
-    pub fn from_config_fil_path(path: PathBuf) -> Self {
-        Self::from_config_fil_path_opt(Some(path))
-    }
-
-    /// Open and parse the config file, then try to create an accumulator
-    /// object from the config.
+impl AccumulatorConfig {
+    /// Open the config file, then try to create an accumulator object.
     ///
     /// An error is returned if:
-    /// 1. The path is None (i.e. was not set).
-    /// 2. The file cannot be opened.
-    /// 3. The file cannot be read.
-    /// 4. The file type is not supported.
-    /// 5. Deserialization of any of the records in the file fails.
-    pub fn parse(self) -> Result<ndm_smt::NdmSmt, AccumulatorParserError> {
-        let config_file_path = self
-            .config_file_path
-            .ok_or(AccumulatorParserError::PathNotSet)?;
-
+    /// 1. The file cannot be opened.
+    /// 2. The file cannot be read.
+    /// 3. The file type is not supported.
+    pub fn deserialize(config_file_path: PathBuf) -> Result<Self, AccumulatorConfigError> {
         let ext = config_file_path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(AccumulatorParserError::UnknownFileType)?;
+            .ok_or(AccumulatorConfigError::UnknownFileType)?;
 
         let config = match FileType::from_str(ext)? {
             FileType::Toml => {
@@ -86,8 +105,16 @@ impl AccumulatorParser {
             }
         };
 
-        let accumulator = match config {
-            AccumulatorConfig::NdmSmt(config) => config.parse(),
+        Ok(config)
+    }
+
+    /// Parse the config, attempting to create an accumulator object.
+    ///
+    /// An error is returned if:
+    /// 1. TODO need to change the ndm-smt parse function to return an error first
+    pub fn parse(self) -> Result<Accumulator, AccumulatorError> {
+        let accumulator = match self {
+            AccumulatorConfig::NdmSmt(config) => Accumulator::NdmSmt(config.parse()),
             // TODO add more accumulators..
         };
 
@@ -95,27 +122,32 @@ impl AccumulatorParser {
     }
 }
 
-/// Supported file types for the parser.
+/// Supported file types for deserialization.
 enum FileType {
     Toml,
 }
 
 impl FromStr for FileType {
-    type Err = AccumulatorParserError;
+    type Err = AccumulatorConfigError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "toml" => Ok(FileType::Toml),
-            _ => Err(AccumulatorParserError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(AccumulatorConfigError::UnsupportedFileType { ext: ext.into() }),
         }
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum AccumulatorParserError {
-    #[error("Expected path to be set but found none")]
-    PathNotSet,
+pub enum AccumulatorError {
+    #[error("Error deserializing file")]
+    DeserializationError(#[from] crate::read_write_utils::ReadWriteError),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum AccumulatorConfigError {
     #[error("Unable to find file extension")]
+    // STENT TODO add path variable here to help user diagnose
     UnknownFileType,
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },

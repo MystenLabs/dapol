@@ -9,7 +9,6 @@
 //! The hash function chosen for the Merkle Sum Tree is blake3.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
@@ -259,21 +258,6 @@ fn new_padding_node_content_closure(
     }
 }
 
-/// Try deserialize an NDM-SMT from the given file path.
-///
-/// The file is assumed to be in [bincode] format.
-///
-/// An error is logged and returned if
-/// 1. The file cannot be opened.
-/// 2. The [bincode] deserializer fails.
-pub fn deserialize(path: PathBuf) -> Result<NdmSmt, NdmSmtError> {
-    use crate::read_write_utils::deserialize_from_bin_file;
-    use crate::utils::LogOnErr;
-
-    let deserialized = deserialize_from_bin_file::<NdmSmt>(path).log_on_err()?;
-    Ok(deserialized)
-}
-
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
@@ -291,8 +275,6 @@ pub enum NdmSmtError {
     EntityIdNotFound,
     #[error("Entity ID {0:?} was duplicated")]
     DuplicateEntityIds(EntityId),
-    #[error("Error deserializing file")]
-    DeserializationError(#[from] crate::read_write_utils::ReadWriteError),
 }
 
 // -------------------------------------------------------------------------------------------------

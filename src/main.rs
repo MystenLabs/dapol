@@ -4,9 +4,10 @@ use clap::Parser;
 use log::error;
 
 use dapol::{
+    accumulators::{ndm_smt, Accumulator, AccumulatorConfig},
     activate_logging,
     cli::{AccumulatorTypeCommand, Cli, Command, TreeBuildCommand},
-    ndm_smt, AccumulatorParser, EntityIdsParser,
+    EntityIdsParser,
 };
 
 // STENT TODO fix the unwraps
@@ -23,50 +24,55 @@ fn main() {
         } => {
             // TODO the type here will need to change once other accumulators
             // are supported.
-            let accumulator: ndm_smt::NdmSmt = match accumulator_type {
+            let accumulator: Accumulator = match accumulator_type {
                 AccumulatorTypeCommand::NdmSmt { tree_build_type } => match tree_build_type {
                     TreeBuildCommand::New {
                         height,
                         secrets_file,
                         entity_source,
                         serialize,
-                    } => ndm_smt::NdmSmtConfigBuilder::default()
-                        .height(height)
-                        .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
-                        .serialization_path_opt(serialize.and_then(|arg| arg.into_path()))
-                        .entities_path_opt(
-                            entity_source.entities_file.and_then(|arg| arg.into_path()),
-                        )
-                        .num_entities_opt(entity_source.random_entities)
-                        .build()
-                        .unwrap()
-                        .parse(),
+                    } => {
+                        let ndm_smt = ndm_smt::NdmSmtConfigBuilder::default()
+                            .height(height)
+                            .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
+                            //.serialization_path_opt(serialize.and_then(|arg| arg.into_path()))
+                            .entities_path_opt(
+                                entity_source.entities_file.and_then(|arg| arg.into_path()),
+                            )
+                            .num_entities_opt(entity_source.random_entities)
+                            .build()
+                            .unwrap()
+                            .parse();
+
+                        Accumulator::NdmSmt(ndm_smt)
+                    }
                     TreeBuildCommand::Deserialize { path } => {
-                        ndm_smt::deserialize(path.into_path().unwrap()).unwrap()
+                        Accumulator::deserialize(path.into_path().unwrap()).unwrap()
                     }
                 },
                 AccumulatorTypeCommand::FromConfig { file_path } => {
-                    AccumulatorParser::from_config_fil_path_opt(file_path.into_path())
+                    AccumulatorConfig::deserialize(file_path.into_path().unwrap())
+                        .unwrap()
                         .parse()
                         .unwrap()
                 }
             };
 
-            if let Some(patharg) = gen_proofs {
-                let entity_ids = EntityIdsParser::from_path(patharg.into_path())
-                    .parse()
-                    .unwrap();
+            // if let Some(patharg) = gen_proofs {
+            //     let entity_ids = EntityIdsParser::from_path(patharg.into_path())
+            //         .parse()
+            //         .unwrap();
 
-                let proof = accumulator
-                    .generate_inclusion_proof(entity_ids.first().unwrap())
-                    .unwrap();
+            //     let proof = accumulator
+            //         .generate_inclusion_proof(entity_ids.first().unwrap())
+            //         .unwrap();
 
-                let a = serde_json::to_string(&proof).unwrap();
+            //     let a = serde_json::to_string(&proof).unwrap();
 
-                let path = "test_proof.json";
-                let mut file = std::fs::File::create(path).unwrap();
-                file.write_all(a.as_bytes());
-            }
+            //     let path = "test_proof.json";
+            //     let mut file = std::fs::File::create(path).unwrap();
+            //     file.write_all(a.as_bytes());
+            // }
         }
         Command::GenProofs {} => {
             error!("TODO implement");

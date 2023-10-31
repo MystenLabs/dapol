@@ -70,7 +70,7 @@ pub struct NdmSmtConfig {
     #[builder(setter(name = "secrets_file_path_opt"))]
     secrets_file_path: Option<PathBuf>,
     #[builder(setter(name = "serialization_path_opt"))]
-    serialization_path: Option<PathBuf>,
+    serialization_path: Option<PathBuf>, // STENT TODO remove this, it should only be an option on the cli, which will call the accumulator.serialize() function
     #[builder(private)]
     entities: EntityConfig,
 }
@@ -104,6 +104,7 @@ impl NdmSmtConfig {
 
         // Do path checks before building so that the build does not have to be
         // repeated for problems with file names etc.
+        // STENT TODO this will move to the cli, after processing build-tree command, before processing any other command
         let serialization_path = match self.serialization_path.clone() {
             Some(path) => {
                 let path = parse_tree_serialization_path(path, FILE_PREFIX)
@@ -117,11 +118,13 @@ impl NdmSmtConfig {
 
         let ndmsmt = NdmSmt::new(secrets, height, entities).log_on_err().unwrap();
 
+        // STENT TODO this will move to the cli, after processing the commands and the tree is built and in mem
         serialization_path
             .if_none_then(|| {
                 info!("No serialization path set, skipping serialization of the tree");
             })
             .consume(|path| {
+                // STENT TODO serialize to Accumulator::NdmSmt (going to be difficult with the ownership here (actually not))
                 serialize_to_bin_file(&ndmsmt, path).log_on_err();
             });
 
