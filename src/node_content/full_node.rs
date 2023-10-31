@@ -15,14 +15,15 @@ use crate::entity::EntityId;
 
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
-use digest::Digest;
 use primitive_types::H256;
 use serde::{Serialize, Deserialize};
-use std::marker::PhantomData;
 
 use crate::utils::H256Finalizable;
 
 use super::HiddenNodeContent;
+
+// Hash function used in the merge function.
+type Hash = blake3::Hasher;
 
 /// Main struct containing:
 /// - Raw liability value
@@ -35,16 +36,14 @@ use super::HiddenNodeContent;
 /// and the merge function in the case of FullNodeContent needs to use a generic hash function.
 /// One way to solve this problem is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct FullNodeContent<H> {
+pub struct FullNodeContent {
     pub liability: u64,
     pub blinding_factor: Scalar,
     pub commitment: RistrettoPoint,
     pub hash: H256,
-    #[serde(skip_serializing, skip_deserializing)]
-    _phantom_hash_function: PhantomData<H>,
 }
 
-impl<H> PartialEq for FullNodeContent<H> {
+impl PartialEq for FullNodeContent {
     fn eq(&self, other: &Self) -> bool {
         self.liability == other.liability
             && self.blinding_factor == other.blinding_factor
@@ -56,7 +55,7 @@ impl<H> PartialEq for FullNodeContent<H> {
 // -------------------------------------------------------------------------------------------------
 // Constructors
 
-impl<H: Digest + H256Finalizable> FullNodeContent<H> {
+impl FullNodeContent {
     /// Simple constructor
     pub fn new(
         liability: u64,
@@ -69,7 +68,6 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
             blinding_factor,
             commitment,
             hash,
-            _phantom_hash_function: PhantomData,
         }
     }
 
@@ -87,7 +85,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
         blinding_factor: Secret,
         entity_id: EntityId,
         entity_salt: Secret,
-    ) -> FullNodeContent<H> {
+    ) -> FullNodeContent {
         // Scalar expects bytes to be in little-endian
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
 
@@ -99,10 +97,10 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
         let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
         // Compute the hash: `H("leaf" | entity_id | entity_salt)`
-        let mut hasher = H::new();
+        let mut hasher = Hash::new();
         hasher.update("leaf".as_bytes());
-        hasher.update(entity_id_bytes);
-        hasher.update(entity_salt_bytes);
+        hasher.update(&entity_id_bytes);
+        hasher.update(&entity_salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
@@ -110,7 +108,6 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
             blinding_factor: blinding_factor_scalar,
             commitment,
             hash,
-            _phantom_hash_function: PhantomData,
         }
     }
 
@@ -119,7 +116,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
     /// The hash requires the node's coordinate as well as a salt. Since the liability of a
     /// padding node is 0 only the blinding factor is required for the Pedersen commitment.
     #[allow(dead_code)]
-    pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> FullNodeContent<H> {
+    pub fn new_pad(blinding_factor: Secret, coord: &Coordinate, salt: Secret) -> FullNodeContent {
         let liability = 0u64;
         // TODO need to think about whether this is okay or if modulo is going to break things. Maybe we should just have the kdf such that it outputs within the correct bounds
         let blinding_factor_scalar = Scalar::from_bytes_mod_order(blinding_factor.into());
@@ -132,10 +129,10 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
         let salt_bytes: [u8; 32] = salt.into();
 
         // Compute the hash: `H("pad" | coordinate | salt)`
-        let mut hasher = H::new();
+        let mut hasher = Hash::new();
         hasher.update("pad".as_bytes());
-        hasher.update(coord_bytes);
-        hasher.update(salt_bytes);
+        hasher.update(&coord_bytes);
+        hasher.update(&salt_bytes);
         let hash = hasher.finalize_as_h256();
 
         FullNodeContent {
@@ -143,7 +140,6 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
             blinding_factor: blinding_factor_scalar,
             commitment,
             hash,
-            _phantom_hash_function: PhantomData,
         }
     }
 }
@@ -151,8 +147,8 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
 // -------------------------------------------------------------------------------------------------
 // Conversions
 
-impl<H: Digest + H256Finalizable> FullNodeContent<H> {
-    pub fn compress(self) -> HiddenNodeContent<H> {
+impl FullNodeContent {
+    pub fn compress(self) -> HiddenNodeContent {
         HiddenNodeContent::new(self.commitment, self.hash)
     }
 }
@@ -160,7 +156,7 @@ impl<H: Digest + H256Finalizable> FullNodeContent<H> {
 // -------------------------------------------------------------------------------------------------
 // Implement Mergeable trait
 
-impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
+impl Mergeable for FullNodeContent {
     /// Returns the parent node content by merging two child node contents.
     ///
     /// The value and blinding factor of the parent are the sums of the two children respectively.
@@ -173,7 +169,7 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
 
         // `hash = H(left.com | right.com | left.hash | right.hash`
         let parent_hash = {
-            let mut hasher = H::new();
+            let mut hasher = Hash::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
             hasher.update(right_sibling.commitment.compress().as_bytes());
             hasher.update(left_sibling.hash.as_bytes());
@@ -186,7 +182,6 @@ impl<H: Digest + H256Finalizable> Mergeable for FullNodeContent<H> {
             blinding_factor: parent_blinding_factor,
             commitment: parent_commitment,
             hash: parent_hash,
-            _phantom_hash_function: PhantomData,
         }
     }
 }
@@ -208,7 +203,7 @@ mod tests {
         let entity_id = EntityId::from_str("some entity").unwrap();
         let entity_salt = 13u64.into();
 
-        FullNodeContent::<blake3::Hasher>::new_leaf(liability, blinding_factor, entity_id, entity_salt);
+        FullNodeContent::new_leaf(liability, blinding_factor, entity_id, entity_salt);
     }
 
     #[test]
@@ -217,7 +212,7 @@ mod tests {
         let coord = Coordinate { x: 1u64, y: 2u8 };
         let entity_salt = 13u64.into();
 
-        FullNodeContent::<blake3::Hasher>::new_pad(blinding_factor, &coord, entity_salt);
+        FullNodeContent::new_pad(blinding_factor, &coord, entity_salt);
     }
 
     #[test]
@@ -226,7 +221,7 @@ mod tests {
         let blinding_factor_1 = 7u64.into();
         let entity_id_1 = EntityId::from_str("some entity 1").unwrap();
         let entity_salt_1 = 13u64.into();
-        let node_1 = FullNodeContent::<blake3::Hasher>::new_leaf(
+        let node_1 = FullNodeContent::new_leaf(
             liability_1,
             blinding_factor_1,
             entity_id_1,
@@ -237,7 +232,7 @@ mod tests {
         let blinding_factor_2 = 27u64.into();
         let entity_id_2 = EntityId::from_str("some entity 2").unwrap();
         let entity_salt_2 = 23u64.into();
-        let node_2 = FullNodeContent::<blake3::Hasher>::new_leaf(
+        let node_2 = FullNodeContent::new_leaf(
             liability_2,
             blinding_factor_2,
             entity_id_2,

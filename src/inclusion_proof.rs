@@ -38,15 +38,15 @@ pub use aggregation_factor::AggregationFactor;
 /// proof, which is more efficient to produce & verify than doing them
 /// individually. Both aggregated and individual range proofs are supported.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct InclusionProof<H: Clone> {
-    path: Path<HiddenNodeContent<H>>,
+pub struct InclusionProof {
+    path: Path<HiddenNodeContent>,
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
     aggregation_factor: AggregationFactor,
     upper_bound_bit_length: u8,
 }
 
-impl<H: Debug + Clone + Digest + H256Finalizable> InclusionProof<H> {
+impl InclusionProof {
     /// Generate an inclusion proof from a tree path.
     ///
     /// `aggregation_factor` is used to determine how many of the range proofs
@@ -62,7 +62,7 @@ impl<H: Debug + Clone + Digest + H256Finalizable> InclusionProof<H> {
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
     pub fn generate(
-        path: Path<FullNodeContent<H>>,
+        path: Path<FullNodeContent>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
@@ -217,6 +217,7 @@ mod tests {
     use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
+    // STENT TODO grab this from a central place
     type Hash = blake3::Hasher;
 
     // tree that is built, with path highlighted
@@ -249,7 +250,7 @@ mod tests {
     //  x| 0     1     2     3     4     5     6     7   //
     //                                                   //
     ///////////////////////////////////////////////////////
-    fn build_test_path() -> (Path<FullNodeContent<Hash>>, RistrettoPoint, H256) {
+    fn build_test_path() -> (Path<FullNodeContent>, RistrettoPoint, H256) {
         // leaf at (2,0)
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
