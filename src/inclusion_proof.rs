@@ -7,10 +7,8 @@
 
 use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
-use crate::utils::H256Finalizable;
 
 use bulletproofs::ProofError;
-use digest::Digest;
 use primitive_types::H256;
 use serde::{Serialize, Deserialize};
 use std::fmt::Debug;

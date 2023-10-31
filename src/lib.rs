@@ -3,10 +3,11 @@
 mod kdf;
 mod node_content;
 mod percentage;
-mod read_write_utils;
 
 pub mod accumulators;
 pub mod cli;
+pub mod read_write_utils;
+pub mod utils;
 
 mod binary_tree;
 pub use binary_tree::Height;
@@ -22,6 +23,3 @@ mod entity;
 pub use entity::{
     EntitiesParser, EntitiesParserError, Entity, EntityId, EntityIdsParser, EntityIdsParserError,
 };
-
-mod utils;
-pub use utils::activate_logging;

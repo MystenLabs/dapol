@@ -32,6 +32,8 @@
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
 
+use crate::utils::LogOnErr;
+
 pub mod ndm_smt;
 
 /// Various accumulator types.
@@ -52,10 +54,16 @@ impl Accumulator {
     /// 2. The [bincode] deserializer fails.
     pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
         use crate::read_write_utils::deserialize_from_bin_file;
-        use crate::utils::LogOnErr;
 
         let accumulator: Accumulator = deserialize_from_bin_file(path).log_on_err()?;
         Ok(accumulator)
+    }
+
+    pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError>{
+        use crate::read_write_utils::serialize_to_bin_file;
+
+        serialize_to_bin_file(self, path).log_on_err()?;
+        Ok(())
     }
 }
 

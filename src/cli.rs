@@ -65,10 +65,16 @@ pub enum Command {
         #[clap(short, long, value_name = "ENTITY_IDS_PATH")]
         gen_proofs: Option<InputArg>,
 
-        /// Keep the program running to initiate more commands (TODO not
-        /// implemented yet).
-        #[clap(short, long)]
-        keep_alive: bool,
+        // /// Keep the program running to initiate more commands (TODO not
+        // /// implemented yet).
+        // #[clap(short, long)]
+        // keep_alive: bool,
+
+        /// Serialize the tree to a file (a default file name will be given if
+        /// only a directory is provided) (file extension is .dapoltree)
+        /// (this option is ignored if 'deserialize' command is used).
+        #[clap(short = 'S', long, value_name = "PATH")]
+        serialize: Option<OutputArg>,
     },
     GenProofs {},
 }
@@ -102,11 +108,6 @@ pub enum TreeBuildCommand {
 
         #[command(flatten)]
         entity_source: EntitySource,
-
-        /// Serialize the tree to a file (a default file name will be given if
-        /// only a directory is provided) (file extension is .dapoltree).
-        #[clap(short = 'S', long, value_name = "PATH")]
-        serialize: Option<OutputArg>,
     },
     /// Deserialize a tree from a file.
     Deserialize { path: InputArg },

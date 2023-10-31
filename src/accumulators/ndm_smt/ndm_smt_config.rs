@@ -16,10 +16,6 @@
 //! # If not present the secrets will be generated randomly.
 //! secrets_file_path = "./secrets_example.toml"
 //!
-//! # Can be a file or directory (default file name given in this case)
-//! # If not present then no serialization is done.
-//! serialization_path = "./tree.dapoltree"
-//!
 //! # At least one of file_path & generate_random must be present.
 //! # If both are given then file_path is prioritized.
 //! [entities]
@@ -42,7 +38,6 @@
 //! let config = ndm_smt::NdmSmtConfigBuilder::default()
 //!     .height(height)
 //!     .secrets_file_path(PathBuf::from("./secrets_example.toml"))
-//!     .serialization_path(PathBuf::from("./ndm_smt.dapoltree"))
 //!     .entities_path(PathBuf::from("./entities_example.csv"))
 //!     .build()
 //!     .unwrap();
@@ -56,12 +51,9 @@ use serde::Deserialize;
 
 use crate::binary_tree::Height;
 use crate::entity::EntitiesParser;
-use crate::read_write_utils::{parse_tree_serialization_path, serialize_to_bin_file};
-use crate::utils::{Consume, IfNoneThen, LogOnErr};
+use crate::utils::{IfNoneThen, LogOnErr};
 
 use super::{NdmSmt, SecretsParser};
-
-const FILE_PREFIX: &str = "ndm_smt_";
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -69,8 +61,6 @@ pub struct NdmSmtConfig {
     height: Option<Height>,
     #[builder(setter(name = "secrets_file_path_opt"))]
     secrets_file_path: Option<PathBuf>,
-    #[builder(setter(name = "serialization_path_opt"))]
-    serialization_path: Option<PathBuf>, // STENT TODO remove this, it should only be an option on the cli, which will call the accumulator.serialize() function
     #[builder(private)]
     entities: EntityConfig,
 }
@@ -102,43 +92,13 @@ impl NdmSmtConfig {
             .parse_or_generate_random()
             .unwrap();
 
-        // Do path checks before building so that the build does not have to be
-        // repeated for problems with file names etc.
-        // STENT TODO this will move to the cli, after processing build-tree command, before processing any other command
-        let serialization_path = match self.serialization_path.clone() {
-            Some(path) => {
-                let path = parse_tree_serialization_path(path, FILE_PREFIX)
-                    .log_on_err()
-                    .unwrap();
-
-                Some(path)
-            }
-            None => None,
-        };
-
-        let ndmsmt = NdmSmt::new(secrets, height, entities).log_on_err().unwrap();
-
-        // STENT TODO this will move to the cli, after processing the commands and the tree is built and in mem
-        serialization_path
-            .if_none_then(|| {
-                info!("No serialization path set, skipping serialization of the tree");
-            })
-            .consume(|path| {
-                // STENT TODO serialize to Accumulator::NdmSmt (going to be difficult with the ownership here (actually not))
-                serialize_to_bin_file(&ndmsmt, path).log_on_err();
-            });
-
-        ndmsmt
+        NdmSmt::new(secrets, height, entities).log_on_err().unwrap()
     }
 }
 
 impl NdmSmtConfigBuilder {
     pub fn height(&mut self, height: Height) -> &mut Self {
         self.height_opt(Some(height))
-    }
-
-    pub fn serialization_path(&mut self, path: PathBuf) -> &mut Self {
-        self.serialization_path_opt(Some(path))
     }
 
     pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
