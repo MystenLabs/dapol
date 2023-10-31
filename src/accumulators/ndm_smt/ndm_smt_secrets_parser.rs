@@ -12,10 +12,10 @@
 //!
 //! See [super][secrets] for more details about the secret values.
 
-use std::{convert::TryFrom, fs::File, io::Read, path::PathBuf, str::FromStr};
+use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
 use log::{warn, info};
 
-use super::secrets::{Secrets, SecretsInput};
+use super::ndm_smt_secrets::{Secrets, SecretsInput};
 use crate::secret::SecretParseError;
 
 /// Parser requires a valid path to a file.

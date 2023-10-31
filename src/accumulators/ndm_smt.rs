@@ -24,17 +24,17 @@ use crate::inclusion_proof::{AggregationFactor, InclusionProof};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
-mod secrets;
-use secrets::Secrets;
+mod ndm_smt_secrets;
+use ndm_smt_secrets::Secrets;
 
-mod secrets_parser;
-pub use secrets_parser::SecretsParser;
+mod ndm_smt_secrets_parser;
+pub use ndm_smt_secrets_parser::SecretsParser;
 
 mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;
 
-mod config;
-pub use config::{NdmSmtConfig, NdmSmtConfigBuilder};
+mod ndm_smt_config;
+pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
