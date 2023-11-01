@@ -23,7 +23,7 @@
 use serde::Deserialize;
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
 
-use super::{ndm_smt, Accumulator, AccumulatorError};
+use super::{ndm_smt, Accumulator};
 
 #[derive(Deserialize, Debug)]
 #[serde(tag = "accumulator_type", rename_all = "kebab-case")]
@@ -34,7 +34,6 @@ pub enum AccumulatorConfig {
 
 // STENT TODO rename all other builder methods that are 'new' to 'default' since this is what derive_default uses
 // STENT TODO also maybe get rid of the 'with' in the setters
-// STENT TODO move this to its own file
 
 impl AccumulatorConfig {
     /// Open the config file, then try to create an accumulator object.
@@ -63,11 +62,11 @@ impl AccumulatorConfig {
 
     /// Parse the config, attempting to create an accumulator object.
     ///
-    /// An error is returned if:
-    /// 1. TODO need to change the ndm-smt parse function to return an error first
-    pub fn parse(self) -> Result<Accumulator, AccumulatorError> {
+    /// An error is returned if the parser for the specific accumulator type
+    /// fails.
+    pub fn parse(self) -> Result<Accumulator, AccumulatorParserError> {
         let accumulator = match self {
-            AccumulatorConfig::NdmSmt(config) => Accumulator::NdmSmt(config.parse()),
+            AccumulatorConfig::NdmSmt(config) => Accumulator::NdmSmt(config.parse()?),
             // TODO add more accumulators..
         };
 
@@ -102,4 +101,10 @@ pub enum AccumulatorConfigError {
     FileReadError(#[from] std::io::Error),
     #[error("Deserialization process failed")]
     DeserializationError(#[from] toml::de::Error),
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum AccumulatorParserError {
+    #[error("Error parsing NDM-SMT config")]
+    NdmSmtError(#[from] ndm_smt::NdmSmtParserError),
 }

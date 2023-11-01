@@ -56,7 +56,8 @@ fn main() {
                             .num_entities_opt(entity_source.random_entities)
                             .build()
                             .unwrap()
-                            .parse();
+                            .parse()
+                            .unwrap();
 
                         Accumulator::NdmSmt(ndm_smt)
                     }

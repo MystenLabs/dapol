@@ -51,14 +51,14 @@
 use std::path::PathBuf;
 
 use derive_builder::Builder;
-use log::info;
+use log::{info, debug};
 use serde::Deserialize;
 
 use crate::binary_tree::Height;
-use crate::entity::EntitiesParser;
+use crate::entity::{EntitiesParser, self};
 use crate::utils::{IfNoneThen, LogOnErr};
 
-use super::{NdmSmt, SecretsParser};
+use super::{NdmSmt, SecretsParser, ndm_smt_secrets_parser};
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -78,11 +78,11 @@ pub struct EntityConfig {
 
 impl NdmSmtConfig {
     /// Try to construct an NDM-SMT from the config.
-    // STENT TODO get rid of these unwraps
-    pub fn parse(self) -> NdmSmt {
+    pub fn parse(self) -> Result<NdmSmt, NdmSmtParserError> {
+        debug!("Parsing config to create a new NDM-SMT");
+
         let secrets = SecretsParser::from_path(self.secrets_file_path)
-            .parse_or_generate_random()
-            .unwrap();
+            .parse_or_generate_random()?;
 
         let height = self
             .height
@@ -94,10 +94,10 @@ impl NdmSmtConfig {
         let entities = EntitiesParser::new()
             .with_path(self.entities.file_path)
             .with_num_entities(self.entities.generate_random)
-            .parse_or_generate_random()
-            .unwrap();
+            .parse_or_generate_random()?;
 
-        NdmSmt::new(secrets, height, entities).log_on_err().unwrap()
+        let tree = NdmSmt::new(secrets, height, entities).log_on_err()?;
+        Ok(tree)
     }
 }
 
@@ -143,4 +143,14 @@ impl NdmSmtConfigBuilder {
     pub fn num_entities(&mut self, num_entites: u64) -> &mut Self {
         self.num_entities_opt(Some(num_entites))
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum NdmSmtParserError {
+    #[error("Secrets parsing failed while trying to parse NDM-SMT config")]
+    SecretsError(#[from] ndm_smt_secrets_parser::SecretsParserError),
+    #[error("Entities parsing failed while trying to parse NDM-SMT config")]
+    EntitiesError(#[from] entity::EntitiesParserError),
+    #[error("Tree construction failed after parsing NDM-SMT config")]
+    BuildError(#[from] super::NdmSmtError),
 }
