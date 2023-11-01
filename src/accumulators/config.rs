@@ -21,7 +21,7 @@
 //! ```
 
 use serde::Deserialize;
-use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
+use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::{ndm_smt, Accumulator};
 
@@ -46,7 +46,9 @@ impl AccumulatorConfig {
         let ext = config_file_path
             .extension()
             .and_then(|s| s.to_str())
-            .ok_or(AccumulatorConfigError::UnknownFileType)?;
+            .ok_or(AccumulatorConfigError::UnknownFileType(
+                config_file_path.clone().into_os_string(),
+            ))?;
 
         let config = match FileType::from_str(ext)? {
             FileType::Toml => {
@@ -92,9 +94,8 @@ impl FromStr for FileType {
 
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorConfigError {
-    #[error("Unable to find file extension")]
-    // STENT TODO add path variable here to help user diagnose
-    UnknownFileType,
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error reading the file")]

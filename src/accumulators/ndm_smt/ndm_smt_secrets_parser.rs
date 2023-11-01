@@ -12,8 +12,8 @@
 //!
 //! See [super][secrets] for more details about the secret values.
 
-use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
-use log::{warn, info};
+use log::{info, warn};
+use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::ndm_smt_secrets::{Secrets, SecretsInput};
 use crate::secret::SecretParseError;
@@ -48,10 +48,9 @@ impl SecretsParser {
 
         let path = self.path.ok_or(SecretsParserError::PathNotSet)?;
 
-        let ext = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .ok_or(SecretsParserError::UnknownFileType)?;
+        let ext = path.extension().and_then(|s| s.to_str()).ok_or(
+            SecretsParserError::UnknownFileType(path.clone().into_os_string()),
+        )?;
 
         let secrets = match FileType::from_str(ext)? {
             FileType::Toml => {
@@ -98,8 +97,8 @@ impl FromStr for FileType {
 pub enum SecretsParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,
-    #[error("Unable to find file extension")]
-    UnknownFileType,
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error converting string found in file to Secret")]
