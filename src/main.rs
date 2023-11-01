@@ -4,7 +4,7 @@ use clap::Parser;
 use log::{error, info};
 
 use dapol::{
-    accumulators::{ndm_smt, Accumulator, AccumulatorConfig},
+    accumulators::{ndm_smt, Accumulator, config::AccumulatorConfig},
     cli::{AccumulatorTypeCommand, Cli, Command, TreeBuildCommand},
     read_write_utils::parse_tree_serialization_path,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr},
