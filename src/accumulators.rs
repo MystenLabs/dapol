@@ -16,6 +16,7 @@
 //!
 //! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
 
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -26,7 +27,6 @@ pub mod ndm_smt;
 
 /// Various accumulator types.
 #[derive(Serialize, Deserialize)]
-// STENT TODO create serialization function in the impl
 pub enum Accumulator {
     NdmSmt(ndm_smt::NdmSmt),
     // TODO other accumulators..
@@ -47,8 +47,13 @@ impl Accumulator {
         Ok(accumulator)
     }
 
+    /// Serialize to a file.
+    ///
+    /// Serialization is done to a binary
     pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError>{
         use crate::read_write_utils::serialize_to_bin_file;
+
+        info!("Serializing accumulator to file {:?}", path.clone().into_os_string());
 
         serialize_to_bin_file(self, path).log_on_err()?;
         Ok(())

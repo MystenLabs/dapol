@@ -1,13 +1,11 @@
-use std::fmt::{Debug};
+use std::fmt::Debug;
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::{ffi::OsString, fs::File};
 
 use log::error;
-use logging_timer::{executing, finish, stimer, Level, stime};
+use logging_timer::{executing, finish, stime, stimer, Level};
 use serde::{de::DeserializeOwned, Serialize};
-
-pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 
 // -------------------------------------------------------------------------------------------------
 // Utility functions.
@@ -50,7 +48,10 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     Ok(decoded)
 }
 
-/// Parse `path` as one that points to a serialized tree file.
+const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
+const TREE_SERIALIZATION_FILE_PREFIX: &str = "accumulator_";
+
+/// Parse `path` as one that points to a serialized dapol tree file.
 ///
 /// `path` can be either of the following:
 /// 1. Existing directory: in this case a default file name is appended to `path`.
@@ -62,7 +63,7 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
 /// extension is checked.
 ///
 /// The default file name is `ndm_smt_<timestamp>.dapoltree`.
-pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Result<PathBuf, ReadWriteError> {
+pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
         // If `path` leads to a file.
 
@@ -86,7 +87,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Re
             std::fs::create_dir_all(path.clone())?;
         }
 
-        let mut file_name: String = file_prefix.to_owned();
+        let mut file_name: String = TREE_SERIALIZATION_FILE_PREFIX.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
         file_name.push_str(SERIALIZED_TREE_EXTENSION);

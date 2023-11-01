@@ -10,9 +10,8 @@ pub mod utils;
 
 mod accumulators;
 pub use accumulators::{
-    ndm_smt,
     config::{AccumulatorConfig, AccumulatorConfigError},
-    Accumulator, AccumulatorError,
+    ndm_smt, Accumulator, AccumulatorError,
 };
 
 mod binary_tree;

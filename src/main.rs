@@ -11,9 +11,6 @@ use dapol::{
     Accumulator, AccumulatorConfig, EntityIdsParser,
 };
 
-// STENT TODO is this fine? surely we can do better
-const TREE_SERIALIZATION_FILE_PREFIX: &str = "accumulator_";
-
 // STENT TODO fix the unwraps
 fn main() {
     let args = Cli::parse();
@@ -31,9 +28,7 @@ fn main() {
             let serialization_path = match serialize {
                 Some(patharg) => {
                     let path = patharg.into_path().unwrap();
-                    parse_tree_serialization_path(path, TREE_SERIALIZATION_FILE_PREFIX)
-                        .log_on_err()
-                        .ok()
+                    parse_tree_serialization_path(path).log_on_err().ok()
                 }
                 None => None,
             };
