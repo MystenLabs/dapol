@@ -26,7 +26,7 @@
 //! ```
 // TODO DOCS replace above help text with better description
 
-use clap::{command, Args, Parser, Subcommand};
+use clap::{command, Args, Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use patharg::{InputArg, OutputArg};
 
@@ -47,9 +47,6 @@ pub struct Cli {
 
     #[command(flatten)]
     pub verbose: Verbosity<WarnLevel>,
-    // /// Choose an accumulator type for the tree.
-    // #[arg(short, long, value_enum)]
-    // pub accumulator: AccumulatorType,
 }
 
 #[derive(Debug, Subcommand)]
@@ -58,10 +55,10 @@ pub enum Command {
     BuildTree {
         /// Choose the accumulator type for the tree.
         #[command(subcommand)]
-        accumulator_type: AccumulatorTypeCommand,
+        build_kind: BuildKindCommand,
 
         /// Generate inclusion proofs for the provided entity IDs, after
-        /// building the tree (TODO not implemented yet).
+        /// building the tree.
         #[clap(short, long, value_name = "ENTITY_IDS_PATH")]
         gen_proofs: Option<InputArg>,
 
@@ -69,7 +66,6 @@ pub enum Command {
         // /// implemented yet).
         // #[clap(short, long)]
         // keep_alive: bool,
-
         /// Serialize the tree to a file (a default file name will be given if
         /// only a directory is provided) (file extension is .dapoltree)
         /// (this option is ignored if 'deserialize' command is used).
@@ -79,25 +75,14 @@ pub enum Command {
     GenProofs {},
 }
 
-//#[derive(ValueEnum, Debug, Clone)]
 #[derive(Debug, Subcommand)]
-pub enum AccumulatorTypeCommand {
-    /// Read accumulator type and other tree configuration from a file.
-    FromConfig {
-        /// Path to the config file.
-        file_path: InputArg,
-    },
-    /// Use the non-deterministic mapping sparse Merkle tree.
-    NdmSmt {
-        #[command(subcommand)]
-        tree_build_type: TreeBuildCommand,
-    },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum TreeBuildCommand {
-    /// Create a new tree from the given parameters.
+pub enum BuildKindCommand {
+    /// Create a new tree using the CLI.
     New {
+        /// Choose an accumulator type for the tree.
+        #[arg(short, long, value_enum)]
+        accumulator: AccumulatorType,
+
         /// Height to use for the binary tree.
         #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
         height: Height,
@@ -109,8 +94,19 @@ pub enum TreeBuildCommand {
         #[command(flatten)]
         entity_source: EntitySource,
     },
+    /// Read accumulator type and other tree configuration from a file.
+    ConfigFile {
+        /// Path to the config file.
+        file_path: InputArg,
+    },
     /// Deserialize a tree from a file.
     Deserialize { path: InputArg },
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+pub enum AccumulatorType {
+    NdmSmt,
+    // TODO other accumulators..
 }
 
 #[derive(Args, Debug)]

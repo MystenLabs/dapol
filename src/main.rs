@@ -1,15 +1,16 @@
-use std::io::Write;
+use std::{io::Write, path::PathBuf};
 
 use clap::Parser;
 use log::{error, info};
 
 use dapol::{
-    cli::{AccumulatorTypeCommand, Cli, Command, TreeBuildCommand},
+    cli::{AccumulatorType, BuildKindCommand, Cli, Command},
     ndm_smt,
     read_write_utils::parse_tree_serialization_path,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr},
     Accumulator, AccumulatorConfig, EntityIdsParser,
 };
+use patharg::InputArg;
 
 // STENT TODO fix the unwraps
 fn main() {
@@ -19,29 +20,35 @@ fn main() {
 
     match args.command {
         Command::BuildTree {
-            accumulator_type,
+            build_kind,
             gen_proofs,
             serialize,
         } => {
-            // Do path checks before building so that the build does not have to be
-            // repeated for problems with file names etc.
-            let serialization_path = match serialize {
-                Some(patharg) => {
-                    let path = patharg.into_path().unwrap();
-                    parse_tree_serialization_path(path).log_on_err().ok()
-                }
-                None => None,
-            };
+            let serialization_path =
+                // Do not try serialize if the command is Deserialize because
+                // this means there already is a serialized file.
+                if !build_kind_is_deserialize(&build_kind) {
+                    // Do path checks before building so that the build does not have to be
+                    // repeated for problems with file names etc.
+                    match serialize {
+                        Some(patharg) => {
+                            let path = patharg.into_path().unwrap();
+                            parse_tree_serialization_path(path).log_on_err().ok()
+                        }
+                        None => None,
+                    }
+                } else {
+                    None
+                };
 
-            // TODO the type here will need to change once other accumulators
-            // are supported.
-            let accumulator: Accumulator = match accumulator_type {
-                AccumulatorTypeCommand::NdmSmt { tree_build_type } => match tree_build_type {
-                    TreeBuildCommand::New {
-                        height,
-                        secrets_file,
-                        entity_source,
-                    } => {
+            let accumulator: Accumulator = match build_kind {
+                BuildKindCommand::New {
+                    accumulator,
+                    height,
+                    secrets_file,
+                    entity_source,
+                } => match accumulator {
+                    AccumulatorType::NdmSmt => {
                         let ndm_smt = ndm_smt::NdmSmtConfigBuilder::default()
                             .height(height)
                             .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
@@ -56,11 +63,11 @@ fn main() {
 
                         Accumulator::NdmSmt(ndm_smt)
                     }
-                    TreeBuildCommand::Deserialize { path } => {
-                        Accumulator::deserialize(path.into_path().unwrap()).unwrap()
-                    }
                 },
-                AccumulatorTypeCommand::FromConfig { file_path } => {
+                BuildKindCommand::Deserialize { path } => {
+                    Accumulator::deserialize(path.into_path().unwrap()).unwrap()
+                }
+                BuildKindCommand::ConfigFile { file_path } => {
                     AccumulatorConfig::deserialize(file_path.into_path().unwrap())
                         .unwrap()
                         .parse()
@@ -94,4 +101,11 @@ fn main() {
             error!("TODO implement");
         }
     }
+}
+
+fn build_kind_is_deserialize(build_kind: &BuildKindCommand) -> bool {
+    let dummy = BuildKindCommand::Deserialize {
+        path: InputArg::default(),
+    };
+    std::mem::discriminant(build_kind) == std::mem::discriminant(&dummy)
 }
