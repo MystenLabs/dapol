@@ -1,33 +1,20 @@
-//! Accumulator config and parser.
+//! Accumulators.
 //!
 //! This is the top-most file in the hierarchy of the dapol crate. An
 //! accumulator is required to build a binary tree, and determines how the
 //! binary tree is constructed. The are different types of accumulators, which
 //! can all be found under this module. Each accumulator has different
 //! configuration requirements, which are detailed in each of the sub-modules.
+//! The currently supported accumulator types are:
+//! - [Non-Deterministic Mapping Sparse Merkle Tree]
 //!
-//! Currently only TOML files are supported for config files. The only
-//! config requirement at this level (not including the specific accumulator
-//! config) is the accumulator type:
+//! Each accumulator can be constructed via the configuration structs:
+//! - [config][AccumulatorConfig] is used to deserialize config from a file. The
+//! specific type of accumulator is determined from the config file.
+//! - [ndm_smt][ndm_smt_config][NdmSmtConfigBuilder] is used to construct the
+//! NDM-SMT accumulator type using the builder pattern.
 //!
-//! ```toml,ignore
-//! accumulator_type = "ndm-smt"
-//! ```
-//!
-//! The rest of the config details can be found in the submodules:
-//! - [ndm_smt][ndm_smt_config]
-//!
-//! Example how to use the parser:
-//! ```
-//! use std::path::PathBuf;
-//! use dapol::AccumulatorParser;
-//!
-//! let path = PathBuf::from("./tree_config_example.toml");
-//!
-//! let accumulator = AccumulatorParser::from_config_fil_path(path)
-//!     .parse()
-//!     .unwrap();
-//! ```
+//! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;

@@ -8,6 +8,8 @@
 //! following format:
 //!
 //! ```toml,ignore
+//! accumulator_type = "ndm-smt"
+//!
 //! # Height of the tree.
 //! # If the height is not set the default height will be used.
 //! height = 32
@@ -26,6 +28,9 @@
 //! # Generate the given number of entities, with random IDs & liabilities.
 //! generate_random = 4
 //! ```
+//!
+//! Construction of this tree using a config file must be done via
+//! [super][super][config][AccumulatorConfig].
 //!
 //! Example how to use the builder:
 //! ```

@@ -4,10 +4,16 @@ mod kdf;
 mod node_content;
 mod percentage;
 
-pub mod accumulators;
 pub mod cli;
 pub mod read_write_utils;
 pub mod utils;
+
+mod accumulators;
+pub use accumulators::{
+    ndm_smt,
+    config::{AccumulatorConfig, AccumulatorConfigError},
+    Accumulator, AccumulatorError,
+};
 
 mod binary_tree;
 pub use binary_tree::Height;

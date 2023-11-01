@@ -1,12 +1,13 @@
-//! Non-deterministic mapping sparse Merkle tree (NDM_SMT).
+//! Non-Deterministic Mapping Sparse Merkle Tree (NDM-SMT).
 //!
-//! The accumulator variant is the simplest. Each entity is randomly mapped to
+//! This accumulator variant is the simplest. Each entity is randomly mapped to
 //! a bottom-layer node in the tree. The algorithm used to determine the mapping
 //! uses a variation of Durstenfeld’s shuffle algorithm (see
 //! [RandomXCoordGenerator]) and will not produce the same mapping for the same
 //! inputs, hence the "non-deterministic" term in the title.
 //!
-//! The hash function chosen for the Merkle Sum Tree is blake3.
+//! Construction of this tree can be done via
+//! [ndm_smt_config][NdmSmtConfigBuilder].
 
 use std::collections::HashMap;
 

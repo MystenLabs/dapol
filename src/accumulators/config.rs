@@ -10,6 +10,15 @@
 //!
 //! The rest of the config details can be found in the submodules:
 //! - [ndm_smt][ndm_smt_config]
+//!
+//! Config deserialization example:
+//! ```
+//! use std::path::PathBuf;
+//! use dapol::AccumulatorConfig;
+//!
+//! let file_path = PathBuf::from("./tree_config_example.toml");
+//! let config = AccumulatorConfig::deserialize(file_path).unwrap();
+//! ```
 
 use serde::Deserialize;
 use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
