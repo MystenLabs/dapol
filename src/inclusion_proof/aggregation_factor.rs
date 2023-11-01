@@ -14,7 +14,7 @@
 //! - if this number is `> tree_height` it means that none of the proofs should
 //!   be aggregated
 //!
-//! Percent: multiply the `tree_height` by this percentage to get the number of
+//! Percentage: multiply the `tree_height` by this percentage to get the number of
 //! nodes to be used in the aggregated proof i.e.
 //! `number_of_ranges_for_aggregation = tree_height * percentage`.
 //!
@@ -22,28 +22,22 @@
 //! that if this number is `> tree_height` it is treated as if it was equal to
 //! `tree_height`.
 
-use crate::percentage::PercentageInteger;
-use crate::binary_tree::Height;
+use crate::{binary_tree::Height, percentage::{Percentage, ONE_HUNDRED_PERCENT}};
 
-use serde::{Serialize, Deserialize};
-use std::fmt;
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum AggregationFactor {
     Divisor(u8),
-    Percent(PercentageInteger),
+    Percent(Percentage),
     Number(u8),
 }
 
-/// We cannot derive this because [percent][PercentageInteger] does not
-/// implement Debug.
-impl fmt::Debug for AggregationFactor {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Divisor(div) => write!(f, "AggregationFactor::Divisor {}", div),
-            Self::Percent(per) => write!(f, "AggregationFactor::Percent {}", per.value()),
-            Self::Number(num) => write!(f, "AggregationFactor::Number {}", num),
-        }
+/// The default number of proofs to aggregate is all of them because this gives
+/// the fastest proving and verification time for a single inclusion proof.
+impl Default for AggregationFactor {
+    fn default() -> Self {
+        AggregationFactor::Percent(ONE_HUNDRED_PERCENT)
     }
 }
 

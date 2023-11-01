@@ -32,7 +32,11 @@ use patharg::{InputArg, OutputArg};
 
 use std::str::FromStr;
 
-use crate::binary_tree::Height;
+use crate::{
+    binary_tree::Height,
+    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+    inclusion_proof::DEFAULT_UPPER_BOUND_BIT_LENGTH,
+};
 
 // STENT TODO print out the root when the tree is done building
 // STENT TODO we want a keep-running flag after new or from-file, for doing
@@ -59,7 +63,7 @@ pub enum Command {
 
         /// Generate inclusion proofs for the provided entity IDs, after
         /// building the tree.
-        #[clap(short, long, value_name = "ENTITY_IDS_PATH")]
+        #[clap(short, long, value_name = "ENTITY_IDS_FILE_PATH")]
         gen_proofs: Option<InputArg>,
 
         // /// Keep the program running to initiate more commands (TODO not
@@ -69,10 +73,29 @@ pub enum Command {
         /// Serialize the tree to a file (a default file name will be given if
         /// only a directory is provided) (file extension is .dapoltree)
         /// (this option is ignored if 'deserialize' command is used).
-        #[clap(short = 'S', long, value_name = "PATH")]
+        #[clap(short = 'S', long, value_name = "FILE_PATH")]
         serialize: Option<OutputArg>,
     },
-    GenProofs {},
+    GenProofs {
+        /// List of entity IDs to generate proofs for, can be a file path or
+        /// simply a comma separated list read from stdin (usi "-" to
+        /// indicate stdin).
+        #[clap(short, long)]
+        entity_ids: InputArg,
+
+        /// Path to the tree file that will be deserialized.
+        #[clap(short, long, value_name = "FILE_PATH")]
+        tree_file: InputArg,
+
+        /// Percentage of the range proofs that
+        /// are aggregated using the Bulletproofs protocol.
+        #[clap(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
+        range_proof_aggregation: Percentage,
+
+        /// Upper bound for the range proofs is 2^(this_number).
+        #[clap(short, long, default_value_t = DEFAULT_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
+        upper_bound_bit_length: u8,
+    },
 }
 
 #[derive(Debug, Subcommand)]

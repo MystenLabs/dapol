@@ -22,7 +22,7 @@ mod secret;
 pub use secret::Secret;
 
 mod inclusion_proof;
-pub use inclusion_proof::{InclusionProof, InclusionProofError};
+pub use inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
 
 mod entity;
 pub use entity::{

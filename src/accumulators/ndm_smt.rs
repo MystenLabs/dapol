@@ -20,7 +20,7 @@ use rayon::prelude::*;
 
 use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
 use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, DEFAULT_UPPER_BOUND_BIT_LENGTH};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
@@ -34,7 +34,7 @@ mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;
 
 mod ndm_smt_config;
-pub use ndm_smt_config::{NdmSmtConfig, NdmSmtParserError, NdmSmtConfigBuilder};
+pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -166,7 +166,7 @@ impl NdmSmt {
         })
     }
 
-    /// Generate an inclusion proof for the given entity_id.
+    /// Generate an inclusion proof for the given `entity_id`.
     ///
     /// The NdmSmt struct defines the content type that is used, and so must
     /// define how to extract the secret value (liability) and blinding
@@ -177,7 +177,7 @@ impl NdmSmt {
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    //j
+    ///
     /// `upper_bound_bit_length` is used to determine the upper bound for the
     /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
     /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
@@ -185,7 +185,7 @@ impl NdmSmt {
     /// to require bounds higher than $2^256$. Note that if the value is set
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
-    pub fn generate_inclusion_proof_with_custom_range_proof_params(
+    pub fn generate_inclusion_proof_with(
         &self,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
@@ -225,12 +225,10 @@ impl NdmSmt {
         &self,
         entity_id: &EntityId,
     ) -> Result<InclusionProof, NdmSmtError> {
-        let aggregation_factor = AggregationFactor::Divisor(2u8);
-        let upper_bound_bit_length = 64u8;
-        self.generate_inclusion_proof_with_custom_range_proof_params(
+        self.generate_inclusion_proof_with(
             entity_id,
-            aggregation_factor,
-            upper_bound_bit_length,
+            AggregationFactor::default(),
+            DEFAULT_UPPER_BOUND_BIT_LENGTH,
         )
     }
 }
@@ -289,10 +287,10 @@ pub enum NdmSmtError {
 #[cfg(test)]
 mod tests {
     mod ndm_smt {
-        use std::str::FromStr;
         use super::super::*;
         use crate::binary_tree::Height;
         use crate::secret::Secret;
+        use std::str::FromStr;
 
         #[test]
         fn constructor_works() {

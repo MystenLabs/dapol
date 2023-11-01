@@ -32,7 +32,7 @@ fn main() {
                     // repeated for problems with file names etc.
                     match serialize {
                         Some(patharg) => {
-                            let path = patharg.into_path().unwrap();
+                            let path = patharg.into_path().expect("Expected a file path, not stdout");
                             parse_tree_serialization_path(path).log_on_err().ok()
                         }
                         None => None,
@@ -64,15 +64,18 @@ fn main() {
                         Accumulator::NdmSmt(ndm_smt)
                     }
                 },
-                BuildKindCommand::Deserialize { path } => {
-                    Accumulator::deserialize(path.into_path().unwrap()).unwrap()
-                }
-                BuildKindCommand::ConfigFile { file_path } => {
-                    AccumulatorConfig::deserialize(file_path.into_path().unwrap())
-                        .unwrap()
-                        .parse()
-                        .unwrap()
-                }
+                BuildKindCommand::Deserialize { path } => Accumulator::deserialize(
+                    path.into_path().expect("Expected file path, not stdout"),
+                )
+                .unwrap(),
+                BuildKindCommand::ConfigFile { file_path } => AccumulatorConfig::deserialize(
+                    file_path
+                        .into_path()
+                        .expect("Expected file path, not stdin"),
+                )
+                .unwrap()
+                .parse()
+                .unwrap(),
             };
 
             serialization_path
@@ -81,23 +84,32 @@ fn main() {
                 })
                 .consume(|path| accumulator.serialize(path).unwrap());
 
-            // if let Some(patharg) = gen_proofs {
-            //     let entity_ids = EntityIdsParser::from_path(patharg.into_path())
-            //         .parse()
-            //         .unwrap();
+            if let Some(patharg) = gen_proofs {
+                let entity_ids = EntityIdsParser::from_path(patharg.into_path())
+                    .parse()
+                    .unwrap();
 
-            //     let proof = accumulator
-            //         .generate_inclusion_proof(entity_ids.first().unwrap())
-            //         .unwrap();
+                // TODO loop for all entity IDs, create a directory with the outputs
+                let proof = accumulator
+                    .generate_inclusion_proof(entity_ids.first().unwrap())
+                    .unwrap();
 
-            //     let a = serde_json::to_string(&proof).unwrap();
+                let a = serde_json::to_string(&proof).unwrap();
 
-            //     let path = "test_proof.json";
-            //     let mut file = std::fs::File::create(path).unwrap();
-            //     file.write_all(a.as_bytes());
-            // }
+                let path = "test_proof.json";
+                let mut file = std::fs::File::create(path).unwrap();
+                file.write_all(a.as_bytes());
+            }
         }
-        Command::GenProofs {} => {
+        Command::GenProofs {
+            entity_ids,
+            tree_file,
+            range_proof_aggregation,
+            upper_bound_bit_length,
+        } => {
+            // TODO for entity IDs: accept either path or stdin
+            // TODO deserialize the tree
+            // TODO generate proofs
             error!("TODO implement");
         }
     }

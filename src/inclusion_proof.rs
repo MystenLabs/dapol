@@ -10,7 +10,7 @@ use crate::node_content::{FullNodeContent, HiddenNodeContent};
 
 use bulletproofs::ProofError;
 use primitive_types::H256;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
 mod individual_range_proof;
@@ -21,6 +21,11 @@ use aggregated_range_proof::AggregatedRangeProof;
 
 mod aggregation_factor;
 pub use aggregation_factor::AggregationFactor;
+
+/// Default upper bound for the range proof in the inclusion proof.
+/// 64 bits should be more than enough bits to represent liabilities for real
+/// world applications such as crypto asset exchange balances.
+pub const DEFAULT_UPPER_BOUND_BIT_LENGTH: u8 = 64u8;
 
 /// Inclusion proof struct.
 ///

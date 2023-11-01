@@ -1,27 +1,29 @@
-//! Copied from [percentage].
-//! Only PercentageInteger was kept, PercentageDecimal was not needed.
-//!
-//! # Percentage
-//!
-//! `percentage` is a crate trying to make using percentages in a safer way and easier to debug.
-//! Whenever you see a Percentage, you will know what is being calculated, instead of having to revise the code.
+//! Wrapper for holding an integer-valued percentage.
 
-use num::{Num, NumCast};
-use serde::{Serialize, Deserialize};
+use clap::builder::{OsStr, Str};
+use serde::{Deserialize, Serialize};
+use std::{num::ParseIntError, str::FromStr, convert::From};
 
-#[derive(Serialize, Deserialize)]
-pub struct PercentageInteger {
+pub const ONE_HUNDRED_PERCENT: Percentage = Percentage { value: 100 };
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Percentage {
     value: u8,
 }
 
-impl PercentageInteger {
+impl Percentage {
+    /// Returns a new `Percentage` with the given value.
+    pub fn from_with_err(value: u8) -> Result<Percentage, ParsePercentageError> {
+        if value > 100 {
+            Err(ParsePercentageError::InputTooBig(value))
+        } else {
+            Ok(Percentage { value })
+        }
+    }
+
     /// Returns the percentage applied to the number given.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The number to apply the percentage.
-    pub fn apply_to<T: Num + Ord + Copy + NumCast>(&self, value: T) -> T {
-        (value * NumCast::from(self.value).unwrap()) / NumCast::from(100).unwrap()
+    pub fn apply_to(&self, value: u8) -> u8 {
+        (value * self.value) / 100u8
     }
 
     /// Returns the percentage saved.
@@ -30,27 +32,38 @@ impl PercentageInteger {
     }
 }
 
-pub struct Percentage;
+// -------------------------------------------------------------------------------------------------
+// Errors.
 
-impl Percentage {
-    /// Returns a new `PercentageInteger` with the Given value.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - The number to use as the percentage between 0 and 100.
-    ///
-    /// # Panics
-    /// - Panics if `value` is over 100
-    /// - Panics if `value` is below 0
-    pub fn from<T: Num + Ord + Copy + NumCast>(value: T) -> PercentageInteger {
-        let value: u8 = NumCast::from(value)
-            .unwrap_or_else(|| panic!("Percentage value must be between 0 and 100"));
-        if value > 100 {
-            panic!("Percentage value must be between 0 and 100");
-        }
-        PercentageInteger { value }
+#[derive(thiserror::Error, Debug)]
+pub enum ParsePercentageError {
+    #[error("Input value {0} cannot be greater than 100")]
+    InputTooBig(u8),
+    #[error("Malformed string input for u8")]
+    MalformedString(#[from] ParseIntError),
+}
+
+// -------------------------------------------------------------------------------------------------
+// From traits for the CLI.
+
+impl FromStr for Percentage {
+    type Err = ParsePercentageError;
+
+    /// Constructor that takes in a string slice.
+    /// If the length of the str is greater than the max then Err is returned.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Percentage::from_with_err(u8::from_str(s)?)
     }
 }
+
+impl From<Percentage> for OsStr {
+    fn from(percentage: Percentage) -> OsStr {
+        OsStr::from(Str::from(percentage.value.to_string()))
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
 
 #[cfg(test)]
 mod tests {
@@ -59,60 +72,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn from_should_panic_if_value_is_over_100() {
-        Percentage::from(101);
-    }
-
-    #[test]
-    #[should_panic]
-    fn from_should_panic_if_value_is_below_0() {
-        Percentage::from(-1);
+        Percentage::from_with_err(101).unwrap();
     }
 
     #[test]
     fn from_should_save_value_on_u8_format() {
         let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_i8_or_u8() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as i8).value);
-        assert_eq!(test, Percentage::from(15 as u8).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_i16_or_u16() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as i16).value);
-        assert_eq!(test, Percentage::from(15 as u16).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_i32_or_u32() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as i32).value);
-        assert_eq!(test, Percentage::from(15 as u32).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_i64_or_u64() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as i64).value);
-        assert_eq!(test, Percentage::from(15 as u64).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_i128_or_u128() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as i128).value);
-        assert_eq!(test, Percentage::from(15 as u128).value);
-    }
-
-    #[test]
-    fn from_should_save_value_from_isize_or_usize() {
-        let test: u8 = 15;
-        assert_eq!(test, Percentage::from(15 as isize).value);
-        assert_eq!(test, Percentage::from(15 as usize).value);
+        assert_eq!(test, Percentage::from_with_err(15).unwrap().value);
     }
 }

@@ -9,7 +9,7 @@
 use std::str::FromStr;
 use std::{ffi::OsString, path::PathBuf};
 
-use log::info;
+use log::debug;
 
 use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 
@@ -35,7 +35,7 @@ impl EntityIdsParser {
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
     pub fn parse(self) -> Result<Vec<EntityId>, EntityIdsParserError> {
-        info!(
+        debug!(
             "Attempting to parse {:?} as a file containing a list of entity IDs",
             &self.path
         );
