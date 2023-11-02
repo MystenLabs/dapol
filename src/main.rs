@@ -1,18 +1,17 @@
 use std::{io::Write, path::PathBuf};
 
 use clap::Parser;
-use log::{error, info};
+use log::debug;
 
 use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
     ndm_smt,
     read_write_utils::parse_tree_serialization_path,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr},
-    Accumulator, AccumulatorConfig, EntityIdsParser,
+    Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
 };
 use patharg::InputArg;
 
-// STENT TODO fix the unwraps
 fn main() {
     let args = Cli::parse();
 
@@ -80,25 +79,24 @@ fn main() {
 
             serialization_path
                 .if_none_then(|| {
-                    info!("No serialization path set, skipping serialization of the tree");
+                    debug!("No serialization path set, skipping serialization of the tree");
                 })
                 .consume(|path| accumulator.serialize(path).unwrap());
 
             if let Some(patharg) = gen_proofs {
-                let entity_ids = EntityIdsParser::from_path(patharg.into_path())
-                    .parse()
-                    .unwrap();
+                let entity_ids = EntityIdsParser::from_path(
+                    patharg.into_path().expect("Expected file path, not stdin"),
+                )
+                .parse()
+                .unwrap();
 
-                // TODO loop for all entity IDs, create a directory with the outputs
-                let proof = accumulator
-                    .generate_inclusion_proof(entity_ids.first().unwrap())
-                    .unwrap();
+                let dir = PathBuf::from("./inclusion_proofs/");
+                std::fs::create_dir(dir.as_path()).unwrap();
 
-                let a = serde_json::to_string(&proof).unwrap();
-
-                let path = "test_proof.json";
-                let mut file = std::fs::File::create(path).unwrap();
-                file.write_all(a.as_bytes());
+                for entity_id in entity_ids {
+                    let proof = accumulator.generate_inclusion_proof(&entity_id).unwrap();
+                    proof.serialize(&entity_id, dir.clone());
+                }
             }
         }
         Command::GenProofs {
@@ -107,10 +105,47 @@ fn main() {
             range_proof_aggregation,
             upper_bound_bit_length,
         } => {
+            let accumulator = Accumulator::deserialize(
+                tree_file
+                    .into_path()
+                    .expect("Expected file path, not stdout"),
+            )
+            .unwrap();
+
             // TODO for entity IDs: accept either path or stdin
-            // TODO deserialize the tree
-            // TODO generate proofs
-            error!("TODO implement");
+            let entity_ids = EntityIdsParser::from_path(
+                entity_ids
+                    .into_path()
+                    .expect("Expected file path, not stdin"),
+            )
+            .parse()
+            .unwrap();
+
+            let dir = PathBuf::from("./inclusion_proofs/");
+            std::fs::create_dir(dir.as_path()).unwrap();
+
+            let aggregation_factor = AggregationFactor::Percent(range_proof_aggregation);
+
+            for entity_id in entity_ids {
+                let proof = accumulator
+                    .generate_inclusion_proof_with(
+                        &entity_id,
+                        aggregation_factor.clone(),
+                        upper_bound_bit_length,
+                    )
+                    .unwrap();
+                proof.serialize(&entity_id, dir.clone());
+            }
+        }
+        Command::VerifyProof { file_path } => {
+            let file = std::fs::File::open(
+                file_path
+                    .into_path()
+                    .expect("Expected file path, not stdin"),
+            )
+            .unwrap();
+            let buf_reader = std::io::BufReader::new(file);
+            let decoded: InclusionProof = serde_json::from_reader(buf_reader).unwrap();
         }
     }
 }

@@ -26,7 +26,7 @@ use crate::{binary_tree::Height, percentage::{Percentage, ONE_HUNDRED_PERCENT}};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AggregationFactor {
     Divisor(u8),
     Percent(Percentage),

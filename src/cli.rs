@@ -63,39 +63,44 @@ pub enum Command {
 
         /// Generate inclusion proofs for the provided entity IDs, after
         /// building the tree.
-        #[clap(short, long, value_name = "ENTITY_IDS_FILE_PATH")]
+        #[arg(short, long, value_name = "ENTITY_IDS_FILE_PATH", global = true)]
         gen_proofs: Option<InputArg>,
 
         // /// Keep the program running to initiate more commands (TODO not
         // /// implemented yet).
-        // #[clap(short, long)]
+        // #[arg(short, long)]
         // keep_alive: bool,
         /// Serialize the tree to a file (a default file name will be given if
         /// only a directory is provided) (file extension is .dapoltree)
         /// (this option is ignored if 'deserialize' command is used).
-        #[clap(short = 'S', long, value_name = "FILE_PATH")]
+        #[arg(short = 'S', long, value_name = "FILE_PATH", global = true)]
         serialize: Option<OutputArg>,
     },
     GenProofs {
         /// List of entity IDs to generate proofs for, can be a file path or
         /// simply a comma separated list read from stdin (usi "-" to
         /// indicate stdin).
-        #[clap(short, long)]
+        #[arg(short, long)]
         entity_ids: InputArg,
 
         /// Path to the tree file that will be deserialized.
-        #[clap(short, long, value_name = "FILE_PATH")]
+        #[arg(short, long, value_name = "FILE_PATH")]
         tree_file: InputArg,
 
         /// Percentage of the range proofs that
         /// are aggregated using the Bulletproofs protocol.
-        #[clap(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
+        #[arg(short, long, value_parser = Percentage::from_str, default_value = ONE_HUNDRED_PERCENT, value_name = "PERCENTAGE")]
         range_proof_aggregation: Percentage,
 
         /// Upper bound for the range proofs is 2^(this_number).
-        #[clap(short, long, default_value_t = DEFAULT_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
+        #[arg(short, long, default_value_t = DEFAULT_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
         upper_bound_bit_length: u8,
     },
+    VerifyProof {
+        /// File path for the serialized inclusion proof json file.
+        #[arg(short, long)]
+        file_path: InputArg,
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -111,7 +116,7 @@ pub enum BuildKindCommand {
         height: Height,
 
         /// TOML file containing secrets (e.g. secrets_example.toml).
-        #[clap(short, long, value_name = "FILE_PATH")]
+        #[arg(short, long, value_name = "FILE_PATH")]
         secrets_file: Option<InputArg>,
 
         #[command(flatten)]

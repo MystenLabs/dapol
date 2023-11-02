@@ -2,7 +2,7 @@
 
 use clap::builder::{OsStr, Str};
 use serde::{Deserialize, Serialize};
-use std::{num::ParseIntError, str::FromStr, convert::From};
+use std::{convert::From, num::ParseIntError, str::FromStr};
 
 pub const ONE_HUNDRED_PERCENT: Percentage = Percentage { value: 100 };
 
@@ -23,7 +23,11 @@ impl Percentage {
 
     /// Returns the percentage applied to the number given.
     pub fn apply_to(&self, value: u8) -> u8 {
-        (value * self.value) / 100u8
+        if value.checked_mul(self.value).is_none() {
+            (value / 100u8) * self.value
+        } else {
+            (value * self.value) / 100u8
+        }
     }
 
     /// Returns the percentage saved.

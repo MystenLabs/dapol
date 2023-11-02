@@ -5,13 +5,17 @@
 //! contents are to be supported then new inclusion proof structs and methods
 //! will need to be written.
 
-use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
-use crate::node_content::{FullNodeContent, HiddenNodeContent};
-
 use bulletproofs::ProofError;
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+
+use std::{fmt::Debug, io::Write, path::PathBuf};
+
+use log::debug;
+
+use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
+use crate::node_content::{FullNodeContent, HiddenNodeContent};
+use crate::EntityId;
 
 mod individual_range_proof;
 use individual_range_proof::IndividualRangeProof;
@@ -182,6 +186,22 @@ impl InclusionProof {
         }
 
         Ok(())
+    }
+
+    // STENT TODO fix unwraps
+    // STENT TODO don't need entity_id as param
+    // STENT TODO move some of this code to read_write_utils
+    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) {
+        let serialized = serde_json::to_string(self).unwrap();
+
+        let mut file_name = entity_id.to_string();
+        file_name.push_str(".json");
+        let path = dir.join(file_name);
+
+        debug!("Serializing inclusion proof to path {:?}", path);
+
+        let mut file = std::fs::File::create(path).unwrap();
+        file.write_all(serialized.as_bytes());
     }
 }
 

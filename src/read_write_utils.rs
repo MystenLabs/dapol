@@ -90,6 +90,7 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
         let mut file_name: String = TREE_SERIALIZATION_FILE_PREFIX.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
+        file_name.push_str(".");
         file_name.push_str(SERIALIZED_TREE_EXTENSION);
         path.push(file_name);
 
@@ -102,8 +103,8 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadWriteError {
-    #[error("Problem serializing with bincode")]
-    SerializationError(#[from] bincode::Error),
+    #[error("Problem serializing/deserializing with bincode")]
+    BincodeSerdeError(#[from] bincode::Error),
     #[error("Problem writing to file")]
     FileWriteError(#[from] std::io::Error),
     #[error("Unknown file extension {0:?}, expected {SERIALIZED_TREE_EXTENSION}")]

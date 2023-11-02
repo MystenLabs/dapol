@@ -108,6 +108,6 @@ impl Accumulator {
 
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorError {
-    #[error("Error deserializing file")]
-    DeserializationError(#[from] crate::read_write_utils::ReadWriteError),
+    #[error("Error serializing/deserializing file")]
+    SerdeError(#[from] crate::read_write_utils::ReadWriteError),
 }
