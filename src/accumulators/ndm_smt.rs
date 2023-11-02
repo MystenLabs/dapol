@@ -11,6 +11,7 @@
 
 use std::collections::HashMap;
 
+use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
 use log::error;
@@ -230,6 +231,11 @@ impl NdmSmt {
             AggregationFactor::default(),
             DEFAULT_UPPER_BOUND_BIT_LENGTH,
         )
+    }
+
+    /// Return the hash digest/bytes of the root node for the binary tree.
+    pub fn root_hash(&self) -> H256 {
+        self.tree.root().content.hash
     }
 }
 

@@ -29,6 +29,7 @@
 use clap::{command, Args, Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
 use patharg::{InputArg, OutputArg};
+use primitive_types::H256;
 
 use std::str::FromStr;
 
@@ -100,6 +101,10 @@ pub enum Command {
         /// File path for the serialized inclusion proof json file.
         #[arg(short, long)]
         file_path: InputArg,
+
+        /// Hash digest/bytes for the root node of the tree.
+        #[arg(short, long, value_parser = H256::from_str, value_name = "BYTES")]
+        root_hash: H256,
     }
 }
 

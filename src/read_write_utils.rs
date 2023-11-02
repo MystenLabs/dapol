@@ -21,7 +21,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
     structure: &T,
     path: PathBuf,
 ) -> Result<(), ReadWriteError> {
-    let tmr = stimer!(Level::Info; "Serialization");
+    let tmr = stimer!(Level::Debug; "Serialization");
 
     let encoded: Vec<u8> = bincode::serialize(&structure)?;
     executing!(tmr, "Done encoding");
@@ -40,7 +40,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
 /// An error is returned if
 /// 1. The file cannot be opened.
 /// 2. The [bincode] deserializer fails.
-#[stime("info")]
+#[stime("debug")]
 pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T, ReadWriteError> {
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);

@@ -6,7 +6,7 @@ use log::debug;
 use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
     ndm_smt,
-    read_write_utils::parse_tree_serialization_path,
+    read_write_utils::{self, parse_tree_serialization_path},
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
 };
@@ -17,6 +17,7 @@ fn main() {
 
     activate_logging(args.verbose.log_level_filter());
 
+    // STENT TODO get rid of the unwraps, we need to print out the full errors
     match args.command {
         Command::BuildTree {
             build_kind,
@@ -137,15 +138,17 @@ fn main() {
                 proof.serialize(&entity_id, dir.clone());
             }
         }
-        Command::VerifyProof { file_path } => {
-            let file = std::fs::File::open(
+        Command::VerifyProof {
+            file_path,
+            root_hash,
+        } => {
+            let proof: InclusionProof = read_write_utils::deserialize_from_bin_file(
                 file_path
                     .into_path()
                     .expect("Expected file path, not stdin"),
             )
             .unwrap();
-            let buf_reader = std::io::BufReader::new(file);
-            let decoded: InclusionProof = serde_json::from_reader(buf_reader).unwrap();
+            proof.verify(root_hash);
         }
     }
 }

@@ -20,6 +20,7 @@
 //! let config = AccumulatorConfig::deserialize(file_path).unwrap();
 //! ```
 
+use log::debug;
 use serde::Deserialize;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
@@ -43,6 +44,11 @@ impl AccumulatorConfig {
     /// 2. The file cannot be read.
     /// 3. The file type is not supported.
     pub fn deserialize(config_file_path: PathBuf) -> Result<Self, AccumulatorConfigError> {
+        debug!(
+            "Successfully deserialized accumulator config from file {:?}",
+            config_file_path.clone().into_os_string()
+        );
+
         let ext = config_file_path
             .extension()
             .and_then(|s| s.to_str())

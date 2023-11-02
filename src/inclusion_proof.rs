@@ -15,7 +15,7 @@ use log::debug;
 
 use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
-use crate::EntityId;
+use crate::{EntityId, read_write_utils};
 
 mod individual_range_proof;
 use individual_range_proof::IndividualRangeProof;
@@ -192,16 +192,21 @@ impl InclusionProof {
     // STENT TODO don't need entity_id as param
     // STENT TODO move some of this code to read_write_utils
     pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) {
-        let serialized = serde_json::to_string(self).unwrap();
+        // let serialized = bincode::serialize(&self).unwrap();
+        // let _deseriazed: InclusionProof = bincode::deserialize(&serialized).unwrap();
 
         let mut file_name = entity_id.to_string();
-        file_name.push_str(".json");
+        file_name.push_str(".dapolproof");
         let path = dir.join(file_name);
 
         debug!("Serializing inclusion proof to path {:?}", path);
 
-        let mut file = std::fs::File::create(path).unwrap();
-        file.write_all(serialized.as_bytes());
+        read_write_utils::serialize_to_bin_file(&self, path).unwrap();
+
+        // let mut file = std::fs::File::create(path).unwrap();
+        // file.write_all(serialized.as_bytes());
+
+        // let decoded: InclusionProof = read_write_utils::deserialize_from_bin_file(file_path.into_path());
     }
 }
 

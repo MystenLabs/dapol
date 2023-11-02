@@ -96,8 +96,11 @@ impl NdmSmtConfig {
             .with_num_entities(self.entities.generate_random)
             .parse_or_generate_random()?;
 
-        let tree = NdmSmt::new(secrets, height, entities).log_on_err()?;
-        Ok(tree)
+        let ndm_smt = NdmSmt::new(secrets, height, entities).log_on_err()?;
+
+        debug!("Successfully built NDM-SMT with root hash {:?}", ndm_smt.root_hash());
+
+        Ok(ndm_smt)
     }
 }
 

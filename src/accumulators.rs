@@ -16,7 +16,7 @@
 //!
 //! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
 
-use log::info;
+use log::{info, debug};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -32,6 +32,7 @@ pub enum Accumulator {
     // TODO other accumulators..
 }
 
+// STENT TODO change name here, accumulator is not super intuitive
 impl Accumulator {
     /// Try deserialize an accumulator from the given file path.
     ///
@@ -43,7 +44,23 @@ impl Accumulator {
     pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
         use crate::read_write_utils::deserialize_from_bin_file;
 
-        let accumulator: Accumulator = deserialize_from_bin_file(path).log_on_err()?;
+        debug!(
+            "Deserializing accumulator from file {:?}",
+            path.clone().into_os_string()
+        );
+
+        let accumulator: Accumulator = deserialize_from_bin_file(path.clone()).log_on_err()?;
+
+        let root_hash = match &accumulator {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
+        };
+
+        info!(
+            "Successfully deserialized accumulator from file {:?} with root hash {:?}",
+            path.clone().into_os_string(),
+            root_hash
+        );
+
         Ok(accumulator)
     }
 
