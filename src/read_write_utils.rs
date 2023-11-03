@@ -63,6 +63,7 @@ const TREE_SERIALIZATION_FILE_PREFIX: &str = "accumulator_";
 /// extension is checked.
 ///
 /// The default file name is `ndm_smt_<timestamp>.dapoltree`.
+// STENT TODO make this generic and put the extension details in accumulator file
 pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
         // If `path` leads to a file.

@@ -39,7 +39,6 @@ use crate::{
     inclusion_proof::DEFAULT_UPPER_BOUND_BIT_LENGTH,
 };
 
-// STENT TODO print out the root when the tree is done building
 // STENT TODO we want a keep-running flag after new or from-file, for doing
 // proofs
 

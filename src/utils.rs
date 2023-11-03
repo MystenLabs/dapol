@@ -46,6 +46,20 @@ impl<T, E: Debug + Display> LogOnErr for Result<T, E> {
     }
 }
 
+pub trait LogOnErrUnwrap<T> {
+    fn log_on_err_unwrap(self) -> T;
+}
+impl<T, E: Debug + Display> LogOnErrUnwrap<T> for Result<T, E> {
+    /// Produce an error [log] if self is an Err, then unwrap.
+    fn log_on_err_unwrap(self) -> T {
+        match &self {
+            Err(err) => error!("{:?} {}", err, err),
+            Ok(_) => {}
+        }
+        self.unwrap()
+    }
+}
+
 pub trait Consume<T> {
     fn consume<F>(self, f: F)
     where

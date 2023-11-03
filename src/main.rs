@@ -7,7 +7,7 @@ use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
     ndm_smt,
     read_write_utils::{self, parse_tree_serialization_path},
-    utils::{activate_logging, Consume, IfNoneThen, LogOnErr},
+    utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
 };
 use patharg::InputArg;
@@ -17,7 +17,6 @@ fn main() {
 
     activate_logging(args.verbose.log_level_filter());
 
-    // STENT TODO get rid of the unwraps, we need to print out the full errors
     match args.command {
         Command::BuildTree {
             build_kind,
@@ -57,9 +56,9 @@ fn main() {
                             )
                             .num_entities_opt(entity_source.random_entities)
                             .build()
-                            .unwrap()
+                            .log_on_err_unwrap()
                             .parse()
-                            .unwrap();
+                            .log_on_err_unwrap();
 
                         Accumulator::NdmSmt(ndm_smt)
                     }
@@ -67,15 +66,15 @@ fn main() {
                 BuildKindCommand::Deserialize { path } => Accumulator::deserialize(
                     path.into_path().expect("Expected file path, not stdout"),
                 )
-                .unwrap(),
+                .log_on_err_unwrap(),
                 BuildKindCommand::ConfigFile { file_path } => AccumulatorConfig::deserialize(
                     file_path
                         .into_path()
                         .expect("Expected file path, not stdin"),
                 )
-                .unwrap()
+                .log_on_err_unwrap()
                 .parse()
-                .unwrap(),
+                .log_on_err_unwrap(),
             };
 
             serialization_path
@@ -89,13 +88,15 @@ fn main() {
                     patharg.into_path().expect("Expected file path, not stdin"),
                 )
                 .parse()
-                .unwrap();
+                .log_on_err_unwrap();
 
                 let dir = PathBuf::from("./inclusion_proofs/");
-                std::fs::create_dir(dir.as_path()).unwrap();
+                std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
 
                 for entity_id in entity_ids {
-                    let proof = accumulator.generate_inclusion_proof(&entity_id).unwrap();
+                    let proof = accumulator
+                        .generate_inclusion_proof(&entity_id)
+                        .log_on_err_unwrap();
                     proof.serialize(&entity_id, dir.clone());
                 }
             }
@@ -111,7 +112,7 @@ fn main() {
                     .into_path()
                     .expect("Expected file path, not stdout"),
             )
-            .unwrap();
+            .log_on_err_unwrap();
 
             // TODO for entity IDs: accept either path or stdin
             let entity_ids = EntityIdsParser::from_path(
@@ -120,10 +121,10 @@ fn main() {
                     .expect("Expected file path, not stdin"),
             )
             .parse()
-            .unwrap();
+            .log_on_err_unwrap();
 
             let dir = PathBuf::from("./inclusion_proofs/");
-            std::fs::create_dir(dir.as_path()).unwrap();
+            std::fs::create_dir(dir.as_path()).log_on_err_unwrap();
 
             let aggregation_factor = AggregationFactor::Percent(range_proof_aggregation);
 
@@ -134,7 +135,8 @@ fn main() {
                         aggregation_factor.clone(),
                         upper_bound_bit_length,
                     )
-                    .unwrap();
+                    .log_on_err_unwrap();
+
                 proof.serialize(&entity_id, dir.clone());
             }
         }
@@ -142,12 +144,13 @@ fn main() {
             file_path,
             root_hash,
         } => {
-            let proof: InclusionProof = read_write_utils::deserialize_from_bin_file(
+            let proof = InclusionProof::deserialize(
                 file_path
                     .into_path()
                     .expect("Expected file path, not stdin"),
             )
-            .unwrap();
+            .log_on_err_unwrap();
+
             proof.verify(root_hash);
         }
     }

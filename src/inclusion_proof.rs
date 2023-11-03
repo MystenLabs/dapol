@@ -5,15 +5,14 @@
 //! contents are to be supported then new inclusion proof structs and methods
 //! will need to be written.
 
-use bulletproofs::ProofError;
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
-use std::{fmt::Debug, io::Write, path::PathBuf};
+use std::{fmt::Debug, path::PathBuf};
 
-use log::debug;
+use log::info;
 
-use crate::binary_tree::{Coordinate, Height, Node, Path, PathError};
+use crate::binary_tree::{Coordinate, Height, Node, Path};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::{EntityId, read_write_utils};
 
@@ -30,6 +29,9 @@ pub use aggregation_factor::AggregationFactor;
 /// 64 bits should be more than enough bits to represent liabilities for real
 /// world applications such as crypto asset exchange balances.
 pub const DEFAULT_UPPER_BOUND_BIT_LENGTH: u8 = 64u8;
+
+/// The file extension used when writing serialized binary files.
+const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 
 /// Inclusion proof struct.
 ///
@@ -188,25 +190,36 @@ impl InclusionProof {
         Ok(())
     }
 
-    // STENT TODO fix unwraps
-    // STENT TODO don't need entity_id as param
-    // STENT TODO move some of this code to read_write_utils
-    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) {
-        // let serialized = bincode::serialize(&self).unwrap();
-        // let _deseriazed: InclusionProof = bincode::deserialize(&serialized).unwrap();
-
+    /// Serialize the [InclusionProof] structure to a binary file.
+    ///
+    /// An error is returned if
+    /// 1. [bincode] fails to serialize the file.
+    /// 2. There is an issue opening or writing the file.
+    // STENT TODO don't need entity_id as param, need to change Path to accept another generic type
+    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<(), InclusionProofError> {
         let mut file_name = entity_id.to_string();
-        file_name.push_str(".dapolproof");
+        file_name.push_str(".");
+        file_name.push_str(SERIALIZED_PROOF_EXTENSION);
+
         let path = dir.join(file_name);
+        info!("Serializing inclusion proof to path {:?}", path);
 
-        debug!("Serializing inclusion proof to path {:?}", path);
+        read_write_utils::serialize_to_bin_file(&self, path)?;
 
-        read_write_utils::serialize_to_bin_file(&self, path).unwrap();
+        Ok(())
+    }
 
-        // let mut file = std::fs::File::create(path).unwrap();
-        // file.write_all(serialized.as_bytes());
-
-        // let decoded: InclusionProof = read_write_utils::deserialize_from_bin_file(file_path.into_path());
+    /// Deserialize the [InclusionProof] structure from a binary file.
+    ///
+    /// The file is assumed to be in [bincode] format.
+    ///
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [bincode] deserializer fails.
+    pub fn deserialize(file_path: PathBuf) -> Result<InclusionProof, InclusionProofError> {
+        info!("Deserializing inclusion proof to path {:?}", file_path);
+        let proof: InclusionProof = read_write_utils::deserialize_from_bin_file(file_path)?;
+        Ok(proof)
     }
 }
 
@@ -216,17 +229,19 @@ impl InclusionProof {
 #[derive(thiserror::Error, Debug)]
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
-    TreePathError(#[from] PathError),
+    TreePathError(#[from] crate::binary_tree::PathError),
     #[error("Issues with range proof")]
     RangeProofError(#[from] RangeProofError),
+    #[error("Error serializing/deserializing file")]
+    SerdeError(#[from] crate::read_write_utils::ReadWriteError),
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum RangeProofError {
     #[error("Bulletproofs generation failed")]
-    BulletproofGenerationError(ProofError),
+    BulletproofGenerationError(bulletproofs::ProofError),
     #[error("Bulletproofs verification failed")]
-    BulletproofVerificationError(ProofError),
+    BulletproofVerificationError(bulletproofs::ProofError),
     #[error("The length of the Pedersen commitments vector did not match the length of the input used to generate the proof")]
     InputVectorLengthMismatch,
 }
