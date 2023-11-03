@@ -1,30 +1,6 @@
 //! Command Line Interface.
 //!
-//! Output of `--help`:
-//! ```bash,ignore
-//! DAPOL+ Proof of Liabilities protocol in Rust
-//!
-//!     Usage: dapol [OPTIONS] <--entity-file <ENTITY_FILE>|--random-entities <RANDOM_ENTITIES>>
-//!
-//!     Options:
-//!         -e, --entity-file <ENTITY_FILE>
-//!             Path to file containing entity ID & liability entries (supported file types: csv)
-//!         -r, --random-entities <RANDOM_ENTITIES>
-//!             Randomly generate a number of entities
-//!         -v, --verbose...
-//!             More output per occurrence
-//!         -q, --quiet...
-//!             Less output per occurrence
-//!         --height <HEIGHT>
-//!             Height to use for the binary tree
-//!         -s, --secrets <SECRETS>
-//!             TOML file containing secrets (see secrets_example.toml)
-//!         -h, --help
-//!             Print help
-//!         -V, --version
-//!             Print version
-//! ```
-// TODO DOCS replace above help text with better description
+//! See [LONG_ABOUT] for more information.
 
 use clap::{command, Args, Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
@@ -35,15 +11,20 @@ use std::str::FromStr;
 
 use crate::{
     binary_tree::Height,
-    percentage::{Percentage, ONE_HUNDRED_PERCENT},
     inclusion_proof::DEFAULT_UPPER_BOUND_BIT_LENGTH,
+    percentage::{Percentage, ONE_HUNDRED_PERCENT},
 };
 
-// STENT TODO we want a keep-running flag after new or from-file, for doing
+// TODO we want a keep-running flag after new or from-file, for doing
 // proofs
 
+const LONG_ABOUT: &str = "DAPOL+ Proof of Liabilities protocol in Rust
+
+MOREMORETODO";
+// TODO more long docs (above , and also for some of the commands)
+
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version, about, long_about = LONG_ABOUT)]
 pub struct Cli {
     /// Initial command for the program.
     #[command(subcommand)]
@@ -76,6 +57,7 @@ pub enum Command {
         #[arg(short = 'S', long, value_name = "FILE_PATH", global = true)]
         serialize: Option<OutputArg>,
     },
+    /// Generate inclusion proofs for entities.
     GenProofs {
         /// List of entity IDs to generate proofs for, can be a file path or
         /// simply a comma separated list read from stdin (usi "-" to
@@ -96,6 +78,7 @@ pub enum Command {
         #[arg(short, long, default_value_t = DEFAULT_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
         upper_bound_bit_length: u8,
     },
+    /// Verify an inclusion proof.
     VerifyProof {
         /// File path for the serialized inclusion proof json file.
         #[arg(short, long)]
@@ -104,7 +87,7 @@ pub enum Command {
         /// Hash digest/bytes for the root node of the tree.
         #[arg(short, long, value_parser = H256::from_str, value_name = "BYTES")]
         root_hash: H256,
-    }
+    },
 }
 
 #[derive(Debug, Subcommand)]

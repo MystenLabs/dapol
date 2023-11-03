@@ -130,6 +130,8 @@ impl InclusionProof {
     pub fn verify(&self, root_hash: H256) -> Result<(), InclusionProofError> {
         use curve25519_dalek_ng::ristretto::CompressedRistretto;
 
+        info!("Verifying inclusion proof..");
+
         // Is this cast safe? Yes because the tree height (which is the same as the
         // length of the input) is also stored as a u8, and so there would never
         // be more siblings than max(u8).
@@ -186,6 +188,8 @@ impl InclusionProof {
                 )?;
             }
         }
+
+        info!("Succesfully verified proof");
 
         Ok(())
     }
