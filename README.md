@@ -1,7 +1,19 @@
 # DAPOL+ implementation
+
 Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available here: https://eprint.iacr.org/2021/1350
 
-*Note: This is a work in progress, and is not yet ready for production use.
+**NOTE** This project is currently still a work in progress, but is ready for
+use as is. The code has _not_ been audited yet (as of Nov 2023).
+
+Top-level doc for the project: https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA
+
+## How this code can be used
+
+There is both a Rust API and a CLI.
+
+## Rust API
+
+TODO
 
 ## CLI usage
 

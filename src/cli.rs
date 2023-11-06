@@ -157,8 +157,14 @@ pub struct EntitySource {
 const MAIN_LONG_ABOUT: &str = "
 DAPOL+ Proof of Liabilities protocol in Rust.
 
-TODO more
-";
+**NOTE** This project is currently still a work in progress, but is ready for
+use as is. The code has _not_ been audited yet (as of Nov 2023).
+
+DAPOL+ paper: https://eprint.iacr.org/2021/1350
+
+Top-level doc for the project: https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA
+
+Source code: https://github.com/silversixpence-crypto/dapol/";
 
 const GEN_PROOFS_HELP: &str = "
 Generate inclusion proofs for the provided entity IDs, after building the tree.
