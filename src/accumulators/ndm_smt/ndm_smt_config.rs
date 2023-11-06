@@ -8,6 +8,8 @@
 //! following format:
 //!
 //! ```toml,ignore
+//! accumulator_type = "ndm-smt"
+//!
 //! # Height of the tree.
 //! # If the height is not set the default height will be used.
 //! height = 32
@@ -15,10 +17,6 @@
 //! # Path to the secrets file.
 //! # If not present the secrets will be generated randomly.
 //! secrets_file_path = "./secrets_example.toml"
-//!
-//! # Can be a file or directory (default file name given in this case)
-//! # If not present then no serialization is done.
-//! serialization_path = "./tree.dapoltree"
 //!
 //! # At least one of file_path & generate_random must be present.
 //! # If both are given then file_path is prioritized.
@@ -31,6 +29,9 @@
 //! generate_random = 4
 //! ```
 //!
+//! Construction of this tree using a config file must be done via
+//! [super][super][config][AccumulatorConfig].
+//!
 //! Example how to use the builder:
 //! ```
 //! use std::path::PathBuf;
@@ -42,7 +43,6 @@
 //! let config = ndm_smt::NdmSmtConfigBuilder::default()
 //!     .height(height)
 //!     .secrets_file_path(PathBuf::from("./secrets_example.toml"))
-//!     .serialization_path(PathBuf::from("./ndm_smt.dapoltree"))
 //!     .entities_path(PathBuf::from("./entities_example.csv"))
 //!     .build()
 //!     .unwrap();
@@ -51,17 +51,14 @@
 use std::path::PathBuf;
 
 use derive_builder::Builder;
-use log::info;
+use log::{info, debug};
 use serde::Deserialize;
 
 use crate::binary_tree::Height;
-use crate::entity::EntitiesParser;
-use crate::read_write_utils::{parse_tree_serialization_path, serialize_to_bin_file};
-use crate::utils::{Consume, IfNoneThen, LogOnErr};
+use crate::entity::{EntitiesParser, self};
+use crate::utils::{IfNoneThen, LogOnErr};
 
-use super::{NdmSmt, SecretsParser};
-
-const FILE_PREFIX: &str = "ndm_smt_";
+use super::{NdmSmt, SecretsParser, ndm_smt_secrets_parser};
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -69,8 +66,6 @@ pub struct NdmSmtConfig {
     height: Option<Height>,
     #[builder(setter(name = "secrets_file_path_opt"))]
     secrets_file_path: Option<PathBuf>,
-    #[builder(setter(name = "serialization_path_opt"))]
-    serialization_path: Option<PathBuf>,
     #[builder(private)]
     entities: EntityConfig,
 }
@@ -83,11 +78,11 @@ pub struct EntityConfig {
 
 impl NdmSmtConfig {
     /// Try to construct an NDM-SMT from the config.
-    // STENT TODO get rid of these unwraps
-    pub fn parse(self) -> NdmSmt {
+    pub fn parse(self) -> Result<NdmSmt, NdmSmtParserError> {
+        debug!("Parsing config to create a new NDM-SMT");
+
         let secrets = SecretsParser::from_path(self.secrets_file_path)
-            .parse_or_generate_random()
-            .unwrap();
+            .parse_or_generate_random()?;
 
         let height = self
             .height
@@ -99,43 +94,19 @@ impl NdmSmtConfig {
         let entities = EntitiesParser::new()
             .with_path(self.entities.file_path)
             .with_num_entities(self.entities.generate_random)
-            .parse_or_generate_random()
-            .unwrap();
+            .parse_or_generate_random()?;
 
-        // Do path checks before building so that the build does not have to be
-        // repeated for problems with file names etc.
-        let serialization_path = match self.serialization_path.clone() {
-            Some(path) => {
-                let path = parse_tree_serialization_path(path, FILE_PREFIX)
-                    .log_on_err()
-                    .unwrap();
+        let ndm_smt = NdmSmt::new(secrets, height, entities).log_on_err()?;
 
-                Some(path)
-            }
-            None => None,
-        };
+        debug!("Successfully built NDM-SMT with root hash {:?}", ndm_smt.root_hash());
 
-        let ndmsmt = NdmSmt::new(secrets, height, entities).log_on_err().unwrap();
-
-        serialization_path
-            .if_none_then(|| {
-                info!("No serialization path set, skipping serialization of the tree");
-            })
-            .consume(|path| {
-                serialize_to_bin_file(&ndmsmt, path).log_on_err();
-            });
-
-        ndmsmt
+        Ok(ndm_smt)
     }
 }
 
 impl NdmSmtConfigBuilder {
     pub fn height(&mut self, height: Height) -> &mut Self {
         self.height_opt(Some(height))
-    }
-
-    pub fn serialization_path(&mut self, path: PathBuf) -> &mut Self {
-        self.serialization_path_opt(Some(path))
     }
 
     pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
@@ -175,4 +146,14 @@ impl NdmSmtConfigBuilder {
     pub fn num_entities(&mut self, num_entites: u64) -> &mut Self {
         self.num_entities_opt(Some(num_entites))
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum NdmSmtParserError {
+    #[error("Secrets parsing failed while trying to parse NDM-SMT config")]
+    SecretsError(#[from] ndm_smt_secrets_parser::SecretsParserError),
+    #[error("Entities parsing failed while trying to parse NDM-SMT config")]
+    EntitiesError(#[from] entity::EntitiesParserError),
+    #[error("Tree construction failed after parsing NDM-SMT config")]
+    BuildError(#[from] super::NdmSmtError),
 }

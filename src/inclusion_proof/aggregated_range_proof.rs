@@ -38,7 +38,7 @@
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
 use merlin::Transcript;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use super::RangeProofError;
 

@@ -1,13 +1,11 @@
-use std::fmt::{Debug};
+use std::fmt::Debug;
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::{ffi::OsString, fs::File};
 
 use log::error;
-use logging_timer::{executing, finish, stimer, Level, stime};
+use logging_timer::{executing, finish, stime, stimer, Level};
 use serde::{de::DeserializeOwned, Serialize};
-
-pub const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
 
 // -------------------------------------------------------------------------------------------------
 // Utility functions.
@@ -23,7 +21,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
     structure: &T,
     path: PathBuf,
 ) -> Result<(), ReadWriteError> {
-    let tmr = stimer!(Level::Info; "Serialization");
+    let tmr = stimer!(Level::Debug; "Serialization");
 
     let encoded: Vec<u8> = bincode::serialize(&structure)?;
     executing!(tmr, "Done encoding");
@@ -42,7 +40,7 @@ pub fn serialize_to_bin_file<T: Serialize>(
 /// An error is returned if
 /// 1. The file cannot be opened.
 /// 2. The [bincode] deserializer fails.
-#[stime("info")]
+#[stime("debug")]
 pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T, ReadWriteError> {
     let file = File::open(path)?;
     let buf_reader = BufReader::new(file);
@@ -50,7 +48,10 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     Ok(decoded)
 }
 
-/// Parse `path` as one that points to a serialized tree file.
+const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
+const TREE_SERIALIZATION_FILE_PREFIX: &str = "accumulator_";
+
+/// Parse `path` as one that points to a serialized dapol tree file.
 ///
 /// `path` can be either of the following:
 /// 1. Existing directory: in this case a default file name is appended to `path`.
@@ -62,7 +63,8 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
 /// extension is checked.
 ///
 /// The default file name is `ndm_smt_<timestamp>.dapoltree`.
-pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Result<PathBuf, ReadWriteError> {
+// STENT TODO make this generic and put the extension details in accumulator file
+pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
         // If `path` leads to a file.
 
@@ -86,9 +88,10 @@ pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Re
             std::fs::create_dir_all(path.clone())?;
         }
 
-        let mut file_name: String = file_prefix.to_owned();
+        let mut file_name: String = TREE_SERIALIZATION_FILE_PREFIX.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
+        file_name.push_str(".");
         file_name.push_str(SERIALIZED_TREE_EXTENSION);
         path.push(file_name);
 
@@ -101,8 +104,8 @@ pub fn parse_tree_serialization_path(mut path: PathBuf, file_prefix: &str) -> Re
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReadWriteError {
-    #[error("Problem serializing with bincode")]
-    SerializationError(#[from] bincode::Error),
+    #[error("Problem serializing/deserializing with bincode")]
+    BincodeSerdeError(#[from] bincode::Error),
     #[error("Problem writing to file")]
     FileWriteError(#[from] std::io::Error),
     #[error("Unknown file extension {0:?}, expected {SERIALIZED_TREE_EXTENSION}")]

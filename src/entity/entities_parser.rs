@@ -13,7 +13,7 @@
 //! At least on of the 2 fields must be set for the parser to succeed. If both
 //! fields are set then the path is prioritized.
 
-use std::{path::PathBuf, str::FromStr};
+use std::{ffi::OsString, path::PathBuf, str::FromStr};
 
 use rand::{
     distributions::{Alphanumeric, DistString, Uniform},
@@ -68,10 +68,9 @@ impl EntitiesParser {
 
         let path = self.path.ok_or(EntitiesParserError::PathNotSet)?;
 
-        let ext = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .ok_or(EntitiesParserError::UnknownFileType)?;
+        let ext = path.extension().and_then(|s| s.to_str()).ok_or(
+            EntitiesParserError::UnknownFileType(path.clone().into_os_string()),
+        )?;
 
         let mut entities = Vec::<Entity>::new();
 
@@ -130,8 +129,8 @@ pub enum EntitiesParserError {
     PathNotSet,
     #[error("Expected num_entities to be set but found none")]
     NumEntitiesNotSet,
-    #[error("Unable to find file extension")]
-    UnknownFileType,
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error opening or reading CSV file")]

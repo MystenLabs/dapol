@@ -1,126 +1,130 @@
-//! Accumulator config and parser.
+//! Accumulators.
 //!
 //! This is the top-most file in the hierarchy of the dapol crate. An
 //! accumulator is required to build a binary tree, and determines how the
 //! binary tree is constructed. The are different types of accumulators, which
 //! can all be found under this module. Each accumulator has different
 //! configuration requirements, which are detailed in each of the sub-modules.
+//! The currently supported accumulator types are:
+//! - [Non-Deterministic Mapping Sparse Merkle Tree]
 //!
-//! Currently only TOML files are supported for config files. The only
-//! config requirement at this level (not including the specific accumulator
-//! config) is the accumulator type:
+//! Each accumulator can be constructed via the configuration structs:
+//! - [config][AccumulatorConfig] is used to deserialize config from a file. The
+//! specific type of accumulator is determined from the config file.
+//! - [ndm_smt][ndm_smt_config][NdmSmtConfigBuilder] is used to construct the
+//! NDM-SMT accumulator type using the builder pattern.
 //!
-//! ```toml,ignore
-//! accumulator_type = "ndm-smt"
-//! ```
-//!
-//! Example how to use the parser:
-//! ```
-//! use std::path::PathBuf;
-//! use dapol::AccumulatorParser;
-//!
-//! let path = PathBuf::from("./tree_config_example.toml");
-//!
-//! let accumulator = AccumulatorParser::from_config_fil_path(path)
-//!     .parse()
-//!     .unwrap();
-//! ```
+//! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
 
-use std::{fs::File, io::Read, path::PathBuf, str::FromStr};
-use serde::Deserialize;
+use log::{info, debug};
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
+use crate::{ndm_smt::NdmSmtError, utils::LogOnErr, AggregationFactor, EntityId, InclusionProof};
+
+pub mod config;
 pub mod ndm_smt;
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "accumulator_type", rename_all = "kebab-case")]
-pub enum AccumulatorConfig {
-    NdmSmt(ndm_smt::NdmSmtConfig),
+/// Various accumulator types.
+#[derive(Serialize, Deserialize)]
+pub enum Accumulator {
+    NdmSmt(ndm_smt::NdmSmt),
     // TODO other accumulators..
 }
 
-/// Parser requires a valid path to a file.
-pub struct AccumulatorParser {
-    config_file_path: Option<PathBuf>,
-}
-
-impl AccumulatorParser {
-    /// Constructor.
+// STENT TODO change name here, accumulator is not super intuitive
+impl Accumulator {
+    /// Try deserialize an accumulator from the given file path.
     ///
-    /// `Option` is used to wrap the parameter to make the code work more
-    /// seamlessly with the config builders in [super][super][accumulators].
-    pub fn from_config_fil_path_opt(path: Option<PathBuf>) -> Self {
-        AccumulatorParser {
-            config_file_path: path,
-        }
-    }
-
-    pub fn from_config_fil_path(path: PathBuf) -> Self {
-        Self::from_config_fil_path_opt(Some(path))
-    }
-
-    /// Open and parse the config file, then try to create an accumulator
-    /// object from the config.
+    /// The file is assumed to be in [bincode] format.
     ///
-    /// An error is returned if:
-    /// 1. The path is None (i.e. was not set).
-    /// 2. The file cannot be opened.
-    /// 3. The file cannot be read.
-    /// 4. The file type is not supported.
-    /// 5. Deserialization of any of the records in the file fails.
-    pub fn parse(self) -> Result<ndm_smt::NdmSmt, AccumulatorParserError> {
-        let config_file_path = self
-            .config_file_path
-            .ok_or(AccumulatorParserError::PathNotSet)?;
+    /// An error is logged and returned if
+    /// 1. The file cannot be opened.
+    /// 2. The [bincode] deserializer fails.
+    pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
+        use crate::read_write_utils::deserialize_from_bin_file;
 
-        let ext = config_file_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .ok_or(AccumulatorParserError::UnknownFileType)?;
+        debug!(
+            "Deserializing accumulator from file {:?}",
+            path.clone().into_os_string()
+        );
 
-        let config = match FileType::from_str(ext)? {
-            FileType::Toml => {
-                let mut buf = String::new();
-                File::open(config_file_path)?.read_to_string(&mut buf)?;
-                let config: AccumulatorConfig = toml::from_str(&buf)?;
-                config
-            }
+        let accumulator: Accumulator = deserialize_from_bin_file(path.clone()).log_on_err()?;
+
+        let root_hash = match &accumulator {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
         };
 
-        let accumulator = match config {
-            AccumulatorConfig::NdmSmt(config) => config.parse(),
-            // TODO add more accumulators..
-        };
+        info!(
+            "Successfully deserialized accumulator from file {:?} with root hash {:?}",
+            path.clone().into_os_string(),
+            root_hash
+        );
 
         Ok(accumulator)
     }
-}
 
-/// Supported file types for the parser.
-enum FileType {
-    Toml,
-}
+    /// Serialize to a file.
+    ///
+    /// Serialization is done using [bincode]
+    ///
+    /// An error is returned if
+    /// 1. [bincode] fails to serialize the file.
+    /// 2. There is an issue opening or writing the file.
+    pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError> {
+        use crate::read_write_utils::serialize_to_bin_file;
 
-impl FromStr for FileType {
-    type Err = AccumulatorParserError;
+        info!(
+            "Serializing accumulator to file {:?}",
+            path.clone().into_os_string()
+        );
 
-    fn from_str(ext: &str) -> Result<FileType, Self::Err> {
-        match ext {
-            "toml" => Ok(FileType::Toml),
-            _ => Err(AccumulatorParserError::UnsupportedFileType { ext: ext.into() }),
+        serialize_to_bin_file(self, path).log_on_err()?;
+        Ok(())
+    }
+
+    /// Generate an inclusion proof for the given `entity_id`.
+    ///
+    /// `aggregation_factor` is used to determine how many of the range proofs
+    /// are aggregated. Those that do not form part of the aggregated proof
+    /// are just proved individually. The aggregation is a feature of the
+    /// Bulletproofs protocol that improves efficiency.
+    ///
+    /// `upper_bound_bit_length` is used to determine the upper bound for the
+    /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
+    /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
+    /// some liability. The type is set to `u8` because we are not expected
+    /// to require bounds higher than $2^256$. Note that if the value is set
+    /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
+    /// an Err.
+    pub fn generate_inclusion_proof_with(
+        &self,
+        entity_id: &EntityId,
+        aggregation_factor: AggregationFactor,
+        upper_bound_bit_length: u8,
+    ) -> Result<InclusionProof, NdmSmtError> {
+        match self {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof_with(
+                entity_id,
+                aggregation_factor,
+                upper_bound_bit_length,
+            ),
+        }
+    }
+
+    /// Generate an inclusion proof for the given `entity_id`.
+    pub fn generate_inclusion_proof(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<InclusionProof, NdmSmtError> {
+        match self {
+            Accumulator::NdmSmt(ndm_smt) => ndm_smt.generate_inclusion_proof(entity_id),
         }
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum AccumulatorParserError {
-    #[error("Expected path to be set but found none")]
-    PathNotSet,
-    #[error("Unable to find file extension")]
-    UnknownFileType,
-    #[error("The file type with extension {ext:?} is not supported")]
-    UnsupportedFileType { ext: String },
-    #[error("Error reading the file")]
-    FileReadError(#[from] std::io::Error),
-    #[error("Deserialization process failed")]
-    DeserializationError(#[from] toml::de::Error),
+pub enum AccumulatorError {
+    #[error("Error serializing/deserializing file")]
+    SerdeError(#[from] crate::read_write_utils::ReadWriteError),
 }

@@ -13,7 +13,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use std::convert::From;
+use std::{convert::From};
 use std::str::FromStr;
 
 mod entities_parser;
@@ -62,3 +62,10 @@ impl From<EntityId> for Vec<u8> {
     }
 }
 
+use std::fmt;
+
+impl fmt::Display for EntityId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}

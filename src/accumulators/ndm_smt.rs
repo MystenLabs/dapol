@@ -1,16 +1,17 @@
-//! Non-deterministic mapping sparse Merkle tree (NDM_SMT).
+//! Non-Deterministic Mapping Sparse Merkle Tree (NDM-SMT).
 //!
-//! The accumulator variant is the simplest. Each entity is randomly mapped to
+//! This accumulator variant is the simplest. Each entity is randomly mapped to
 //! a bottom-layer node in the tree. The algorithm used to determine the mapping
 //! uses a variation of Durstenfeld’s shuffle algorithm (see
 //! [RandomXCoordGenerator]) and will not produce the same mapping for the same
 //! inputs, hence the "non-deterministic" term in the title.
 //!
-//! The hash function chosen for the Merkle Sum Tree is blake3.
+//! Construction of this tree can be done via
+//! [ndm_smt_config][NdmSmtConfigBuilder].
 
 use std::collections::HashMap;
-use std::path::PathBuf;
 
+use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
 use log::error;
@@ -20,21 +21,21 @@ use rayon::prelude::*;
 
 use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
 use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, DEFAULT_UPPER_BOUND_BIT_LENGTH};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
-mod secrets;
-use secrets::Secrets;
+mod ndm_smt_secrets;
+use ndm_smt_secrets::Secrets;
 
-mod secrets_parser;
-pub use secrets_parser::SecretsParser;
+mod ndm_smt_secrets_parser;
+pub use ndm_smt_secrets_parser::SecretsParser;
 
 mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;
 
-mod config;
-pub use config::{NdmSmtConfig, NdmSmtConfigBuilder};
+mod ndm_smt_config;
+pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
@@ -113,10 +114,10 @@ impl NdmSmt {
                 .par_iter()
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
-                    let w: [u8; 32] =
+                    let entity_secret: [u8; 32] =
                         generate_key(master_secret_bytes, &x_coord.to_le_bytes()).into();
-                    let blinding_factor = generate_key(&w, salt_b_bytes);
-                    let entity_salt = generate_key(&w, salt_s_bytes);
+                    let blinding_factor = generate_key(&entity_secret, salt_b_bytes);
+                    let entity_salt = generate_key(&entity_secret, salt_s_bytes);
 
                     InputLeafNode {
                         content: Content::new_leaf(
@@ -166,7 +167,7 @@ impl NdmSmt {
         })
     }
 
-    /// Generate an inclusion proof for the given entity_id.
+    /// Generate an inclusion proof for the given `entity_id`.
     ///
     /// The NdmSmt struct defines the content type that is used, and so must
     /// define how to extract the secret value (liability) and blinding
@@ -177,7 +178,7 @@ impl NdmSmt {
     /// are aggregated. Those that do not form part of the aggregated proof
     /// are just proved individually. The aggregation is a feature of the
     /// Bulletproofs protocol that improves efficiency.
-    //j
+    ///
     /// `upper_bound_bit_length` is used to determine the upper bound for the
     /// range proof, which is set to `2^upper_bound_bit_length` i.e. the
     /// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
@@ -185,7 +186,7 @@ impl NdmSmt {
     /// to require bounds higher than $2^256$. Note that if the value is set
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
-    pub fn generate_inclusion_proof_with_custom_range_proof_params(
+    pub fn generate_inclusion_proof_with(
         &self,
         entity_id: &EntityId,
         aggregation_factor: AggregationFactor,
@@ -225,13 +226,16 @@ impl NdmSmt {
         &self,
         entity_id: &EntityId,
     ) -> Result<InclusionProof, NdmSmtError> {
-        let aggregation_factor = AggregationFactor::Divisor(2u8);
-        let upper_bound_bit_length = 64u8;
-        self.generate_inclusion_proof_with_custom_range_proof_params(
+        self.generate_inclusion_proof_with(
             entity_id,
-            aggregation_factor,
-            upper_bound_bit_length,
+            AggregationFactor::default(),
+            DEFAULT_UPPER_BOUND_BIT_LENGTH,
         )
+    }
+
+    /// Return the hash digest/bytes of the root node for the binary tree.
+    pub fn root_hash(&self) -> H256 {
+        self.tree.root().content.hash
     }
 }
 
@@ -259,21 +263,6 @@ fn new_padding_node_content_closure(
     }
 }
 
-/// Try deserialize an NDM-SMT from the given file path.
-///
-/// The file is assumed to be in [bincode] format.
-///
-/// An error is logged and returned if
-/// 1. The file cannot be opened.
-/// 2. The [bincode] deserializer fails.
-pub fn deserialize(path: PathBuf) -> Result<NdmSmt, NdmSmtError> {
-    use crate::read_write_utils::deserialize_from_bin_file;
-    use crate::utils::LogOnErr;
-
-    let deserialized = deserialize_from_bin_file::<NdmSmt>(path).log_on_err()?;
-    Ok(deserialized)
-}
-
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
@@ -291,8 +280,6 @@ pub enum NdmSmtError {
     EntityIdNotFound,
     #[error("Entity ID {0:?} was duplicated")]
     DuplicateEntityIds(EntityId),
-    #[error("Error deserializing file")]
-    DeserializationError(#[from] crate::read_write_utils::ReadWriteError),
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -306,10 +293,10 @@ pub enum NdmSmtError {
 #[cfg(test)]
 mod tests {
     mod ndm_smt {
-        use std::str::FromStr;
         use super::super::*;
         use crate::binary_tree::Height;
         use crate::secret::Secret;
+        use std::str::FromStr;
 
         #[test]
         fn constructor_works() {

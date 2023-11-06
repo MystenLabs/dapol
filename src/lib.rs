@@ -4,6 +4,16 @@ mod kdf;
 mod node_content;
 mod percentage;
 
+pub mod cli;
+pub mod read_write_utils;
+pub mod utils;
+
+mod accumulators;
+pub use accumulators::{
+    config::{AccumulatorConfig, AccumulatorConfigError},
+    ndm_smt, Accumulator, AccumulatorError,
+};
+
 mod binary_tree;
 pub use binary_tree::Height;
 
@@ -12,18 +22,9 @@ mod secret;
 pub use secret::Secret;
 
 mod inclusion_proof;
-pub use inclusion_proof::{InclusionProof, InclusionProofError};
+pub use inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
 
 mod entity;
 pub use entity::{
     EntitiesParser, EntitiesParserError, Entity, EntityId, EntityIdsParser, EntityIdsParserError,
 };
-
-mod accumulators;
-pub use accumulators::{ndm_smt, AccumulatorParser};
-
-pub mod cli;
-mod read_write_utils;
-
-mod utils;
-pub use utils::activate_logging;

@@ -6,10 +6,10 @@
 //! Formatting:
 //! CSV: `id`
 
-use std::path::PathBuf;
 use std::str::FromStr;
+use std::{ffi::OsString, path::PathBuf};
 
-use log::info;
+use log::debug;
 
 use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 
@@ -23,8 +23,8 @@ enum FileType {
 }
 
 impl EntityIdsParser {
-    pub fn from_path(path: Option<PathBuf>) -> Self {
-        EntityIdsParser { path }
+    pub fn from_path(path: PathBuf) -> Self {
+        EntityIdsParser { path: Some(path) }
     }
 
     /// Open and parse the file, returning a vector of entity IDs.
@@ -35,17 +35,16 @@ impl EntityIdsParser {
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
     pub fn parse(self) -> Result<Vec<EntityId>, EntityIdsParserError> {
-        info!(
+        debug!(
             "Attempting to parse {:?} as a file containing a list of entity IDs",
             &self.path
         );
 
         let path = self.path.ok_or(EntityIdsParserError::PathNotSet)?;
 
-        let ext = path
-            .extension()
-            .and_then(|s| s.to_str())
-            .ok_or(EntityIdsParserError::UnknownFileType)?;
+        let ext = path.extension().and_then(|s| s.to_str()).ok_or(
+            EntityIdsParserError::UnknownFileType(path.clone().into_os_string()),
+        )?;
 
         let mut entity_ids = Vec::<EntityId>::new();
 
@@ -84,8 +83,8 @@ pub enum EntityIdsParserError {
     PathNotSet,
     #[error("Expected num_entities to be set but found none")]
     NumEntitiesNotSet,
-    #[error("Unable to find file extension")]
-    UnknownFileType,
+    #[error("Unable to find file extension for path {0:?}")]
+    UnknownFileType(OsString),
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error opening or reading CSV file")]
@@ -95,4 +94,3 @@ pub enum EntityIdsParserError {
     )]
     EntityIdTooLongError { id: String },
 }
-
