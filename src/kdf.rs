@@ -15,6 +15,7 @@
 use hkdf::Hkdf;
 use sha2::Sha256;
 use std::convert::From;
+use log::error;
 
 /// Output of the KDF.
 ///
@@ -30,11 +31,22 @@ impl From<Key> for [u8; 32] {
 
 /// Use the KDF to generate a [Key].
 ///
-/// HKDF requires 3 inputs: salt, IKM, info.
-pub fn generate_key(ikm: &[u8], info: &[u8]) -> Key {
-    let hk = Hkdf::<Sha256>::new(None, ikm);
+/// HKDF requires 3 inputs: salt, initial key material (IKM), info. Both the
+/// `salt` and `info` parameters and optional. The reason for this is that the
+/// DAPOL paper only specifies 2 inputs to its KDF, but the HKDF takes 3 inputs.
+/// In some of the cases `salt` is preferred, and in some `info` is. At least
+/// one of `salt` or `info` must be set, otherwise the function will panic;
+/// since this state is a potential security vulnerability, and should only be
+/// reachable if there is a bug in the code, a panic is the best option.
+pub fn generate_key(salt: Option<&[u8]>, ikm: &[u8], info: Option<&[u8]>) -> Key {
+    if salt.is_none() && info.is_none() {
+        error!("At least one of salt/info must be set when using the KDF to generate keys");
+        panic!("At least one of salt/info must be set when using the KDF to generate keys");
+    }
+
+    let hk = Hkdf::<Sha256>::new(salt, ikm);
     let mut okm = [0u8; 32];
-    hk.expand(info, &mut okm)
+    hk.expand(info.unwrap_or_default(), &mut okm)
         .expect("32 is a valid byte length for Sha256 to output");
 
     Key(okm)
