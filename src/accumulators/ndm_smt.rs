@@ -114,10 +114,10 @@ impl NdmSmt {
                 .par_iter()
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
-                    let w: [u8; 32] =
+                    let entity_secret: [u8; 32] =
                         generate_key(master_secret_bytes, &x_coord.to_le_bytes()).into();
-                    let blinding_factor = generate_key(&w, salt_b_bytes);
-                    let entity_salt = generate_key(&w, salt_s_bytes);
+                    let blinding_factor = generate_key(&entity_secret, salt_b_bytes);
+                    let entity_salt = generate_key(&entity_secret, salt_s_bytes);
 
                     InputLeafNode {
                         content: Content::new_leaf(
