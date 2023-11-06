@@ -1,12 +1,11 @@
-use std::{io::Write, path::PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use log::debug;
 
 use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
-    ndm_smt,
-    read_write_utils::{self, parse_tree_serialization_path},
+    ndm_smt, read_write_utils,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
 };
@@ -32,7 +31,7 @@ fn main() {
                     match serialize {
                         Some(patharg) => {
                             let path = patharg.into_path().expect("Expected a file path, not stdout");
-                            parse_tree_serialization_path(path).log_on_err().ok()
+                            read_write_utils::parse_tree_serialization_path(path).log_on_err().ok()
                         }
                         None => None,
                     }
