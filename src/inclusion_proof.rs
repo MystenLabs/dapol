@@ -259,6 +259,7 @@ pub enum RangeProofError {
 mod tests {
     use super::*;
     use crate::binary_tree::Coordinate;
+    use crate::utils::H256Finalizable;
 
     use bulletproofs::PedersenGens;
     use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
