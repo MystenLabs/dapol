@@ -1,7 +1,12 @@
 //! Aggregation factor.
 //!
-//! Method used to determine how many of the range proofs are aggregated. Those
-//! that do not form part of the aggregated proof are just proved individually.
+//! The Bulletproofs protocol allows many range proofs to be proved together,
+//! which is faster than proving them individually. [AggregationFactor] is used
+//! to determine how many of the range proofs in an inclusion proof are
+//! aggregated (proved together). Those that do not form part of the aggregated
+//! proof are just proved individually.
+//!
+//! [AggregationFactor] is an enum with 3 options:
 //!
 //! Divisor: divide the number of nodes by this number to get the ratio of the
 //! nodes to be used in the aggregated proof i.e.
@@ -14,15 +19,18 @@
 //! - if this number is `> tree_height` it means that none of the proofs should
 //!   be aggregated
 //!
-//! Percentage: multiply the `tree_height` by this percentage to get the number of
-//! nodes to be used in the aggregated proof i.e.
+//! Percentage: multiply the `tree_height` by this percentage to get the number
+//! of nodes to be used in the aggregated proof i.e.
 //! `number_of_ranges_for_aggregation = tree_height * percentage`.
 //!
 //! Number: the exact number of nodes to be used in the aggregated proof. Note
 //! that if this number is `> tree_height` it is treated as if it was equal to
 //! `tree_height`.
 
-use crate::{binary_tree::Height, percentage::{Percentage, ONE_HUNDRED_PERCENT}};
+use crate::{
+    binary_tree::Height,
+    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -71,8 +79,155 @@ impl AggregationFactor {
     pub fn is_max(&self, tree_height: &Height) -> bool {
         match self {
             Self::Divisor(div) => *div == 1,
-            Self::Percent(per) => per.value() == 100,
-            Self::Number(num) => *num == tree_height.as_raw_int(),
+            Self::Percent(per) => per == &ONE_HUNDRED_PERCENT,
+            Self::Number(num) => *num >= tree_height.as_raw_int(),
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
+#[cfg(test)]
+mod tests {
+    mod divisor {
+        use super::super::*;
+        use crate::Height;
+
+        // TODO fuzz on tree height
+        #[test]
+        fn zero_divisor_gives_zero_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Divisor(0);
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
+            assert!(aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn one_divisor_gives_full_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Divisor(1);
+            assert_eq!(
+                aggregagation_factor.apply_to(&tree_height),
+                tree_height.as_raw_int()
+            );
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn tree_height_divisor_gives_one_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Divisor(tree_height.as_raw_int());
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 1);
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height & the number added to tree height
+        #[test]
+        fn greater_than_tree_height_divisor_gives_zero_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Divisor(tree_height.as_raw_int() + 1);
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
+            assert!(aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+    }
+
+    mod percent {
+        use super::super::*;
+        use crate::percentage::{Percentage, ONE_HUNDRED_PERCENT};
+        use crate::Height;
+
+        // TODO fuzz on tree height
+        #[test]
+        fn one_hundred_percent_gives_full_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Percent(ONE_HUNDRED_PERCENT);
+            assert_eq!(
+                aggregagation_factor.apply_to(&tree_height),
+                tree_height.as_raw_int()
+            );
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn fifty_percent_gives_half_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Percent(Percentage::from(50));
+            assert_eq!(
+                aggregagation_factor.apply_to(&tree_height),
+                tree_height.as_raw_int() / 2
+            );
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn zero_percent_gives_zero_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Percent(Percentage::from(0));
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
+            assert!(aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+    }
+
+    mod number {
+        use super::super::*;
+        use crate::Height;
+
+        // TODO fuzz on tree height
+        #[test]
+        fn zero_number_gives_zero_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Number(0);
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
+            assert!(aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn one_number_gives_one_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Number(1);
+            assert_eq!(aggregagation_factor.apply_to(&tree_height), 1);
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(!aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height
+        #[test]
+        fn tree_height_number_gives_full_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Number(tree_height.as_raw_int());
+            assert_eq!(
+                aggregagation_factor.apply_to(&tree_height),
+                tree_height.as_raw_int()
+            );
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(aggregagation_factor.is_max(&tree_height));
+        }
+
+        // TODO fuzz on tree height and the number added to tree height
+        #[test]
+        fn greater_than_tree_height_number_gives_full_aggregation() {
+            let tree_height = Height::from(10);
+            let aggregagation_factor = AggregationFactor::Number(tree_height.as_raw_int() + 1);
+            assert_eq!(
+                aggregagation_factor.apply_to(&tree_height),
+                tree_height.as_raw_int()
+            );
+            assert!(!aggregagation_factor.is_zero(&tree_height));
+            assert!(aggregagation_factor.is_max(&tree_height));
         }
     }
 }
