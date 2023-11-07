@@ -79,16 +79,46 @@ impl From<Percentage> for OsStr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_utils::assert_err;
 
     #[test]
     #[should_panic]
     fn from_should_panic_if_value_is_over_100() {
-        Percentage::from_with_err(101).unwrap();
+        Percentage::from(101);
     }
 
     #[test]
-    fn from_should_save_value_on_u8_format() {
-        let test: u8 = 15;
+    fn from_should_give_err_if_value_is_over_100() {
+        let res = Percentage::from_with_err(101);
+        assert_err!(res, Err(ParsePercentageError::InputTooBig(101)));
+    }
+
+    #[test]
+    fn from_str_happy_case() {
+        Percentage::from_str("50").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn from_str_should_panic_if_value_is_over_100() {
+        Percentage::from_str("101").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn from_str_should_panic_if_value_is_not_u8() {
+        Percentage::from_str("bleh").unwrap();
+    }
+
+    #[test]
+    fn from_with_err_happy_case() {
+        let test = 15;
         assert_eq!(test, Percentage::from_with_err(15).unwrap().value);
+    }
+
+    #[test]
+    fn from_happy_case() {
+        let test = 15;
+        assert_eq!(test, Percentage::from(15).value);
     }
 }
