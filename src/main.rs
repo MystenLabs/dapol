@@ -5,7 +5,6 @@ use log::debug;
 
 use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
-    read_write_utils,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
     NdmSmtConfigBuilder,

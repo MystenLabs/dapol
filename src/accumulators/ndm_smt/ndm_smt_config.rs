@@ -92,9 +92,9 @@ impl NdmSmtConfig {
             .unwrap_or_default();
 
         let entities = EntitiesParser::new()
-            .with_path(self.entities.file_path)
-            .with_num_entities(self.entities.generate_random)
-            .parse_or_generate_random()?;
+            .with_path_opt(self.entities.file_path)
+            .with_num_entities_opt(self.entities.generate_random)
+            .parse_file_or_generate_random()?;
 
         let ndm_smt = NdmSmt::new(secrets, height, entities).log_on_err()?;
 
