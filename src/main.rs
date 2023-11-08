@@ -5,9 +5,10 @@ use log::debug;
 
 use dapol::{
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
-    ndm_smt, read_write_utils,
+    read_write_utils,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
+    NdmSmtConfigBuilder,
 };
 use patharg::InputArg;
 
@@ -31,7 +32,7 @@ fn main() {
                     match serialize {
                         Some(patharg) => {
                             let path = patharg.into_path().expect("Expected a file path, not stdout");
-                            read_write_utils::parse_tree_serialization_path(path).log_on_err().ok()
+                            Accumulator::parse_accumulator_serialization_path(path).log_on_err().ok()
                         }
                         None => None,
                     }
@@ -47,7 +48,7 @@ fn main() {
                     entity_source,
                 } => match accumulator {
                     AccumulatorType::NdmSmt => {
-                        let ndm_smt = ndm_smt::NdmSmtConfigBuilder::default()
+                        let ndm_smt = NdmSmtConfigBuilder::default()
                             .height(height)
                             .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
                             .entities_path_opt(

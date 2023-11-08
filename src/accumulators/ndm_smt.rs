@@ -237,6 +237,11 @@ impl NdmSmt {
     pub fn root_hash(&self) -> H256 {
         self.tree.root().content.hash
     }
+
+    /// Return the entity mapping, the x-coord that each entity is mapped to.
+    pub fn entity_mapping(&self) -> &HashMap<EntityId, u64> {
+        &self.entity_mapping
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -36,11 +36,11 @@
 //! ```
 //! use std::path::PathBuf;
 //! use dapol::Height;
-//! use dapol::ndm_smt;
+//! use dapol::NdmSmtConfigBuilder;
 //!
 //! let height = Height::from(8);
 //!
-//! let config = ndm_smt::NdmSmtConfigBuilder::default()
+//! let config = NdmSmtConfigBuilder::default()
 //!     .height(height)
 //!     .secrets_file_path(PathBuf::from("./secrets_example.toml"))
 //!     .entities_path(PathBuf::from("./entities_example.csv"))

@@ -16,14 +16,21 @@
 //!
 //! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
 
-use log::{info, debug};
+use log::{debug, info};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-use crate::{ndm_smt::NdmSmtError, utils::LogOnErr, AggregationFactor, EntityId, InclusionProof};
+use crate::{
+    read_write_utils::{self, ReadWriteError},
+    utils::LogOnErr,
+    AggregationFactor, EntityId, InclusionProof, NdmSmtError,
+};
 
 pub mod config;
 pub mod ndm_smt;
+
+const SERIALIZED_ACCUMULATOR_EXTENSION: &str = "dapoltree";
+const SERIALIZED_ACCUMULATOR_FILE_PREFIX: &str = "accumulator_";
 
 /// Various accumulator types.
 #[derive(Serialize, Deserialize)]
@@ -42,14 +49,25 @@ impl Accumulator {
     /// 1. The file cannot be opened.
     /// 2. The [bincode] deserializer fails.
     pub fn deserialize(path: PathBuf) -> Result<Accumulator, AccumulatorError> {
-        use crate::read_write_utils::deserialize_from_bin_file;
-
         debug!(
             "Deserializing accumulator from file {:?}",
             path.clone().into_os_string()
         );
 
-        let accumulator: Accumulator = deserialize_from_bin_file(path.clone()).log_on_err()?;
+        match path.extension() {
+            Some(ext) => {
+                if ext != SERIALIZED_ACCUMULATOR_EXTENSION {
+                    Err(ReadWriteError::UnsupportedFileExtension {
+                        expected: SERIALIZED_ACCUMULATOR_EXTENSION.to_owned(),
+                        actual: ext.to_os_string(),
+                    })?;
+                }
+            }
+            None => Err(ReadWriteError::NotAFile(path.clone().into_os_string()))?,
+        }
+
+        let accumulator: Accumulator =
+            read_write_utils::deserialize_from_bin_file(path.clone()).log_on_err()?;
 
         let root_hash = match &accumulator {
             Accumulator::NdmSmt(ndm_smt) => ndm_smt.root_hash(),
@@ -64,6 +82,28 @@ impl Accumulator {
         Ok(accumulator)
     }
 
+    /// Parse `path` as one that points to a serialized dapol tree file.
+    ///
+    /// `path` can be either of the following:
+    /// 1. Existing directory: in this case a default file name is appended to `path`.
+    /// 2. Non-existing directory: in this case all dirs in the path are created,
+    /// and a default file name is appended.
+    /// 3. File in existing dir: in this case the extension is checked to be
+    /// [SERIALIZED_ACCUMULATOR_EXTENSION], then `path` is returned.
+    /// 4. File in non-existing dir: dirs in the path are created and the file
+    /// extension is checked.
+    ///
+    /// The file prefix is [SERIALIZED_ACCUMULATOR_FILE_PREFIX].
+    pub fn parse_accumulator_serialization_path(
+        path: PathBuf,
+    ) -> Result<PathBuf, ReadWriteError> {
+        read_write_utils::parse_serialization_path(
+            path,
+            SERIALIZED_ACCUMULATOR_EXTENSION,
+            SERIALIZED_ACCUMULATOR_FILE_PREFIX,
+        )
+    }
+
     /// Serialize to a file.
     ///
     /// Serialization is done using [bincode]
@@ -72,14 +112,12 @@ impl Accumulator {
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
     pub fn serialize(&self, path: PathBuf) -> Result<(), AccumulatorError> {
-        use crate::read_write_utils::serialize_to_bin_file;
-
         info!(
             "Serializing accumulator to file {:?}",
             path.clone().into_os_string()
         );
 
-        serialize_to_bin_file(self, path).log_on_err()?;
+        read_write_utils::serialize_to_bin_file(self, path).log_on_err()?;
         Ok(())
     }
 
@@ -126,5 +164,5 @@ impl Accumulator {
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorError {
     #[error("Error serializing/deserializing file")]
-    SerdeError(#[from] crate::read_write_utils::ReadWriteError),
+    SerdeError(#[from] ReadWriteError),
 }

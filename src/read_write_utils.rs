@@ -48,28 +48,43 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     Ok(decoded)
 }
 
-const SERIALIZED_TREE_EXTENSION: &str = "dapoltree";
-const TREE_SERIALIZATION_FILE_PREFIX: &str = "accumulator_";
-
-/// Parse `path` as one that points to a serialized dapol tree file.
+/// Parse `path` as one that points to a file that will be used for serialization.
 ///
 /// `path` can be either of the following:
 /// 1. Existing directory: in this case a default file name is appended to `path`.
 /// 2. Non-existing directory: in this case all dirs in the path are created,
 /// and a default file name is appended.
 /// 3. File in existing dir: in this case the extension is checked to be
-/// '.dapoltree', then `path` is returned.
+/// `expected_extension`, then `path` is returned.
 /// 4. File in non-existing dir: dirs in the path are created and the file
 /// extension is checked.
 ///
-/// The default file name is `ndm_smt_<timestamp>.dapoltree`.
-// STENT TODO make this generic and put the extension details in accumulator file
-pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadWriteError> {
+/// The default file name is `default_file_name_prefix + "_" + <timestamp> + "." + extension`.
+///
+/// Example:
+/// ```
+/// use dapol::read_write_utils::parse_serialization_path;
+/// use std::path::PathBuf;
+///
+/// let path = PathBuf::from("./");
+/// let extension = "test";
+/// let default_file_name_prefix = "test_prefix";
+///
+/// let path = parse_serialization_path(path, extension, default_file_name_prefix).unwrap();
+/// ```
+pub fn parse_serialization_path(
+    mut path: PathBuf,
+    extension: &str,
+    default_file_name_prefix: &str,
+) -> Result<PathBuf, ReadWriteError> {
     if let Some(ext) = path.extension() {
         // If `path` leads to a file.
 
-        if ext != SERIALIZED_TREE_EXTENSION {
-            return Err(ReadWriteError::UnsupportedTreeExtension(ext.to_os_string()));
+        if ext != extension {
+            return Err(ReadWriteError::UnsupportedFileExtension {
+                expected: extension.to_owned(),
+                actual: ext.to_os_string(),
+            });
         }
 
         if let Some(parent) = path.parent() {
@@ -88,11 +103,11 @@ pub fn parse_tree_serialization_path(mut path: PathBuf) -> Result<PathBuf, ReadW
             std::fs::create_dir_all(path.clone())?;
         }
 
-        let mut file_name: String = TREE_SERIALIZATION_FILE_PREFIX.to_owned();
+        let mut file_name: String = default_file_name_prefix.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
         file_name.push_str(".");
-        file_name.push_str(SERIALIZED_TREE_EXTENSION);
+        file_name.push_str(extension);
         path.push(file_name);
 
         Ok(path)
@@ -108,6 +123,57 @@ pub enum ReadWriteError {
     BincodeSerdeError(#[from] bincode::Error),
     #[error("Problem writing to file")]
     FileWriteError(#[from] std::io::Error),
-    #[error("Unknown file extension {0:?}, expected {SERIALIZED_TREE_EXTENSION}")]
-    UnsupportedTreeExtension(OsString),
+    #[error("Unknown file extension {actual:?}, expected {expected}")]
+    UnsupportedFileExtension { expected: String, actual: OsString },
+    #[error("Expected a file but only a path was given: {0:?}")]
+    NotAFile(OsString),
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+#[cfg(test)]
+mod tests {
+    mod parse_serialization_path {
+        use super::super::*;
+
+        #[test]
+        fn parse_serialization_path_for_existing_directory_gives_correct_file_name() {
+            let path = PathBuf::from("./");
+            let expected_extension = "test";
+            let default_file_name_prefix = "test_prefix";
+
+            let path = parse_serialization_path(path, expected_extension, default_file_name_prefix)
+                .unwrap();
+
+            let ext = path.extension().unwrap().to_str().unwrap();
+            assert_eq!(ext, expected_extension);
+
+            let file_name_without_extension = path.file_stem().unwrap().to_str().unwrap();
+            assert!(file_name_without_extension.contains(default_file_name_prefix));
+        }
+
+        #[test]
+        fn parse_serialization_path_for_existing_file() {
+            let this_file = std::file!();
+            let path = PathBuf::from(this_file);
+            let expected_extension = "rs";
+            let default_file_name_prefix = "test_prefix";
+
+            parse_serialization_path(path, expected_extension, default_file_name_prefix).unwrap();
+        }
+
+        #[test]
+        #[should_panic]
+        fn parse_serialization_path_for_existing_file_wrong_extension() {
+            let this_file = std::file!();
+            let path = PathBuf::from(this_file);
+            let expected_extension = "bad_ext";
+            let default_file_name_prefix = "test_prefix";
+
+            parse_serialization_path(path, expected_extension, default_file_name_prefix).unwrap();
+        }
+
+        // TODO test that intermediate dirs are created, but how to do this without actually creating dirs?
+    }
 }

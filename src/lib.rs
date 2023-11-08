@@ -2,8 +2,8 @@
 
 mod kdf;
 mod node_content;
-mod percentage;
 
+pub mod percentage;
 pub mod cli;
 pub mod read_write_utils;
 pub mod utils;
@@ -11,7 +11,8 @@ pub mod utils;
 mod accumulators;
 pub use accumulators::{
     config::{AccumulatorConfig, AccumulatorConfigError},
-    ndm_smt, Accumulator, AccumulatorError,
+    ndm_smt::{NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtParserError},
+    Accumulator, AccumulatorError,
 };
 
 mod binary_tree;
@@ -22,7 +23,7 @@ mod secret;
 pub use secret::Secret;
 
 mod inclusion_proof;
-pub use inclusion_proof::{InclusionProof, InclusionProofError, AggregationFactor};
+pub use inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
 
 mod entity;
 pub use entity::{
