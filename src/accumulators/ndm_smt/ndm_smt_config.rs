@@ -82,7 +82,7 @@ impl NdmSmtConfig {
         debug!("Parsing config to create a new NDM-SMT");
 
         let secrets =
-            NdmSmtSecretsParser::from_path(self.secrets_file_path).parse_or_generate_random()?;
+            NdmSmtSecretsParser::from_path_opt(self.secrets_file_path).parse_or_generate_random()?;
 
         let height = self
             .height

@@ -26,7 +26,7 @@ use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
 mod ndm_smt_secrets;
-use ndm_smt_secrets::Secrets;
+use ndm_smt_secrets::NdmSmtSecrets;
 
 mod ndm_smt_secrets_parser;
 pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
@@ -49,7 +49,7 @@ type Content = FullNodeContent;
 /// keeps track of which entity is assigned to which leaf node.
 #[derive(Serialize, Deserialize)]
 pub struct NdmSmt {
-    secrets: Secrets,
+    secrets: NdmSmtSecrets,
     tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
@@ -74,7 +74,7 @@ impl NdmSmt {
     ///
     /// [input leaf node]: crate::binary_tree::InputLeafNode
     pub fn new(
-        secrets: Secrets,
+        secrets: NdmSmtSecrets,
         height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
@@ -308,7 +308,7 @@ mod tests {
             let master_secret: Secret = 1u64.into();
             let salt_b: Secret = 2u64.into();
             let salt_s: Secret = 3u64.into();
-            let secrets = Secrets {
+            let secrets = NdmSmtSecrets {
                 master_secret,
                 salt_b,
                 salt_s,

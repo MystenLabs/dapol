@@ -26,7 +26,7 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types::U256 ] or [num256::Uint256] but those are options for
 /// later need be.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Secret([u8; 32]);
 
 impl Secret {
