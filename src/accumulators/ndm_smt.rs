@@ -242,6 +242,11 @@ impl NdmSmt {
     pub fn entity_mapping(&self) -> &HashMap<EntityId, u64> {
         &self.entity_mapping
     }
+
+    /// Return the height of the binary tree.
+    pub fn height(&self) -> &Height {
+        self.tree.height()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
