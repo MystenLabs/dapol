@@ -1,11 +1,10 @@
 //! Accumulators.
 //!
 //! This is the top-most file in the hierarchy of the dapol crate. An
-//! accumulator is required to build a binary tree, and determines how the
-//! binary tree is constructed. The are different types of accumulators, which
-//! can all be found under this module. Each accumulator has different
-//! configuration requirements, which are detailed in each of the sub-modules.
-//! The currently supported accumulator types are:
+//! accumulator defines how the binary tree is built. The are different types of
+//! accumulators, which can all be found under this module. Each accumulator has
+//! different configuration requirements, which are detailed in each of the
+//! sub-modules. The currently supported accumulator types are:
 //! - [Non-Deterministic Mapping Sparse Merkle Tree]
 //!
 //! Each accumulator can be constructed via the configuration structs:
@@ -39,7 +38,6 @@ pub enum Accumulator {
     // TODO other accumulators..
 }
 
-// STENT TODO change name here, accumulator is not super intuitive
 impl Accumulator {
     /// Try deserialize an accumulator from the given file path.
     ///
@@ -85,18 +83,25 @@ impl Accumulator {
     /// Parse `path` as one that points to a serialized dapol tree file.
     ///
     /// `path` can be either of the following:
-    /// 1. Existing directory: in this case a default file name is appended to `path`.
-    /// 2. Non-existing directory: in this case all dirs in the path are created,
-    /// and a default file name is appended.
+    /// 1. Existing directory: in this case a default file name is appended to
+    /// `path`. 2. Non-existing directory: in this case all dirs in the path
+    /// are created, and a default file name is appended.
     /// 3. File in existing dir: in this case the extension is checked to be
     /// [SERIALIZED_ACCUMULATOR_EXTENSION], then `path` is returned.
     /// 4. File in non-existing dir: dirs in the path are created and the file
     /// extension is checked.
     ///
     /// The file prefix is [SERIALIZED_ACCUMULATOR_FILE_PREFIX].
-    pub fn parse_accumulator_serialization_path(
-        path: PathBuf,
-    ) -> Result<PathBuf, ReadWriteError> {
+    ///
+    /// Example:
+    /// ```
+    /// use dapol::Accumulator;
+    /// use std::path::PathBuf;
+    ///
+    /// let dir = PathBuf::from("./");
+    /// let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
+    /// ```
+    pub fn parse_accumulator_serialization_path(path: PathBuf) -> Result<PathBuf, ReadWriteError> {
         read_write_utils::parse_serialization_path(
             path,
             SERIALIZED_ACCUMULATOR_EXTENSION,
@@ -166,3 +171,5 @@ pub enum AccumulatorError {
     #[error("Error serializing/deserializing file")]
     SerdeError(#[from] ReadWriteError),
 }
+
+// NOTE no unit tests here because this code is tested in the integration tests.

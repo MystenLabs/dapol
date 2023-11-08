@@ -51,14 +51,14 @@
 use std::path::PathBuf;
 
 use derive_builder::Builder;
-use log::{info, debug};
+use log::{debug, info};
 use serde::Deserialize;
 
 use crate::binary_tree::Height;
-use crate::entity::{EntitiesParser, self};
+use crate::entity::{self, EntitiesParser};
 use crate::utils::{IfNoneThen, LogOnErr};
 
-use super::{NdmSmt, SecretsParser, ndm_smt_secrets_parser};
+use super::{ndm_smt_secrets_parser, NdmSmt, SecretsParser};
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -81,8 +81,8 @@ impl NdmSmtConfig {
     pub fn parse(self) -> Result<NdmSmt, NdmSmtParserError> {
         debug!("Parsing config to create a new NDM-SMT");
 
-        let secrets = SecretsParser::from_path(self.secrets_file_path)
-            .parse_or_generate_random()?;
+        let secrets =
+            SecretsParser::from_path(self.secrets_file_path).parse_or_generate_random()?;
 
         let height = self
             .height
@@ -98,7 +98,10 @@ impl NdmSmtConfig {
 
         let ndm_smt = NdmSmt::new(secrets, height, entities).log_on_err()?;
 
-        debug!("Successfully built NDM-SMT with root hash {:?}", ndm_smt.root_hash());
+        debug!(
+            "Successfully built NDM-SMT with root hash {:?}",
+            ndm_smt.root_hash()
+        );
 
         Ok(ndm_smt)
     }

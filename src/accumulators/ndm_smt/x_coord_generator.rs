@@ -43,9 +43,9 @@
 //! on 1 of the iterations of the first loop.
 // TODO DOCS the above explanation is not so good, improve it
 
-use std::collections::HashMap;
-use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use crate::binary_tree::Height;
+use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
+use std::collections::HashMap;
 
 pub struct RandomXCoordGenerator {
     rng: ThreadRng,

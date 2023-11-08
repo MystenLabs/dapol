@@ -48,29 +48,31 @@ pub fn deserialize_from_bin_file<T: DeserializeOwned>(path: PathBuf) -> Result<T
     Ok(decoded)
 }
 
-/// Parse `path` as one that points to a file that will be used for serialization.
+/// Parse `path` as one that points to a file that will be used for
+/// serialization.
 ///
 /// `path` can be either of the following:
-/// 1. Existing directory: in this case a default file name is appended to `path`.
-/// 2. Non-existing directory: in this case all dirs in the path are created,
-/// and a default file name is appended.
+/// 1. Existing directory: in this case a default file name is appended to
+/// `path`. 2. Non-existing directory: in this case all dirs in the path are
+/// created, and a default file name is appended.
 /// 3. File in existing dir: in this case the extension is checked to be
 /// `expected_extension`, then `path` is returned.
 /// 4. File in non-existing dir: dirs in the path are created and the file
 /// extension is checked.
 ///
-/// The default file name is `default_file_name_prefix + "_" + <timestamp> + "." + extension`.
+/// The default file name is `default_file_name_prefix + "_" + <timestamp> + "."
+/// + extension`.
 ///
 /// Example:
 /// ```
 /// use dapol::read_write_utils::parse_serialization_path;
 /// use std::path::PathBuf;
 ///
-/// let path = PathBuf::from("./");
 /// let extension = "test";
-/// let default_file_name_prefix = "test_prefix";
+/// let default_file_name_prefix = "file_prefix";
+/// let dir = PathBuf::from("./");
 ///
-/// let path = parse_serialization_path(path, extension, default_file_name_prefix).unwrap();
+/// let path = parse_serialization_path(dir, extension, default_file_name_prefix).unwrap();
 /// ```
 pub fn parse_serialization_path(
     mut path: PathBuf,
@@ -174,6 +176,7 @@ mod tests {
             parse_serialization_path(path, expected_extension, default_file_name_prefix).unwrap();
         }
 
-        // TODO test that intermediate dirs are created, but how to do this without actually creating dirs?
+        // TODO test that intermediate dirs are created, but how to do this
+        // without actually creating dirs?
     }
 }
