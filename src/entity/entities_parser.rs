@@ -12,33 +12,6 @@
 //!
 //! At least on of the 2 fields must be set for the parser to succeed. If both
 //! fields are set then the path is prioritized.
-//!
-//! Examples:
-//! ```
-//! use dapol::EntitiesParser;
-//! use std::path::PathBuf;
-//!
-//! {
-//!   // from entities file
-//!
-//!   let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//!   path.push("./entities_example.csv");
-//!
-//!   let entities = EntitiesParser::new()
-//!       .with_path(path)
-//!       .parse_file()
-//!       .unwrap();
-//! }
-//!
-//! {
-//!   // generate random entities
-//!
-//!   let entities = EntitiesParser::new()
-//!       .with_num_entities(10)
-//!       .generate_random()
-//!       .unwrap();
-//! }
-//! ```
 
 use std::{ffi::OsString, path::PathBuf, str::FromStr};
 

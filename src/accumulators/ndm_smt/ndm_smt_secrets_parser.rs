@@ -5,8 +5,16 @@
 //!
 //! TOML format:
 //! ```toml,ignore
+//! # None of these values should be shared. They should be kept with the tree
+//! # creator.
+//!
+//! # Used for generating secrets for each entity.
 //! master_secret = "master_secret"
+//!
+//! # Used for generating blinding factors for Pedersen commitments.
 //! salt_b = "salt_b"
+//!
+//! # Used as an input to the hash function when merging nodes.
 //! salt_s = "salt_s"
 //! ```
 //!
@@ -19,17 +27,17 @@ use super::ndm_smt_secrets::{Secrets, SecretsInput};
 use crate::secret::SecretParseError;
 
 /// Parser requires a valid path to a file.
-pub struct SecretsParser {
+pub struct NdmSmtSecretsParser {
     path: Option<PathBuf>,
 }
 
-impl SecretsParser {
+impl NdmSmtSecretsParser {
     /// Constructor.
     ///
     /// `Option` is used to wrap the parameter to make the code work more
     /// seamlessly with the config builders in [super][super][accumulators].
     pub fn from_path(path: Option<PathBuf>) -> Self {
-        SecretsParser { path }
+        NdmSmtSecretsParser { path }
     }
 
     /// Open and parse the file, returning a [Secrets] struct.
@@ -40,16 +48,16 @@ impl SecretsParser {
     /// 3. The file cannot be read.
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
-    pub fn parse(self) -> Result<Secrets, SecretsParserError> {
+    pub fn parse(self) -> Result<Secrets, NdmSmtSecretsParserError> {
         info!(
             "Attempting to parse {:?} as a file containing NDM-SMT secrets",
             &self.path
         );
 
-        let path = self.path.ok_or(SecretsParserError::PathNotSet)?;
+        let path = self.path.ok_or(NdmSmtSecretsParserError::PathNotSet)?;
 
         let ext = path.extension().and_then(|s| s.to_str()).ok_or(
-            SecretsParserError::UnknownFileType(path.clone().into_os_string()),
+            NdmSmtSecretsParserError::UnknownFileType(path.clone().into_os_string()),
         )?;
 
         let secrets = match FileType::from_str(ext)? {
@@ -64,7 +72,7 @@ impl SecretsParser {
         Ok(secrets)
     }
 
-    pub fn parse_or_generate_random(self) -> Result<Secrets, SecretsParserError> {
+    pub fn parse_or_generate_random(self) -> Result<Secrets, NdmSmtSecretsParserError> {
         match &self.path {
             Some(_) => self.parse(),
             None => {
@@ -83,18 +91,18 @@ enum FileType {
 }
 
 impl FromStr for FileType {
-    type Err = SecretsParserError;
+    type Err = NdmSmtSecretsParserError;
 
     fn from_str(ext: &str) -> Result<FileType, Self::Err> {
         match ext {
             "toml" => Ok(FileType::Toml),
-            _ => Err(SecretsParserError::UnsupportedFileType { ext: ext.into() }),
+            _ => Err(NdmSmtSecretsParserError::UnsupportedFileType { ext: ext.into() }),
         }
     }
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum SecretsParserError {
+pub enum NdmSmtSecretsParserError {
     #[error("Expected path to be set but found none")]
     PathNotSet,
     #[error("Unable to find file extension for path {0:?}")]

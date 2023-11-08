@@ -58,7 +58,7 @@ use crate::binary_tree::Height;
 use crate::entity::{self, EntitiesParser};
 use crate::utils::{IfNoneThen, LogOnErr};
 
-use super::{ndm_smt_secrets_parser, NdmSmt, SecretsParser};
+use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
@@ -82,7 +82,7 @@ impl NdmSmtConfig {
         debug!("Parsing config to create a new NDM-SMT");
 
         let secrets =
-            SecretsParser::from_path(self.secrets_file_path).parse_or_generate_random()?;
+            NdmSmtSecretsParser::from_path(self.secrets_file_path).parse_or_generate_random()?;
 
         let height = self
             .height
@@ -154,7 +154,7 @@ impl NdmSmtConfigBuilder {
 #[derive(thiserror::Error, Debug)]
 pub enum NdmSmtParserError {
     #[error("Secrets parsing failed while trying to parse NDM-SMT config")]
-    SecretsError(#[from] ndm_smt_secrets_parser::SecretsParserError),
+    SecretsError(#[from] ndm_smt_secrets_parser::NdmSmtSecretsParserError),
     #[error("Entities parsing failed while trying to parse NDM-SMT config")]
     EntitiesError(#[from] entity::EntitiesParserError),
     #[error("Tree construction failed after parsing NDM-SMT config")]

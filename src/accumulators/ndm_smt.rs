@@ -29,7 +29,7 @@ mod ndm_smt_secrets;
 use ndm_smt_secrets::Secrets;
 
 mod ndm_smt_secrets_parser;
-pub use ndm_smt_secrets_parser::SecretsParser;
+pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
 
 mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;

@@ -66,7 +66,7 @@ impl Secrets {
 }
 
 impl TryFrom<SecretsInput> for Secrets {
-    type Error = super::ndm_smt_secrets_parser::SecretsParserError;
+    type Error = super::ndm_smt_secrets_parser::NdmSmtSecretsParserError;
 
     fn try_from(input: SecretsInput) -> Result<Secrets, Self::Error> {
         Ok(Secrets {
