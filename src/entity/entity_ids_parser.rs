@@ -1,10 +1,19 @@
 //! Parser for files containing a list of entity IDs.
 //!
-//! Supported file types: csv
-//! Note that the file type is inferred from its path extension.
+//! The entity IDs file is expected to be a list of entity IDs, each on a new
+//! line.    All file formats are accepted. It is also possible to use the same
+//! entity IDs &    liabilities file that is accepted by
+//! [super][EntitiesParser].
 //!
-//! Formatting:
-//! CSV: `id`
+//! Example:
+//! ```
+//! use dapol::EntityIdsParser;
+//! use std::path::PathBuf;
+//!
+//! let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+//! path.push("./entities_example.csv");
+//! let entities = EntityIdsParser::from_path(path).parse().unwrap();
+//! ```
 
 use std::str::FromStr;
 use std::{ffi::OsString, path::PathBuf};
@@ -93,4 +102,30 @@ pub enum EntityIdsParserError {
         "The given entity ID ({id:?}) is longer than the max allowed {ENTITY_ID_MAX_BYTES} bytes"
     )]
     EntityIdTooLongError { id: String },
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn parser_csv_file_happy_case() {
+        let src_dir = env!("CARGO_MANIFEST_DIR");
+        let path = Path::new(&src_dir).join("entities_example.csv");
+
+        let entities = EntityIdsParser::from_path(path).parse().unwrap();
+
+        let first_entity = EntityId::from_str("john.doe@example.com").unwrap();
+
+        let last_entity = EntityId::from_str("david.martin@example.com").unwrap();
+
+        assert!(entities.contains(&first_entity));
+        assert!(entities.contains(&last_entity));
+
+        assert_eq!(entities.len(), 100);
+    }
 }
