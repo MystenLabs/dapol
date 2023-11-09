@@ -115,9 +115,9 @@ impl NdmSmt {
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
                     let entity_secret: [u8; 32] =
-                        generate_key(master_secret_bytes, &x_coord.to_le_bytes()).into();
-                    let blinding_factor = generate_key(&entity_secret, salt_b_bytes);
-                    let entity_salt = generate_key(&entity_secret, salt_s_bytes);
+                        generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes())).into();
+                    let blinding_factor = generate_key(Some(salt_b_bytes), &entity_secret, None);
+                    let entity_salt = generate_key(Some(salt_s_bytes), &entity_secret, None);
 
                     InputLeafNode {
                         content: Content::new_leaf(
@@ -265,10 +265,10 @@ fn new_padding_node_content_closure(
         // copying
         let coord_bytes = coord.as_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
-        let pad_secret = generate_key(&master_secret_bytes, &coord_bytes);
+        let pad_secret = generate_key(None, &master_secret_bytes, Some(&coord_bytes));
         let pad_secret_bytes: [u8; 32] = pad_secret.into();
-        let blinding_factor = generate_key(&pad_secret_bytes, &salt_b_bytes);
-        let salt = generate_key(&pad_secret_bytes, &salt_s_bytes);
+        let blinding_factor = generate_key(Some(&salt_b_bytes), &pad_secret_bytes, None);
+        let salt = generate_key(Some(&salt_s_bytes), &pad_secret_bytes, None);
         Content::new_pad(blinding_factor.into(), coord, salt.into())
     }
 }
