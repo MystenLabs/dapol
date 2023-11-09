@@ -4,6 +4,8 @@ use clap::builder::{OsStr, Str};
 use serde::{Deserialize, Serialize};
 use std::{convert::From, num::ParseIntError, str::FromStr};
 
+pub const ZERO_PERCENT: Percentage = Percentage { value: 0 };
+pub const FIFTY_PERCENT: Percentage = Percentage { value: 50 };
 pub const ONE_HUNDRED_PERCENT: Percentage = Percentage { value: 100 };
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

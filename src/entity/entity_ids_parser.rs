@@ -11,7 +11,7 @@
 //! use std::path::PathBuf;
 //!
 //! let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//! path.push("./entities_example.csv");
+//! path.push("./examples/entities_example.csv");
 //! let entities = EntityIdsParser::from_path(path).parse().unwrap();
 //! ```
 
@@ -115,7 +115,8 @@ mod tests {
     #[test]
     fn parser_csv_file_happy_case() {
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let path = Path::new(&src_dir).join("entities_example.csv");
+        let resources_dir = Path::new(&src_dir).join("examples");
+        let path = resources_dir.join("entities_example.csv");
 
         let entities = EntityIdsParser::from_path(path).parse().unwrap();
 

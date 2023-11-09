@@ -21,7 +21,7 @@ use rayon::prelude::*;
 
 use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
 use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof, DEFAULT_UPPER_BOUND_BIT_LENGTH};
+use crate::inclusion_proof::{AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
@@ -229,7 +229,7 @@ impl NdmSmt {
         self.generate_inclusion_proof_with(
             entity_id,
             AggregationFactor::default(),
-            DEFAULT_UPPER_BOUND_BIT_LENGTH,
+            DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
         )
     }
 

@@ -20,7 +20,10 @@ mod secret;
 pub use secret::{Secret, SecretParseError};
 
 mod inclusion_proof;
-pub use inclusion_proof::{AggregationFactor, InclusionProof, InclusionProofError};
+pub use inclusion_proof::{
+    AggregationFactor, InclusionProof, InclusionProofError,
+    DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
+};
 
 mod entity;
 pub use entity::{Entity, EntityId, EntityIdsParser, EntityIdsParserError};
