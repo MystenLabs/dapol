@@ -51,12 +51,12 @@
 use std::path::PathBuf;
 
 use derive_builder::Builder;
-use log::{debug, info};
+use log::debug;
 use serde::Deserialize;
 
 use crate::binary_tree::Height;
 use crate::entity::{self, EntitiesParser};
-use crate::utils::{IfNoneThen, LogOnErr};
+use crate::utils::LogOnErr;
 
 use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 

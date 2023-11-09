@@ -108,7 +108,7 @@ pub fn parse_serialization_path(
         let mut file_name: String = default_file_name_prefix.to_owned();
         let now = chrono::offset::Local::now();
         file_name.push_str(&now.timestamp().to_string());
-        file_name.push_str(".");
+        file_name.push('.');
         file_name.push_str(extension);
         path.push(file_name);
 

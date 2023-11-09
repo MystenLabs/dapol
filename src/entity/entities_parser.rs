@@ -48,7 +48,7 @@ impl EntitiesParser {
         self
     }
 
-    pub fn with_path(mut self, path: PathBuf) -> Self {
+    pub fn with_path(self, path: PathBuf) -> Self {
         self.with_path_opt(Some(path))
     }
 
@@ -57,7 +57,7 @@ impl EntitiesParser {
         self
     }
 
-    pub fn with_num_entities(mut self, num_entities: u64) -> Self {
+    pub fn with_num_entities(self, num_entities: u64) -> Self {
         self.with_num_entities_opt(Some(num_entities))
     }
 

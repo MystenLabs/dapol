@@ -96,7 +96,8 @@ fn main() {
                     let proof = accumulator
                         .generate_inclusion_proof(&entity_id)
                         .log_on_err_unwrap();
-                    proof.serialize(&entity_id, dir.clone());
+
+                    proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
                 }
             }
         }
@@ -136,7 +137,7 @@ fn main() {
                     )
                     .log_on_err_unwrap();
 
-                proof.serialize(&entity_id, dir.clone());
+                proof.serialize(&entity_id, dir.clone()).log_on_err_unwrap();
             }
         }
         Command::VerifyProof {
@@ -150,7 +151,7 @@ fn main() {
             )
             .log_on_err_unwrap();
 
-            proof.verify(root_hash);
+            proof.verify(root_hash).log_on_err_unwrap();
         }
     }
 }

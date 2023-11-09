@@ -125,7 +125,7 @@ mod tests {
     fn new_unique_value_works() {
         let height = Height::from(4u8);
         let mut rxcg = RandomXCoordGenerator::from(&height);
-        for i in 0..max_bottom_layer_nodes(&height) {
+        for _i in 0..max_bottom_layer_nodes(&height) {
             rxcg.new_unique_x_coord().unwrap();
         }
     }
@@ -135,7 +135,7 @@ mod tests {
         let height = Height::from(4u8);
         let mut rxcg = RandomXCoordGenerator::from(&height);
         let mut set = HashSet::<u64>::new();
-        for i in 0..max_bottom_layer_nodes(&height) {
+        for _i in 0..max_bottom_layer_nodes(&height) {
             let x = rxcg.new_unique_x_coord().unwrap();
             if set.contains(&x) {
                 panic!("{:?} was generated twice!", x);
@@ -153,10 +153,10 @@ mod tests {
         let max = max_bottom_layer_nodes(&height);
         let mut res = rxcg.new_unique_x_coord();
 
-        for i in 0..max {
+        for _i in 0..max {
             res = rxcg.new_unique_x_coord();
         }
 
-        assert_err!(res, Err(OutOfBoundsError { max_value: max }));
+        assert_err!(res, Err(OutOfBoundsError { max_value: _ }));
     }
 }

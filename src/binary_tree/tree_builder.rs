@@ -353,7 +353,7 @@ mod tests {
         let height = Height::from(8u8);
 
         for i in 0..max_bottom_layer_nodes(&height) {
-            let leaf_node = vec![single_leaf(i as u64)];
+            let leaf_node = vec![single_leaf(i)];
 
             let single_threaded = TreeBuilder::new()
                 .with_height(height.clone())
@@ -445,13 +445,13 @@ mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
-        let _ = verify_no_duplicate_leaves(&leaf_nodes).unwrap();
+        verify_no_duplicate_leaves(&leaf_nodes).unwrap();
     }
 
     #[test]
     fn no_err_if_no_duplicates() {
         let height = Height::from(4);
-        let mut leaf_nodes = sparse_leaves(&height);
-        let _ = verify_no_duplicate_leaves(&leaf_nodes).unwrap();
+        let leaf_nodes = sparse_leaves(&height);
+        verify_no_duplicate_leaves(&leaf_nodes).unwrap();
     }
 }

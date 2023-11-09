@@ -226,9 +226,6 @@ impl<'a, C> PathBuilder<'a, C> {
 
             let sibling = tree
                 .get_node(&sibling_coord)
-                .map(|n| {
-                    n
-                })
                 .unwrap_or_else(|| node_builder(&sibling_coord, tree));
 
             siblings.push(sibling);
@@ -556,7 +553,7 @@ mod tests {
         let height = Height::from(8u8);
 
         for i in 0..max_bottom_layer_nodes(&height) {
-            let leaf_node = vec![single_leaf(i as u64)];
+            let leaf_node = vec![single_leaf(i)];
 
             let tree_single_threaded = TreeBuilder::new()
                 .with_height(height.clone())
@@ -567,7 +564,7 @@ mod tests {
 
             let proof = tree_single_threaded
                 .path_builder()
-                .with_leaf_x_coord(i as u64)
+                .with_leaf_x_coord(i)
                 .build_using_single_threaded_algorithm(get_padding_function())
                 .expect("Path generation should have been successful");
 
@@ -584,7 +581,7 @@ mod tests {
         let height = Height::from(8u8);
 
         for i in 0..max_bottom_layer_nodes(&height) {
-            let leaf_node = vec![single_leaf(i as u64)];
+            let leaf_node = vec![single_leaf(i)];
 
             let tree_multi_threaded = TreeBuilder::new()
                 .with_height(height.clone())
@@ -595,7 +592,7 @@ mod tests {
 
             let proof = tree_multi_threaded
                 .path_builder()
-                .with_leaf_x_coord(i as u64)
+                .with_leaf_x_coord(i)
                 .build_using_multi_threaded_algorithm(get_padding_function())
                 .expect("Path generation should have been successful");
 
