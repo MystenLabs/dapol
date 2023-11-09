@@ -35,7 +35,7 @@ fn build_dapol(c: &mut Criterion) {
             bench.iter(|| {
                 // we bench range proof padding only because building a tree does not depend on
                 // the type of range proof we do
-                build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height)
+                build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items.as_slice(), tree_height)
             });
         });
     }
@@ -48,7 +48,7 @@ fn build_dapol(c: &mut Criterion) {
             bench.iter(|| {
                 // we bench range proof padding only because building a tree does not depend on
                 // the type of range proof we do
-                build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height)
+                build_dapol_tree::<blake3::Hasher, RangeProofPadding>(items.as_slice(), tree_height)
             });
         });
     }
@@ -68,7 +68,7 @@ fn generate_proof(c: &mut Criterion) {
         let mut rng = thread_rng();
         let item_range = Uniform::new(0usize, num_leaves);
 
-        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(&items, tree_height);
+        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(items.as_slice(), tree_height);
         group.bench_function(BenchmarkId::new("splitting", tree_height), |bench| {
             bench.iter(|| {
                 // time proof generation
@@ -77,7 +77,7 @@ fn generate_proof(c: &mut Criterion) {
             });
         });
 
-        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
+        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(items.as_slice(), tree_height);
         group.bench_function(BenchmarkId::new("padding", tree_height), |bench| {
             bench.iter(|| {
                 // time proof generation
@@ -102,7 +102,7 @@ fn verify_proof(c: &mut Criterion) {
         let mut rng = thread_rng();
         let item_range = Uniform::new(0usize, num_leaves);
 
-        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(&items, tree_height);
+        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(items.as_slice(), tree_height);
         group.bench_function(BenchmarkId::new("splitting", tree_height), |bench| {
             bench.iter_batched(
                 || {
@@ -119,7 +119,7 @@ fn verify_proof(c: &mut Criterion) {
             );
         });
 
-        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
+        let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(items.as_slice(), tree_height);
         group.bench_function(BenchmarkId::new("padding", tree_height), |bench| {
             bench.iter_batched(
                 || {
