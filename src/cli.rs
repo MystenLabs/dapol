@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use crate::{
     binary_tree::Height,
-    inclusion_proof::DEFAULT_UPPER_BOUND_BIT_LENGTH,
+    inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
     percentage::{Percentage, ONE_HUNDRED_PERCENT},
 };
 
@@ -83,7 +83,7 @@ pub enum Command {
         range_proof_aggregation: Percentage,
 
         /// Upper bound for the range proofs is 2^(this_number).
-        #[arg(short, long, default_value_t = DEFAULT_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
+        #[arg(short, long, default_value_t = DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH, value_name = "U8_INT")]
         upper_bound_bit_length: u8,
     },
 
