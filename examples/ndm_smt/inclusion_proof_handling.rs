@@ -2,7 +2,7 @@
 
 /// An inclusion proof can be generated from only a tree + entity ID.
 pub fn simple_inclusion_proof_generation_and_verification(
-    ndm_smt: dapol::NdmSmt,
+    ndm_smt: &dapol::NdmSmt,
     entity_id: dapol::EntityId,
 ) {
     let inclusion_proof = ndm_smt.generate_inclusion_proof(&entity_id).unwrap();
@@ -12,7 +12,7 @@ pub fn simple_inclusion_proof_generation_and_verification(
 /// The inclusion proof generation algorithm can be customized via some
 /// parameters. See [dapol][InclusionProof] for more details.
 pub fn advanced_inclusion_proof_generation_and_verification(
-    ndm_smt: dapol::NdmSmt,
+    ndm_smt: &dapol::NdmSmt,
     entity_id: dapol::EntityId,
 ) {
     // Determines how many of the range proofs in the inclusion proof are

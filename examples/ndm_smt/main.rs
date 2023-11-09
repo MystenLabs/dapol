@@ -37,20 +37,22 @@ fn main() {
     // The above 2 builder methods produce a different tree because the entities
     // are mapped randomly to points on the bottom layer, but the entity mapping
     // of one tree should simply be a permutation of the other. We check this:
-    match accumulator {
+    let ndm_smt_other = match accumulator {
         dapol::Accumulator::NdmSmt(ndm_smt_other) => {
             assert_ne!(ndm_smt_other.root_hash(), ndm_smt.root_hash());
 
             for (entity, _) in ndm_smt_other.entity_mapping() {
                 assert!(ndm_smt.entity_mapping().contains_key(&entity));
             }
+
+            ndm_smt_other
         }
-    }
+    };
 
     // =========================================================================
     // Inclusion proof generation & verification.
 
     let entity_id = dapol::EntityId::from_str("john.doe@example.com").unwrap();
-    simple_inclusion_proof_generation_and_verification(ndm_smt, entity_id);
-    advanced_inclusion_proof_generation_and_verification(ndm_smt, entity_id);
+    simple_inclusion_proof_generation_and_verification(&ndm_smt, entity_id.clone());
+    advanced_inclusion_proof_generation_and_verification(&ndm_smt_other, entity_id);
 }
