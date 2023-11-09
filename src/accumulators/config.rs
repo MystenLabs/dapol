@@ -16,7 +16,7 @@
 //! use std::path::PathBuf;
 //! use dapol::AccumulatorConfig;
 //!
-//! let file_path = PathBuf::from("./tree_config_example.toml");
+//! let file_path = PathBuf::from("./resources/tree_config_example.toml");
 //! let config = AccumulatorConfig::deserialize(file_path).unwrap();
 //! ```
 

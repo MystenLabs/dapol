@@ -16,14 +16,14 @@
 //!
 //! # Path to the secrets file.
 //! # If not present the secrets will be generated randomly.
-//! secrets_file_path = "./secrets_example.toml"
+//! secrets_file_path = "./resources/secrets_example.toml"
 //!
 //! # At least one of file_path & generate_random must be present.
 //! # If both are given then file_path is prioritized.
 //! [entities]
 //!
 //! # Path to a file containing a list of entity IDs and their liabilities.
-//! file_path = "./entities_example.csv"
+//! file_path = "./resources/entities_example.csv"
 //!
 //! # Generate the given number of entities, with random IDs & liabilities.
 //! generate_random = 4
@@ -42,8 +42,8 @@
 //!
 //! let config = NdmSmtConfigBuilder::default()
 //!     .height(height)
-//!     .secrets_file_path(PathBuf::from("./secrets_example.toml"))
-//!     .entities_path(PathBuf::from("./entities_example.csv"))
+//!     .secrets_file_path(PathBuf::from("./resources/secrets_example.toml"))
+//!     .entities_path(PathBuf::from("./resources/entities_example.csv"))
 //!     .build()
 //!     .unwrap();
 //! ```
@@ -79,7 +79,7 @@ pub struct EntityConfig {
 impl NdmSmtConfig {
     /// Try to construct an NDM-SMT from the config.
     pub fn parse(self) -> Result<NdmSmt, NdmSmtParserError> {
-        debug!("Parsing config to create a new NDM-SMT");
+        debug!("Parsing config to create a new NDM-SMT: {:?}", self);
 
         let secrets = NdmSmtSecretsParser::from_path_opt(self.secrets_file_path)
             .parse_or_generate_random()?;
@@ -171,8 +171,9 @@ mod tests {
         let height = Height::from(8);
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let secrets_file_path = Path::new(&src_dir).join("secrets_example.toml");
-        let entities_file_path = Path::new(&src_dir).join("entities_example.csv");
+        let resources_dir = Path::new(&src_dir).join("resources");
+        let secrets_file_path = resources_dir.join("secrets_example.toml");
+        let entities_file_path = resources_dir.join("entities_example.csv");
 
         let entities_file = File::open(entities_file_path.clone()).unwrap();
         // "-1" because we don't include the top line of the csv which defines
@@ -198,7 +199,8 @@ mod tests {
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let secrets_file = Path::new(&src_dir).join("secrets_example.toml");
+        let resources_dir = Path::new(&src_dir).join("resources");
+        let secrets_file = resources_dir.join("secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
             .height(height.clone())
@@ -218,7 +220,8 @@ mod tests {
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let secrets_file = Path::new(&src_dir).join("secrets_example.toml");
+        let resources_dir = Path::new(&src_dir).join("resources");
+        let secrets_file = resources_dir.join("secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
             .secrets_file_path(secrets_file)
