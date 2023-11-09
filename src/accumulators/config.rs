@@ -33,8 +33,9 @@ pub enum AccumulatorConfig {
     // TODO other accumulators..
 }
 
-// STENT TODO rename all other builder methods that are 'new' to 'default' since this is what derive_default uses
-// STENT TODO also maybe get rid of the 'with' in the setters
+// STENT TODO rename all other builder methods that are 'new' to 'default' since
+// this is what derive_default uses STENT TODO also maybe get rid of the 'with'
+// in the setters
 
 impl AccumulatorConfig {
     /// Open the config file, then try to create an accumulator object.

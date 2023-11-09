@@ -326,7 +326,7 @@ mod tests {
         #[test]
         fn verify_works_for_padding() {
             let upper_bound_bit_length = 32u8;
-            let mut values = build_secrets_blindings_tuples();
+            let values = build_secrets_blindings_tuples();
             let commitments: Vec<CompressedRistretto> = values
                 .clone()
                 .into_iter()
@@ -341,7 +341,7 @@ mod tests {
                 AggregatedRangeProof::generate_with_padding(&values, upper_bound_bit_length)
                     .unwrap();
 
-            let _ = proof.verify(&commitments, upper_bound_bit_length).unwrap();
+            proof.verify(&commitments, upper_bound_bit_length).unwrap();
         }
 
         #[test]
@@ -443,7 +443,7 @@ mod tests {
         #[test]
         fn verify_works_for_splitting() {
             let upper_bound_bit_length = 32u8;
-            let mut values = build_secrets_blindings_tuples();
+            let values = build_secrets_blindings_tuples();
             let commitments = values
                 .clone()
                 .into_iter()
@@ -458,7 +458,7 @@ mod tests {
                 AggregatedRangeProof::generate_with_splitting(&values, upper_bound_bit_length)
                     .unwrap();
 
-            let _ = proof.verify(&commitments, upper_bound_bit_length).unwrap();
+            proof.verify(&commitments, upper_bound_bit_length).unwrap();
         }
 
         #[test]

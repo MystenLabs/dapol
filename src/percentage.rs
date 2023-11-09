@@ -6,13 +6,14 @@ use std::{convert::From, num::ParseIntError, str::FromStr};
 
 pub const ONE_HUNDRED_PERCENT: Percentage = Percentage { value: 100 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Percentage {
     value: u8,
 }
 
 impl Percentage {
     /// Returns a new `Percentage` with the given value.
+    /// Returns an error if the value is greater than 100.
     pub fn from_with_err(value: u8) -> Result<Percentage, ParsePercentageError> {
         if value > 100 {
             Err(ParsePercentageError::InputTooBig(value))
@@ -21,13 +22,19 @@ impl Percentage {
         }
     }
 
+    /// Returns a new `Percentage` with the given value.
+    /// Panics if the value is greater than 100.
+    pub fn from(value: u8) -> Percentage {
+        if value > 100 {
+            panic!("Invalid percentage value {}", value);
+        } else {
+            Percentage { value }
+        }
+    }
+
     /// Returns the percentage applied to the number given.
     pub fn apply_to(&self, value: u8) -> u8 {
-        if value.checked_mul(self.value).is_none() {
-            (value / 100u8) * self.value
-        } else {
-            (value * self.value) / 100u8
-        }
+        ((value as u16 * self.value as u16) / 100u16) as u8
     }
 
     /// Returns the percentage saved.
@@ -72,16 +79,46 @@ impl From<Percentage> for OsStr {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::utils::test_utils::assert_err;
 
     #[test]
     #[should_panic]
     fn from_should_panic_if_value_is_over_100() {
-        Percentage::from_with_err(101).unwrap();
+        Percentage::from(101);
     }
 
     #[test]
-    fn from_should_save_value_on_u8_format() {
-        let test: u8 = 15;
+    fn from_should_give_err_if_value_is_over_100() {
+        let res = Percentage::from_with_err(101);
+        assert_err!(res, Err(ParsePercentageError::InputTooBig(101)));
+    }
+
+    #[test]
+    fn from_str_happy_case() {
+        Percentage::from_str("50").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn from_str_should_panic_if_value_is_over_100() {
+        Percentage::from_str("101").unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn from_str_should_panic_if_value_is_not_u8() {
+        Percentage::from_str("bleh").unwrap();
+    }
+
+    #[test]
+    fn from_with_err_happy_case() {
+        let test = 15;
         assert_eq!(test, Percentage::from_with_err(15).unwrap().value);
+    }
+
+    #[test]
+    fn from_happy_case() {
+        let test = 15;
+        assert_eq!(test, Percentage::from(15).value);
     }
 }

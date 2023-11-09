@@ -145,7 +145,8 @@ mod tests {
         let proof =
             IndividualRangeProof::generate(secret, &blinding_factor, upper_bound_bit_length)
                 .unwrap();
-        let _ = proof
+
+        proof
             .verify(&commitment.compress(), upper_bound_bit_length)
             .unwrap();
     }

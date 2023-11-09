@@ -25,7 +25,7 @@ pub use entity_ids_parser::{EntityIdsParser, EntityIdsParserError};
 // -------------------------------------------------------------------------------------------------
 // Main structs & implementations.
 
-#[derive(Deserialize)]
+#[derive(Deserialize, PartialEq)]
 pub struct Entity {
     pub liability: u64,
     pub id: EntityId,
@@ -34,7 +34,7 @@ pub struct Entity {
 /// The max size of the entity ID is 256 bits, but this is a soft limit so it
 /// can be increased if necessary. Note that the underlying array length will
 /// also have to be increased.
-// TODO this is not enforced on deserialization, do that
+// STENT TODO this is not enforced on deserialization, do that
 pub const ENTITY_ID_MAX_BYTES: usize = 32;
 
 /// Abstract representation of an entity ID.

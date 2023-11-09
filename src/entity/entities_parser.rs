@@ -43,14 +43,22 @@ impl EntitiesParser {
         }
     }
 
-    pub fn with_path(mut self, path: Option<PathBuf>) -> Self {
+    pub fn with_path_opt(mut self, path: Option<PathBuf>) -> Self {
         self.path = path;
         self
     }
 
-    pub fn with_num_entities(mut self, num_entities: Option<u64>) -> Self {
+    pub fn with_path(self, path: PathBuf) -> Self {
+        self.with_path_opt(Some(path))
+    }
+
+    pub fn with_num_entities_opt(mut self, num_entities: Option<u64>) -> Self {
         self.num_entities = num_entities;
         self
+    }
+
+    pub fn with_num_entities(self, num_entities: u64) -> Self {
+        self.with_num_entities_opt(Some(num_entities))
     }
 
     /// Open and parse the file, returning a vector of entities.
@@ -60,7 +68,8 @@ impl EntitiesParser {
     /// a) the file cannot be opened
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
-    pub fn parse(self) -> Result<Vec<Entity>, EntitiesParserError> {
+    #[time("debug")]
+    pub fn parse_file(self) -> Result<Vec<Entity>, EntitiesParserError> {
         info!(
             "Attempting to parse {:?} as a file containing a list of entity IDs and liabilities",
             &self.path
@@ -88,6 +97,34 @@ impl EntitiesParser {
         Ok(entities)
     }
 
+    /// Generate a vector of entities with random IDs & liabilities.
+    ///
+    /// A cryptographic pseudo-random number generator is used to generate the
+    /// data. `num_entities` determines the length of the vector.
+    ///
+    /// An error is returned if `num_entities` is not set.
+    #[time("debug")]
+    pub fn generate_random(self) -> Result<Vec<Entity>, EntitiesParserError> {
+        let num_entities = self
+            .num_entities
+            .ok_or(EntitiesParserError::NumEntitiesNotSet)?;
+
+        let mut rng = thread_rng();
+        let mut result = Vec::with_capacity(num_entities as usize);
+
+        let liability_range = Uniform::new(0u64, u64::MAX / num_entities);
+
+        for _i in 0..num_entities {
+            let liability = rng.sample(liability_range);
+            let rand_str = Alphanumeric.sample_string(&mut rng, ENTITY_ID_MAX_BYTES);
+            let id = EntityId::from_str(&rand_str).expect("A failure should not be possible here because the length of the random string exactly matches the max allowed length");
+
+            result.push(Entity { liability, id })
+        }
+
+        Ok(result)
+    }
+
     /// If a file path is present then parse the file, otherwise generate
     /// entity records randomly. The number of entity records generated must
     /// be provided.
@@ -95,16 +132,12 @@ impl EntitiesParser {
     /// Errors are returned if:
     /// a) a file is present and [parse] gives an error
     /// b) neither a file nor a number of entities are present
-    pub fn parse_or_generate_random(self) -> Result<Vec<Entity>, EntitiesParserError> {
-        match &self.path {
-            Some(_) => self.parse(),
-            None => {
-                info!("No entity file provided, defaulting to generating random entities");
-                Ok(generate_random_entities(
-                    self.num_entities
-                        .ok_or(EntitiesParserError::NumEntitiesNotSet)?,
-                ))
-            }
+    pub fn parse_file_or_generate_random(self) -> Result<Vec<Entity>, EntitiesParserError> {
+        if self.path.is_some() {
+            self.parse_file()
+        } else {
+            info!("No entity file provided, defaulting to generating random entities");
+            self.generate_random()
         }
     }
 }
@@ -142,49 +175,44 @@ pub enum EntitiesParserError {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Random entities generator.
-
-const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
-
-/// Generate a vector of entities with random IDs & liabilities.
-/// A cryptographic pseudo-random number generator is used to generate the data.
-/// `num_leaves` determines the length of the vector.
-#[time("debug")]
-pub fn generate_random_entities(num_leaves: u64) -> Vec<Entity> {
-    let mut rng = thread_rng();
-    let mut result = Vec::with_capacity(num_leaves as usize);
-
-    let liability_range = Uniform::new(0u64, u64::MAX / num_leaves);
-
-    for _i in 0..num_leaves {
-        let liability = rng.sample(liability_range);
-        let rand_str = Alphanumeric.sample_string(&mut rng, ENTITY_ID_MAX_BYTES);
-        let id = EntityId::from_str(&rand_str).expect(STRING_CONVERSION_ERR_MSG);
-
-        result.push(Entity { liability, id })
-    }
-
-    result
-}
-
-// -------------------------------------------------------------------------------------------------
 // Unit tests
-
-// TODO add more tests
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env;
     use std::path::Path;
 
     #[test]
     fn parser_csv_file_happy_case() {
-        let src_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+        let src_dir = env!("CARGO_MANIFEST_DIR");
         let path = Path::new(&src_dir).join("entities_example.csv");
-        EntitiesParser::new()
-            .with_path(path.into())
-            .parse()
+
+        let entities = EntitiesParser::new().with_path(path).parse_file().unwrap();
+
+        let first_entity = Entity {
+            id: EntityId::from_str("john.doe@example.com").unwrap(),
+            liability: 893267u64,
+        };
+
+        let last_entity = Entity {
+            id: EntityId::from_str("david.martin@example.com").unwrap(),
+            liability: 142798u64,
+        };
+
+        assert!(entities.contains(&first_entity));
+        assert!(entities.contains(&last_entity));
+
+        assert_eq!(entities.len(), 100);
+    }
+
+    // TODO fuzz on num entities
+    #[test]
+    fn generate_random_entities_happy_case() {
+        let num_entities = 99;
+        let entities = EntitiesParser::new()
+            .with_num_entities(num_entities)
+            .generate_random()
             .unwrap();
+        assert_eq!(entities.len(), num_entities as usize);
     }
 }

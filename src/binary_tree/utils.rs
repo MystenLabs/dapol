@@ -31,7 +31,7 @@ pub mod test_utils {
 
     impl H256Finalizable for blake3::Hasher {
         fn finalize_as_h256(&self) -> H256 {
-            H256(self.finalize().as_bytes().clone())
+            H256(*self.finalize().as_bytes())
         }
     }
 
@@ -86,14 +86,13 @@ pub mod test_utils {
     }
 
     pub fn single_leaf(x_coord_of_leaf: u64) -> InputLeafNode<TestContent> {
-        let leaf = InputLeafNode::<TestContent> {
+        InputLeafNode::<TestContent> {
             x_coord: x_coord_of_leaf,
             content: TestContent {
                 hash: H256::random(),
                 value: 100000000,
             },
-        };
-        leaf
+        }
     }
 
     // A selection of leaves dispersed sparsely along the bottom layer.

@@ -43,9 +43,9 @@
 //! on 1 of the iterations of the first loop.
 // TODO DOCS the above explanation is not so good, improve it
 
-use std::collections::HashMap;
-use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use crate::binary_tree::Height;
+use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
+use std::collections::HashMap;
 
 pub struct RandomXCoordGenerator {
     rng: ThreadRng,
@@ -107,4 +107,56 @@ impl RandomXCoordGenerator {
 #[error("Counter i cannot exceed max value {max_value:?}")]
 pub struct OutOfBoundsError {
     pub max_value: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::binary_tree::{max_bottom_layer_nodes, Height};
+    use std::collections::HashSet;
+
+    #[test]
+    fn constructor_works() {
+        let height = Height::from(4u8);
+        RandomXCoordGenerator::from(&height);
+    }
+
+    #[test]
+    fn new_unique_value_works() {
+        let height = Height::from(4u8);
+        let mut rxcg = RandomXCoordGenerator::from(&height);
+        for _i in 0..max_bottom_layer_nodes(&height) {
+            rxcg.new_unique_x_coord().unwrap();
+        }
+    }
+
+    #[test]
+    fn generated_values_all_unique() {
+        let height = Height::from(4u8);
+        let mut rxcg = RandomXCoordGenerator::from(&height);
+        let mut set = HashSet::<u64>::new();
+        for _i in 0..max_bottom_layer_nodes(&height) {
+            let x = rxcg.new_unique_x_coord().unwrap();
+            if set.contains(&x) {
+                panic!("{:?} was generated twice!", x);
+            }
+            set.insert(x);
+        }
+    }
+
+    #[test]
+    fn new_unique_value_fails_for_large_i() {
+        use crate::utils::test_utils::assert_err;
+
+        let height = Height::from(4u8);
+        let mut rxcg = RandomXCoordGenerator::from(&height);
+        let max = max_bottom_layer_nodes(&height);
+        let mut res = rxcg.new_unique_x_coord();
+
+        for _i in 0..max {
+            res = rxcg.new_unique_x_coord();
+        }
+
+        assert_err!(res, Err(OutOfBoundsError { max_value: _ }));
+    }
 }

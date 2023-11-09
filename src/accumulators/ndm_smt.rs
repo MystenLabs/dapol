@@ -26,10 +26,10 @@ use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
 mod ndm_smt_secrets;
-use ndm_smt_secrets::Secrets;
+use ndm_smt_secrets::NdmSmtSecrets;
 
 mod ndm_smt_secrets_parser;
-pub use ndm_smt_secrets_parser::SecretsParser;
+pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
 
 mod x_coord_generator;
 use x_coord_generator::RandomXCoordGenerator;
@@ -49,7 +49,7 @@ type Content = FullNodeContent;
 /// keeps track of which entity is assigned to which leaf node.
 #[derive(Serialize, Deserialize)]
 pub struct NdmSmt {
-    secrets: Secrets,
+    secrets: NdmSmtSecrets,
     tree: BinaryTree<Content>,
     entity_mapping: HashMap<EntityId, u64>,
 }
@@ -74,7 +74,7 @@ impl NdmSmt {
     ///
     /// [input leaf node]: crate::binary_tree::InputLeafNode
     pub fn new(
-        secrets: Secrets,
+        secrets: NdmSmtSecrets,
         height: Height,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
@@ -237,6 +237,16 @@ impl NdmSmt {
     pub fn root_hash(&self) -> H256 {
         self.tree.root().content.hash
     }
+
+    /// Return the entity mapping, the x-coord that each entity is mapped to.
+    pub fn entity_mapping(&self) -> &HashMap<EntityId, u64> {
+        &self.entity_mapping
+    }
+
+    /// Return the height of the binary tree.
+    pub fn height(&self) -> &Height {
+        self.tree.height()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -303,7 +313,7 @@ mod tests {
             let master_secret: Secret = 1u64.into();
             let salt_b: Secret = 2u64.into();
             let salt_s: Secret = 3u64.into();
-            let secrets = Secrets {
+            let secrets = NdmSmtSecrets {
                 master_secret,
                 salt_b,
                 salt_s,
@@ -316,58 +326,6 @@ mod tests {
             }];
 
             NdmSmt::new(secrets, height, entities).unwrap();
-        }
-    }
-
-    mod random_x_coord_generator {
-        use std::collections::HashSet;
-
-        use super::super::x_coord_generator::{OutOfBoundsError, RandomXCoordGenerator};
-        use crate::binary_tree::{max_bottom_layer_nodes, Height};
-
-        #[test]
-        fn constructor_works() {
-            let height = Height::from(4u8);
-            RandomXCoordGenerator::from(&height);
-        }
-
-        #[test]
-        fn new_unique_value_works() {
-            let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::from(&height);
-            for i in 0..max_bottom_layer_nodes(&height) {
-                rxcg.new_unique_x_coord().unwrap();
-            }
-        }
-
-        #[test]
-        fn generated_values_all_unique() {
-            let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::from(&height);
-            let mut set = HashSet::<u64>::new();
-            for i in 0..max_bottom_layer_nodes(&height) {
-                let x = rxcg.new_unique_x_coord().unwrap();
-                if set.contains(&x) {
-                    panic!("{:?} was generated twice!", x);
-                }
-                set.insert(x);
-            }
-        }
-
-        #[test]
-        fn new_unique_value_fails_for_large_i() {
-            use crate::utils::test_utils::assert_err;
-
-            let height = Height::from(4u8);
-            let mut rxcg = RandomXCoordGenerator::from(&height);
-            let max = max_bottom_layer_nodes(&height);
-            let mut res = rxcg.new_unique_x_coord();
-
-            for i in 0..max {
-                res = rxcg.new_unique_x_coord();
-            }
-
-            assert_err!(res, Err(OutOfBoundsError { max_value: max }));
         }
     }
 }

@@ -446,7 +446,7 @@ mod tests {
             .unwrap();
 
         for leaf in leaf_nodes {
-            tree.get_leaf_node(leaf.x_coord).expect(&format!(
+            tree.get_leaf_node(leaf.x_coord).unwrap_or_else(|| panic!(
                 "Leaf node at x-coord {} is not present in the store",
                 leaf.x_coord
             ));

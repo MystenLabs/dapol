@@ -25,8 +25,8 @@ use rand::{
 ///
 /// The names of the secret values are exactly the same as the ones given in the
 /// DAPOL+ paper.
-#[derive(Serialize, Deserialize)]
-pub struct Secrets {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NdmSmtSecrets {
     pub master_secret: Secret,
     pub salt_b: Secret,
     pub salt_s: Secret,
@@ -36,12 +36,12 @@ pub struct Secrets {
 /// desired outcome, which is to deserialize toml values into a byte array.
 /// We can't deserialize automatically to [a secret] without a custom
 /// implementation of the [deserialize trait]. Instead we deserialize to
-/// [SecretsInput] and then convert the individual string fields to byte arrays.
+/// [NdmSmtSecretsInput] and then convert the individual string fields to byte arrays.
 ///
 /// [a secret] crate::secret::Secret
 /// [deserialize trait] serde::Deserialize
 #[derive(Deserialize)]
-pub struct SecretsInput {
+pub struct NdmSmtSecretsInput {
     master_secret: String,
     salt_b: String,
     salt_s: String,
@@ -49,15 +49,15 @@ pub struct SecretsInput {
 
 const STRING_CONVERSION_ERR_MSG: &str = "A failure should not be possible here because the length of the random string exactly matches the max allowed length";
 
-impl Secrets {
-    #[time("debug", "NdmSmt::Secrets::{}")]
+impl NdmSmtSecrets {
+    #[time("debug", "NdmSmt::NdmSmtSecrets::{}")]
     pub fn generate_random() -> Self {
         let mut rng = thread_rng();
         let master_secret_str = Alphanumeric.sample_string(&mut rng, MAX_LENGTH_BYTES);
         let salt_b_str = Alphanumeric.sample_string(&mut rng, MAX_LENGTH_BYTES);
         let salt_s_str = Alphanumeric.sample_string(&mut rng, MAX_LENGTH_BYTES);
 
-        Secrets {
+        NdmSmtSecrets {
             master_secret: Secret::from_str(&master_secret_str).expect(STRING_CONVERSION_ERR_MSG),
             salt_b: Secret::from_str(&salt_b_str).expect(STRING_CONVERSION_ERR_MSG),
             salt_s: Secret::from_str(&salt_s_str).expect(STRING_CONVERSION_ERR_MSG),
@@ -65,11 +65,11 @@ impl Secrets {
     }
 }
 
-impl TryFrom<SecretsInput> for Secrets {
-    type Error = super::ndm_smt_secrets_parser::SecretsParserError;
+impl TryFrom<NdmSmtSecretsInput> for NdmSmtSecrets {
+    type Error = super::ndm_smt_secrets_parser::NdmSmtSecretsParserError;
 
-    fn try_from(input: SecretsInput) -> Result<Secrets, Self::Error> {
-        Ok(Secrets {
+    fn try_from(input: NdmSmtSecretsInput) -> Result<NdmSmtSecrets, Self::Error> {
+        Ok(NdmSmtSecrets {
             master_secret: Secret::from_str(&input.master_secret)?,
             salt_b: Secret::from_str(&input.salt_b)?,
             salt_s: Secret::from_str(&input.salt_s)?,

@@ -415,9 +415,9 @@ mod tests {
             "3rd element of byte array should be equal to most significant byte of x-coord"
         ); // 2, x-coord
 
-        for i in 3..32 {
+        for item in bytes.iter().skip(3) {
             assert_eq!(
-                bytes[i], 0,
+                *item, 0,
                 "4th-last elements of byte array should be equal to 0"
             );
         }
@@ -470,8 +470,6 @@ mod tests {
     // TODO fuzz on the x,y coord
     #[test]
     fn sibling_coord_calculated_correctly() {
-        let height = Height::from(8);
-
         let x_coord = 5;
         let right_node = single_leaf(x_coord).into_node();
         let sibling_coord = right_node.sibling_coord();
@@ -497,8 +495,6 @@ mod tests {
     // TODO fuzz on the x,y coord
     #[test]
     fn parent_coord_calculated_correctly() {
-        let height = Height::from(8);
-
         let x_coord = 5;
         let right_node = single_leaf(x_coord).into_node();
         let right_parent_coord = right_node.parent_coord();
@@ -524,7 +520,6 @@ mod tests {
     // TODO fuzz on x-coord
     #[test]
     fn input_node_correctly_converted_into_node() {
-        let height = Height::from(8);
         let x_coord = 5;
         let input_node = single_leaf(x_coord);
         let content = input_node.content.clone();
@@ -545,8 +540,6 @@ mod tests {
     // depending on the case
     #[test]
     fn sibling_from_node_works() {
-        let height = Height::from(8);
-
         let x_coord = 11;
         let right_node = single_leaf(x_coord).into_node();
         let sibling = Sibling::from_node(right_node);
@@ -567,8 +560,6 @@ mod tests {
     // TODO fuzz on the 1 x-coord then calculate the other one from this
     #[test]
     fn matched_pair_merge_works() {
-        let height = Height::from(8);
-
         let x_coord = 17;
         let right = single_leaf(x_coord).into_node();
 
