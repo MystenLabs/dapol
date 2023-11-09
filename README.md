@@ -25,10 +25,7 @@ A fuzzing technique should be used for the unit tests: https://github.com/silver
 
 Performance can be improved: https://github.com/silversixpence-crypto/dapol/issues/44
 
-Alternate accumulators mentioned in the paper should be built:
-- https://github.com/silversixpence-crypto/dapol/issues/9
-- https://github.com/silversixpence-crypto/dapol/issues/8
-- https://github.com/silversixpence-crypto/dapol/issues/7
+Alternate accumulators mentioned in the paper should be built: https://github.com/silversixpence-crypto/dapol/issues/9 https://github.com/silversixpence-crypto/dapol/issues/8 https://github.com/silversixpence-crypto/dapol/issues/7
 
 Other than the above there are a few minor tasks to do, each of which has an issue for tracking.
 
@@ -41,7 +38,7 @@ There is both a Rust API and a CLI. Details for both can be found in the section
 The library has not been released as a crate yet (as of Nov 2023) but the API has the following capabilities:
 - build a tree using the builder pattern or a configuration file
 - generate inclusion proofs from a list of entity IDs (tree required)
-- verify an inclusion proof using a roof has (no tree required)
+- verify an inclusion proof using a root hash (no tree required)
 
 See the examples directory for details on how to use the API.
 
