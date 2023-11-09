@@ -16,14 +16,14 @@
 //!
 //! # Path to the secrets file.
 //! # If not present the secrets will be generated randomly.
-//! secrets_file_path = "./resources/secrets_example.toml"
+//! secrets_file_path = "./examples/secrets_example.toml"
 //!
 //! # At least one of file_path & generate_random must be present.
 //! # If both are given then file_path is prioritized.
 //! [entities]
 //!
 //! # Path to a file containing a list of entity IDs and their liabilities.
-//! file_path = "./resources/entities_example.csv"
+//! file_path = "./examples/entities_example.csv"
 //!
 //! # Generate the given number of entities, with random IDs & liabilities.
 //! generate_random = 4
@@ -42,8 +42,8 @@
 //!
 //! let config = NdmSmtConfigBuilder::default()
 //!     .height(height)
-//!     .secrets_file_path(PathBuf::from("./resources/secrets_example.toml"))
-//!     .entities_path(PathBuf::from("./resources/entities_example.csv"))
+//!     .secrets_file_path(PathBuf::from("./examples/secrets_example.toml"))
+//!     .entities_path(PathBuf::from("./examples/entities_example.csv"))
 //!     .build()
 //!     .unwrap();
 //! ```
@@ -171,7 +171,7 @@ mod tests {
         let height = Height::from(8);
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let resources_dir = Path::new(&src_dir).join("resources");
+        let resources_dir = Path::new(&src_dir).join("examples");
         let secrets_file_path = resources_dir.join("secrets_example.toml");
         let entities_file_path = resources_dir.join("entities_example.csv");
 
@@ -199,7 +199,7 @@ mod tests {
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let resources_dir = Path::new(&src_dir).join("resources");
+        let resources_dir = Path::new(&src_dir).join("examples");
         let secrets_file = resources_dir.join("secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
@@ -220,7 +220,7 @@ mod tests {
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let resources_dir = Path::new(&src_dir).join("resources");
+        let resources_dir = Path::new(&src_dir).join("examples");
         let secrets_file = resources_dir.join("secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()

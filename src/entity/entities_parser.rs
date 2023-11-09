@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn parser_csv_file_happy_case() {
         let src_dir = env!("CARGO_MANIFEST_DIR");
-        let resources_dir = Path::new(&src_dir).join("resources");
+        let resources_dir = Path::new(&src_dir).join("examples");
         let path = resources_dir.join("entities_example.csv");
 
         let entities = EntitiesParser::new().with_path(path).parse_file().unwrap();

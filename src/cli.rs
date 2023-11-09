@@ -220,7 +220,7 @@ height = 16
 
 # Path to the secrets file.
 # If not present the secrets will be generated randomly.
-secrets_file_path = \"./resources/secrets_example.toml\"
+secrets_file_path = \"./examples/secrets_example.toml\"
 
 # Can be a file or directory (default file name given in this case)
 # If not present then no serialization is done.
@@ -231,7 +231,7 @@ serialization_path = \"./tree.dapoltree\"
 [entities]
 
 # Path to a file containing a list of entity IDs and their liabilities.
-file_path = \"./resources/entities_example.csv\"
+file_path = \"./examples/entities_example.csv\"
 
 # Generate the given number of entities, with random IDs & liabilities.
 generate_random = 4
