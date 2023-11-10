@@ -6,6 +6,9 @@ pub mod percentage;
 pub mod read_write_utils;
 pub mod utils;
 
+mod hasher;
+pub use hasher::Hasher;
+
 mod accumulators;
 pub use accumulators::{
     config::{AccumulatorConfig, AccumulatorConfigError},

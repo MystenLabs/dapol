@@ -282,16 +282,13 @@ pub enum RangeProofError {
 mod tests {
     use super::*;
     use crate::binary_tree::Coordinate;
-    use crate::utils::H256Finalizable;
+    use crate::hasher::Hasher;
 
     use bulletproofs::PedersenGens;
     use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
-    // STENT TODO grab this from a central place
-    type Hash = blake3::Hasher;
-
-    // tree that is built, with path highlighted
+    // Tree that is built, with path highlighted.
     ///////////////////////////////////////////////////////
     //    |                   [root]                     //
     //  3 |                     224                      //
@@ -326,9 +323,9 @@ mod tests {
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
         let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("leaf".as_bytes());
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
         let leaf = Node {
             coord: Coordinate { x: 2u64, y: 0u8 },
             content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
@@ -338,9 +335,9 @@ mod tests {
         let liability = 23u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"22223333444455556666777788881111");
         let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("sibling1".as_bytes());
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
         let sibling1 = Node {
             coord: Coordinate { x: 3u64, y: 0u8 },
             content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
@@ -358,9 +355,9 @@ mod tests {
         let liability = 30u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
         let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("sibling2".as_bytes());
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
         let sibling2 = Node {
             coord: Coordinate { x: 0u64, y: 1u8 },
             content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
@@ -378,9 +375,9 @@ mod tests {
         let liability = 144u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
         let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("sibling3".as_bytes());
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
         let sibling3 = Node {
             coord: Coordinate { x: 1u64, y: 2u8 },
             content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
@@ -414,12 +411,12 @@ mod tests {
 
         // `H(parent) = Hash(C(L) | C(R) | H(L) | H(R))`
         let parent_hash = {
-            let mut hasher = Hash::new();
+            let mut hasher = Hasher::new();
             hasher.update(left_commitment.compress().as_bytes());
             hasher.update(right_commitment.compress().as_bytes());
             hasher.update(left_hash.as_bytes());
             hasher.update(right_hash.as_bytes());
-            hasher.finalize_as_h256()
+            hasher.finalize()
         };
 
         (parent_hash, parent_commitment)
@@ -445,25 +442,6 @@ mod tests {
         let proof =
             InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
         proof.verify(root_hash).unwrap();
-    }
-
-    // Ensures Blake 3 library produces correct hashed output.
-    // Comparison hash derived through the following urls:
-    // https://toolkitbay.com/tkb/tool/BLAKE3
-    // https://connor4312.github.io/blake3/index.html
-    // https://asecuritysite.com/hash/blake3
-    #[test]
-    fn verify_hasher() {
-        use std::str::FromStr;
-
-        let mut hasher = Hash::new();
-        hasher.update("dapol-PoR".as_bytes());
-        let hash = hasher.finalize_as_h256();
-        assert_eq!(
-            hash,
-            H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850")
-                .unwrap()
-        );
     }
 
     // TODO test correct error translation from lower layers (probably should

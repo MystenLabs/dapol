@@ -12,29 +12,20 @@
 use crate::binary_tree::{Coordinate, Mergeable};
 use crate::secret::Secret;
 use crate::entity::EntityId;
+use crate::hasher::Hasher;
 
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use primitive_types::H256;
 use serde::{Serialize, Deserialize};
 
-use crate::utils::H256Finalizable;
-
 use super::HiddenNodeContent;
-
-// Hash function used in the merge function.
-type Hash = blake3::Hasher;
 
 /// Main struct containing:
 /// - Raw liability value
 /// - Blinding factor
 /// - Pedersen commitment
 /// - Hash
-///
-/// The hash function needs to be a generic parameter because when implementing
-/// [crate][binary_tree][`Mergeable`] one needs to define the merge function, which is not generic,
-/// and the merge function in the case of FullNodeContent needs to use a generic hash function.
-/// One way to solve this problem is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FullNodeContent {
     pub liability: u64,
@@ -97,11 +88,11 @@ impl FullNodeContent {
         let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
         // Compute the hash: `H("leaf" | entity_id | entity_salt)`
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("leaf".as_bytes());
         hasher.update(&entity_id_bytes);
         hasher.update(&entity_salt_bytes);
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
 
         FullNodeContent {
             liability,
@@ -129,11 +120,11 @@ impl FullNodeContent {
         let salt_bytes: [u8; 32] = salt.into();
 
         // Compute the hash: `H("pad" | coordinate | salt)`
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("pad".as_bytes());
         hasher.update(&coord_bytes);
         hasher.update(&salt_bytes);
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
 
         FullNodeContent {
             liability,
@@ -169,12 +160,12 @@ impl Mergeable for FullNodeContent {
 
         // `hash = H(left.com | right.com | left.hash | right.hash`
         let parent_hash = {
-            let mut hasher = Hash::new();
+            let mut hasher = Hasher::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
             hasher.update(right_sibling.commitment.compress().as_bytes());
             hasher.update(left_sibling.hash.as_bytes());
             hasher.update(right_sibling.hash.as_bytes());
-            hasher.finalize_as_h256()
+            hasher.finalize()
         };
 
         FullNodeContent {
