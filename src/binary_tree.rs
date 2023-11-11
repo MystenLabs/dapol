@@ -40,8 +40,8 @@ pub use tree_builder::{
     multi_threaded, single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
 };
 
-mod path_builder;
-pub use path_builder::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
+mod path_siblings;
+pub use path_siblings::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
 
 mod utils;
 pub use utils::max_bottom_layer_nodes;
