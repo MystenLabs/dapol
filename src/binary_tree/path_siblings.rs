@@ -42,27 +42,9 @@ pub struct PathSiblings<C>(Vec<Node<C>>);
 /// and the leaf node's x-coord.
 pub struct PathSiblingsBuilder<'a, C> {
     tree: Option<&'a BinaryTree<C>>,
-    leaf_x_coord: Option<u64>,
 }
 
-impl<'a, C> PathSiblingsBuilder<'a, C> {
-    pub fn new() -> Self {
-        PathSiblingsBuilder {
-            tree: None,
-            leaf_x_coord: None,
-        }
-    }
-
-    pub fn with_tree(mut self, tree: &'a BinaryTree<C>) -> Self {
-        self.tree = Some(tree);
-        self
-    }
-
-    pub fn with_leaf_x_coord(mut self, leaf_x_coord: u64) -> Self {
-        self.leaf_x_coord = Some(leaf_x_coord);
-        self
-    }
-
+impl<C> PathSiblings<C> {
     /// High performance build algorithm utilizing parallelization.
     /// Uses the same code in [super][tree_builder][multi_threaded].
     ///
@@ -75,7 +57,8 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
     /// This function defines a closure for building nodes that are not found
     /// in the store, which is then passed to [build].
     pub fn build_using_multi_threaded_algorithm<F>(
-        self,
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
         new_padding_node_content: F,
     ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
@@ -88,7 +71,7 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
 
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
-        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+        let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
             let params = RecursionParams::from_coordinate(coord)
                 // We don't want to store anything because the store already exists
                 // inside the binary tree struct.
@@ -105,7 +88,6 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
                 });
             }
 
-            // if coord.y == 1 {
             // If the above vector is empty then we know this node needs to be a
             // padding node.
             if leaf_nodes.is_empty() {
@@ -123,7 +105,7 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
             )
         };
 
-        self.build(node_builder)
+        PathSiblings::build(tree, leaf_node, node_builder)
     }
 
     /// Sequential build algorithm.
@@ -135,7 +117,8 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
     ///
     /// `new_padding_node_content` is needed to generate new nodes.
     pub fn build_using_single_threaded_algorithm<F>(
-        self,
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
         new_padding_node_content: F,
     ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
@@ -144,7 +127,7 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
     {
         use super::tree_builder::single_threaded::build_node;
 
-        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+        let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
             // We don't want to store anything because the store already exists
             // inside the binary tree struct.
             let store_depth = MIN_STORE_DEPTH;
@@ -184,7 +167,7 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
             node
         };
 
-        self.build(node_builder)
+        PathSiblings::build(tree, leaf_node, node_builder)
     }
 
     /// Private build function that is to be called only by
@@ -198,29 +181,17 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
     /// Since the store is expected to contain all non-padding leaf nodes an
     /// error will be returned if the leaf node at the given x-coord is not
     /// found in the store.
-    fn build<F>(self, node_builder: F) -> Result<PathSiblings<C>, PathSiblingsBuildError>
+    fn build<F>(
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
+        node_builder: F) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
         C: Debug + Clone,
-        F: Fn(&Coordinate, &'a BinaryTree<C>) -> Node<C>,
+        F: Fn(&Coordinate, &BinaryTree<C>) -> Node<C>,
     {
-        let tree = self.tree.ok_or(PathSiblingsBuildError::NoTreeProvided)?;
-
-        // STENT TODO remove leaf stuff
-        // let leaf_x_coord = self
-        //     .leaf_x_coord
-        //     .ok_or(PathSiblingsBuildError::NoLeafProvided)?;
-        // let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
-
-        // let leaf = tree.get_leaf_node(leaf_x_coord).ok_or_else(|| {
-        //     PathSiblingsBuildError::LeafNodeNotFound {
-        //         coord: leaf_coord.clone(),
-        //     }
-        // })?;
-
         let mut siblings = Vec::with_capacity(tree.height().as_usize());
         let max_y_coord = tree.height().as_y_coord();
-        // STENT TODO we will need to take the leaf node as a parameter
-        let mut current_coord = leaf_coord;
+        let mut current_coord = leaf_node.coord().clone();
 
         for _y in 0..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
@@ -234,12 +205,6 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
         }
 
         Ok(PathSiblings(siblings))
-    }
-}
-
-impl<C> BinaryTree<C> {
-    pub fn path_builder(&self) -> PathSiblingsBuilder<C> {
-        PathSiblingsBuilder::new().with_tree(self)
     }
 }
 
@@ -312,19 +277,6 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
 
 // -------------------------------------------------------------------------------------------------
 // PathSiblings conversion.
-
-// STENT TODO this is not compiling, clash with some other From
-// impl<C, D> From<PathSiblings<C>> for PathSiblings<D> {
-//     fn from(path_siblings: PathSiblings<C>) -> Self {
-//         PathSiblings(
-//             path_siblings
-//                 .0
-//                 .into_iter()
-//                 .map(|node| node.convert())
-//                 .collect(),
-//         )
-//     }
-// }
 
 impl<C> PathSiblings<C> {
     /// Convert `PathSiblings<C>` to `PathSiblings<D>`.

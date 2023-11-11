@@ -19,7 +19,7 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
+use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder, PathSiblings};
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{
     AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
@@ -201,17 +201,14 @@ impl NdmSmt {
         let new_padding_node_content =
             new_padding_node_content_closure(*master_secret_bytes, *salt_b_bytes, *salt_s_bytes);
 
-        let path_siblings = self
-            .tree
-            // STENT TODO change name of this function, maybe even do away with the builder since there is only one function to call?
-            .path_builder()
-            .build_using_multi_threaded_algorithm(new_padding_node_content)?;
-
         let leaf_node = self
             .entity_mapping
             .get(entity_id)
             .and_then(|leaf_x_coord| self.tree.get_leaf_node(*leaf_x_coord))
             .ok_or(NdmSmtError::EntityIdNotFound)?;
+
+        let path_siblings = PathSiblings::
+            build_using_multi_threaded_algorithm(&self.tree, &leaf_node, new_padding_node_content)?;
 
         Ok(InclusionProof::generate(
             leaf_node,

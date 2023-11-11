@@ -138,7 +138,6 @@ impl FullNodeContent {
 // -------------------------------------------------------------------------------------------------
 // Conversions
 
-// STENT TODO change this to From
 impl FullNodeContent {
     pub fn compress(self) -> HiddenNodeContent {
         HiddenNodeContent::new(self.commitment, self.hash)

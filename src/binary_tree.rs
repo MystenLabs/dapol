@@ -299,6 +299,11 @@ impl<C> Node<C> {
         }
     }
 
+    // STENT TODO docs
+    pub fn coord(&self) -> &Coordinate {
+        &self.coord
+    }
+
     /// Return the coordinates of this node's sibling, whether that be a right
     /// or a left sibling.
     fn sibling_coord(&self) -> Coordinate {
@@ -314,7 +319,6 @@ impl<C> Node<C> {
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
-    // STENT TODO change this to From
     pub fn convert<B: From<C>>(self) -> Node<B> {
         Node {
             content: self.content.into(),

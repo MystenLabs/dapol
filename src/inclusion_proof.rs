@@ -107,7 +107,6 @@ impl InclusionProof {
         let tree_height = Height::from_y_coord(path_siblings.len() as u8);
         let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
-        // STENT TODO need to pass the leaf node in here
         let mut nodes_for_aggregation = path_siblings.build_path(leaf_node.clone())?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
@@ -191,7 +190,7 @@ impl InclusionProof {
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
                 .path_siblings
-                .build_path(self.leaf_node.convert())?
+                .build_path(self.leaf_node.clone().convert())?
                 .iter()
                 .map(|node| node.content.commitment.compress())
                 .collect();
