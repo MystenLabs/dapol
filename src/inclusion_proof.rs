@@ -71,7 +71,7 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
     path_siblings: PathSiblings<HiddenNodeContent>,
-    // STENT TODO add leaf node here with FullNodeContent
+    leaf_node: Node<FullNodeContent>,
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
     aggregation_factor: AggregationFactor,
@@ -94,6 +94,7 @@ impl InclusionProof {
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
     pub fn generate(
+        leaf_node: Node<FullNodeContent>,
         path_siblings: PathSiblings<FullNodeContent>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
@@ -107,7 +108,7 @@ impl InclusionProof {
         let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
         // STENT TODO need to pass the leaf node in here
-        let mut nodes_for_aggregation = path_siblings.build_path()?;
+        let mut nodes_for_aggregation = path_siblings.build_path(leaf_node.clone())?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
@@ -143,6 +144,7 @@ impl InclusionProof {
 
         Ok(InclusionProof {
             path_siblings: path_siblings.convert(),
+            leaf_node,
             individual_range_proofs,
             aggregated_range_proof,
             aggregation_factor,
@@ -179,7 +181,7 @@ impl InclusionProof {
                 },
             };
 
-            self.path_siblings.verify(&root)?;
+            self.path_siblings.verify(self.leaf_node.clone().convert(), &root)?;
         }
 
         {
@@ -189,8 +191,7 @@ impl InclusionProof {
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
                 .path_siblings
-            // STENT TODO need to pass the leaf node in here
-                .build_path()?
+                .build_path(self.leaf_node.convert())?
                 .iter()
                 .map(|node| node.content.commitment.compress())
                 .collect();

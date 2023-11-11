@@ -21,7 +21,9 @@ use rayon::prelude::*;
 
 use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder};
 use crate::entity::{Entity, EntityId};
-use crate::inclusion_proof::{AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH};
+use crate::inclusion_proof::{
+    AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
+};
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
 
@@ -115,7 +117,8 @@ impl NdmSmt {
                 .map(|(entity, x_coord)| {
                     // `w` is the letter used in the DAPOL+ paper.
                     let entity_secret: [u8; 32] =
-                        generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes())).into();
+                        generate_key(None, master_secret_bytes, Some(&x_coord.to_le_bytes()))
+                            .into();
                     let blinding_factor = generate_key(Some(salt_b_bytes), &entity_secret, None);
                     let entity_salt = generate_key(Some(salt_s_bytes), &entity_secret, None);
 
@@ -192,26 +195,27 @@ impl NdmSmt {
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<InclusionProof, NdmSmtError> {
-        let leaf_x_coord = self
-            .entity_mapping
-            .get(entity_id)
-            .ok_or(NdmSmtError::EntityIdNotFound)?;
-
         let master_secret_bytes = self.secrets.master_secret.as_bytes();
         let salt_b_bytes = self.secrets.salt_b.as_bytes();
         let salt_s_bytes = self.secrets.salt_s.as_bytes();
         let new_padding_node_content =
             new_padding_node_content_closure(*master_secret_bytes, *salt_b_bytes, *salt_s_bytes);
 
-        let path = self
+        let path_siblings = self
             .tree
+            // STENT TODO change name of this function, maybe even do away with the builder since there is only one function to call?
             .path_builder()
-        // STENT TODO remove this, rather feed the leaf node into the generate function
-            .with_leaf_x_coord(*leaf_x_coord)
             .build_using_multi_threaded_algorithm(new_padding_node_content)?;
 
+        let leaf_node = self
+            .entity_mapping
+            .get(entity_id)
+            .and_then(|leaf_x_coord| self.tree.get_leaf_node(*leaf_x_coord))
+            .ok_or(NdmSmtError::EntityIdNotFound)?;
+
         Ok(InclusionProof::generate(
-            path,
+            leaf_node,
+            path_siblings,
             aggregation_factor,
             upper_bound_bit_length,
         )?)

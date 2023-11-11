@@ -17,8 +17,8 @@
 //! [super][tree_builder][multi_threaded] and
 //! [super][tree_builder][single_threaded].
 
-use crate::utils::Consume;
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
+use crate::utils::Consume;
 
 use std::fmt::Debug;
 
@@ -32,9 +32,7 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PathSiblings<C> (
-    Vec<Node<C>>
-);
+pub struct PathSiblings<C>(Vec<Node<C>>);
 
 // -------------------------------------------------------------------------------------------------
 // Builder.
@@ -208,17 +206,20 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
         let tree = self.tree.ok_or(PathSiblingsBuildError::NoTreeProvided)?;
 
         // STENT TODO remove leaf stuff
-        let leaf_x_coord = self.leaf_x_coord.ok_or(PathSiblingsBuildError::NoLeafProvided)?;
-        let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
+        // let leaf_x_coord = self
+        //     .leaf_x_coord
+        //     .ok_or(PathSiblingsBuildError::NoLeafProvided)?;
+        // let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
 
-        let leaf =
-            tree.get_leaf_node(leaf_x_coord)
-            .ok_or_else(|| PathSiblingsBuildError::LeafNodeNotFound {
-                coord: leaf_coord.clone(),
-            })?;
+        // let leaf = tree.get_leaf_node(leaf_x_coord).ok_or_else(|| {
+        //     PathSiblingsBuildError::LeafNodeNotFound {
+        //         coord: leaf_coord.clone(),
+        //     }
+        // })?;
 
         let mut siblings = Vec::with_capacity(tree.height().as_usize());
         let max_y_coord = tree.height().as_y_coord();
+        // STENT TODO we will need to take the leaf node as a parameter
         let mut current_coord = leaf_coord;
 
         for _y in 0..max_y_coord {
@@ -232,9 +233,7 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
             current_coord = current_coord.parent_coord();
         }
 
-        Ok(PathSiblings (
-            siblings
-        ))
+        Ok(PathSiblings(siblings))
     }
 }
 
@@ -262,14 +261,12 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
     ///
     /// An error is returned if the number of siblings is less than the min
     /// amount, or the constructed root node does not match the given one.
-        // STENT TODO add leaf as parameter, also change the name of this to something explaining that it is building the path
+    // STENT TODO add leaf as parameter, also change the name of this to something explaining that it is building the path
     // in fact it's probably better to move the verify to InclusionProof because this function is basically the same as the below function
-    pub fn verify(&self, leaf: &Node<C>, root: &Node<C>) -> Result<(), PathSiblingsError> {
+    pub fn verify(&self, leaf: Node<C>, root: &Node<C>) -> Result<(), PathSiblingsError> {
         use super::MIN_HEIGHT;
 
-        // Cloning is not strictly necessary here but it makes the code cleaner,
-        // and it's not an expensive clone.
-        let mut parent = leaf.clone();
+        let mut parent = leaf;
 
         if self.len() < MIN_HEIGHT.as_usize() {
             return Err(PathSiblingsError::TooFewSiblings);
@@ -294,11 +291,11 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
     /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [PathSiblings] data is invalid.
-    pub fn build_path(&self, leaf: &Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
+    pub fn build_path(&self, leaf: Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
         // +1 because the root node is included in the returned vector
         let mut nodes = Vec::<Node<C>>::with_capacity(self.len() + 1);
 
-        nodes.push(leaf.clone());
+        nodes.push(leaf);
 
         for node in &self.0 {
             // this should never panic because we pushed the leaf node before the loop
@@ -316,25 +313,32 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
 // -------------------------------------------------------------------------------------------------
 // PathSiblings conversion.
 
+// STENT TODO this is not compiling, clash with some other From
+// impl<C, D> From<PathSiblings<C>> for PathSiblings<D> {
+//     fn from(path_siblings: PathSiblings<C>) -> Self {
+//         PathSiblings(
+//             path_siblings
+//                 .0
+//                 .into_iter()
+//                 .map(|node| node.convert())
+//                 .collect(),
+//         )
+//     }
+// }
+
 impl<C> PathSiblings<C> {
     /// Convert `PathSiblings<C>` to `PathSiblings<D>`.
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
     pub fn convert<B: From<C>>(self) -> PathSiblings<B> {
-        PathSiblings (
-            self
-                .0
-                .into_iter()
-                .map(|node| node.convert())
-                .collect()
-        )
+        PathSiblings(self.0.into_iter().map(|node| node.convert()).collect())
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
 pub enum PathSiblingsBuildError {

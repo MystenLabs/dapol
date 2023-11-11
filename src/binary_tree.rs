@@ -314,7 +314,8 @@ impl<C> Node<C> {
     }
 
     /// Convert a `Node<C>` to a `Node<B>`.
-    fn convert<B: From<C>>(self) -> Node<B> {
+    // STENT TODO change this to From
+    pub fn convert<B: From<C>>(self) -> Node<B> {
         Node {
             content: self.content.into(),
             coord: self.coord,
