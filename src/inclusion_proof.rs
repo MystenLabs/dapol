@@ -70,7 +70,7 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
-    path: PathSiblings<HiddenNodeContent>,
+    path_siblings: PathSiblings<HiddenNodeContent>,
     // STENT TODO add leaf node here with FullNodeContent
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
@@ -94,7 +94,7 @@ impl InclusionProof {
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
     pub fn generate(
-        path: PathSiblings<FullNodeContent>,
+        path_siblings: PathSiblings<FullNodeContent>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
@@ -103,10 +103,11 @@ impl InclusionProof {
         // be more siblings than max(u8). TODO might be worth using a bounded
         // vector for siblings. If the tree height changes type for some
         // reason then this code would fail silently.
-        let tree_height = Height::from_y_coord(path.siblings.len() as u8);
+        let tree_height = Height::from_y_coord(path_siblings.len() as u8);
         let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
-        let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
+        // STENT TODO need to pass the leaf node in here
+        let mut nodes_for_aggregation = path_siblings.build_path()?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
@@ -141,7 +142,7 @@ impl InclusionProof {
         };
 
         Ok(InclusionProof {
-            path: path.convert(),
+            path_siblings: path_siblings.convert(),
             individual_range_proofs,
             aggregated_range_proof,
             aggregation_factor,
@@ -158,7 +159,7 @@ impl InclusionProof {
         // Is this cast safe? Yes because the tree height (which is the same as the
         // length of the input) is also stored as a u8, and so there would never
         // be more siblings than max(u8).
-        let tree_height = Height::from_y_coord(self.path.siblings.len() as u8);
+        let tree_height = Height::from_y_coord(self.path_siblings.len() as u8);
 
         {
             // Merkle tree path verification
@@ -178,7 +179,7 @@ impl InclusionProof {
                 },
             };
 
-            self.path.verify(&root)?;
+            self.path_siblings.verify(&root)?;
         }
 
         {
@@ -187,8 +188,9 @@ impl InclusionProof {
             let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-                .path
-                .nodes_from_bottom_to_top()?
+                .path_siblings
+            // STENT TODO need to pass the leaf node in here
+                .build_path()?
                 .iter()
                 .map(|node| node.content.commitment.compress())
                 .collect();

@@ -32,12 +32,9 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
-// STENT TODO change to PathSiblings
-pub struct PathSiblings<C> {
-    // STENT TODO remove leaf
-    pub leaf: Node<C>,
-    pub siblings: Vec<Node<C>>,
-}
+pub struct PathSiblings<C> (
+    Vec<Node<C>>
+);
 
 // -------------------------------------------------------------------------------------------------
 // Builder.
@@ -235,11 +232,9 @@ impl<'a, C> PathSiblingsBuilder<'a, C> {
             current_coord = current_coord.parent_coord();
         }
 
-        Ok(PathSiblings {
-            // STENT TODO remove leaf
-            leaf: leaf.clone(),
-            siblings,
-        })
+        Ok(PathSiblings (
+            siblings
+        ))
     }
 }
 
@@ -250,9 +245,14 @@ impl<C> BinaryTree<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// PathSiblings verification.
+// Implementation.
 
 impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
+    // STENT TODO docs
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     /// Verify that the given list of sibling nodes + the base leaf node matches
     /// the given root node.
     ///
@@ -262,17 +262,20 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
     ///
     /// An error is returned if the number of siblings is less than the min
     /// amount, or the constructed root node does not match the given one.
-        // STENT TODO add leaf as parameter
-    pub fn verify(&self, root: &Node<C>) -> Result<(), PathSiblingsError> {
+        // STENT TODO add leaf as parameter, also change the name of this to something explaining that it is building the path
+    // in fact it's probably better to move the verify to InclusionProof because this function is basically the same as the below function
+    pub fn verify(&self, leaf: &Node<C>, root: &Node<C>) -> Result<(), PathSiblingsError> {
         use super::MIN_HEIGHT;
 
-        let mut parent = self.leaf.clone();
+        // Cloning is not strictly necessary here but it makes the code cleaner,
+        // and it's not an expensive clone.
+        let mut parent = leaf.clone();
 
-        if self.siblings.len() < MIN_HEIGHT.as_usize() {
+        if self.len() < MIN_HEIGHT.as_usize() {
             return Err(PathSiblingsError::TooFewSiblings);
         }
 
-        for node in &self.siblings {
+        for node in &self.0 {
             let pair = MatchedPairRef::new(node, &parent)?;
             parent = pair.merge();
         }
@@ -291,14 +294,13 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
     /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [PathSiblings] data is invalid.
-    // STENT TODO change this to build_path
-    pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathSiblingsError> {
+    pub fn build_path(&self, leaf: &Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
         // +1 because the root node is included in the returned vector
-        let mut nodes = Vec::<Node<C>>::with_capacity(self.siblings.len() + 1);
+        let mut nodes = Vec::<Node<C>>::with_capacity(self.len() + 1);
 
-        nodes.push(self.leaf.clone());
+        nodes.push(leaf.clone());
 
-        for node in &self.siblings {
+        for node in &self.0 {
             // this should never panic because we pushed the leaf node before the loop
             let parent = nodes
                 .last()
@@ -319,14 +321,13 @@ impl<C> PathSiblings<C> {
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
     pub fn convert<B: From<C>>(self) -> PathSiblings<B> {
-        PathSiblings {
-            siblings: self
-                .siblings
+        PathSiblings (
+            self
+                .0
                 .into_iter()
                 .map(|node| node.convert())
-                .collect(),
-            leaf: self.leaf.convert(),
-        }
+                .collect()
+        )
     }
 }
 
@@ -446,8 +447,9 @@ mod tests {
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
 
+    // STENT TODO change name of proof
     fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &PathSiblings<TestContent>) {
-        assert_eq!(proof.siblings.len() as u8, tree.height().as_y_coord());
+        assert_eq!(proof.len() as u8, tree.height().as_y_coord());
     }
 
     #[test]
