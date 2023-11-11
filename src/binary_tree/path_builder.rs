@@ -32,7 +32,9 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
+// STENT TODO change to PathSiblings
 pub struct Path<C> {
+    // STENT TODO remove leaf
     pub leaf: Node<C>,
     pub siblings: Vec<Node<C>>,
 }
@@ -208,14 +210,15 @@ impl<'a, C> PathBuilder<'a, C> {
     {
         let tree = self.tree.ok_or(PathBuildError::NoTreeProvided)?;
 
+        // STENT TODO remove leaf stuff
         let leaf_x_coord = self.leaf_x_coord.ok_or(PathBuildError::NoLeafProvided)?;
         let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
 
         let leaf =
             tree.get_leaf_node(leaf_x_coord)
-                .ok_or_else(|| PathBuildError::LeafNodeNotFound {
-                    coord: leaf_coord.clone(),
-                })?;
+            .ok_or_else(|| PathBuildError::LeafNodeNotFound {
+                coord: leaf_coord.clone(),
+            })?;
 
         let mut siblings = Vec::with_capacity(tree.height().as_usize());
         let max_y_coord = tree.height().as_y_coord();
@@ -233,6 +236,7 @@ impl<'a, C> PathBuilder<'a, C> {
         }
 
         Ok(Path {
+            // STENT TODO remove leaf
             leaf: leaf.clone(),
             siblings,
         })
@@ -258,6 +262,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
     ///
     /// An error is returned if the number of siblings is less than the min
     /// amount, or the constructed root node does not match the given one.
+        // STENT TODO add leaf as parameter
     pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
         use super::MIN_HEIGHT;
 
@@ -286,6 +291,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
     /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [Path] data is invalid.
+    // STENT TODO change this to build_path
     pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathError> {
         // +1 because the root node is included in the returned vector
         let mut nodes = Vec::<Node<C>>::with_capacity(self.siblings.len() + 1);

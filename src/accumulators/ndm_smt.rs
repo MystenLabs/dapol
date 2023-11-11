@@ -206,6 +206,7 @@ impl NdmSmt {
         let path = self
             .tree
             .path_builder()
+        // STENT TODO remove this, rather feed the leaf node into the generate function
             .with_leaf_x_coord(*leaf_x_coord)
             .build_using_multi_threaded_algorithm(new_padding_node_content)?;
 

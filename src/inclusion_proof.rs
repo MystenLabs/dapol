@@ -71,6 +71,7 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
     path: Path<HiddenNodeContent>,
+    // STENT TODO add leaf node here with FullNodeContent
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
     aggregation_factor: AggregationFactor,
