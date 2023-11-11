@@ -41,7 +41,7 @@ pub use tree_builder::{
 };
 
 mod path_builder;
-pub use path_builder::{Path, PathBuildError, PathError};
+pub use path_builder::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
 
 mod utils;
 pub use utils::max_bottom_layer_nodes;

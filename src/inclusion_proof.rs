@@ -44,7 +44,7 @@ use std::{fmt::Debug, path::PathBuf};
 
 use log::info;
 
-use crate::binary_tree::{Coordinate, Height, Node, Path};
+use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::{read_write_utils, EntityId};
 
@@ -70,7 +70,7 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
-    path: Path<HiddenNodeContent>,
+    path: PathSiblings<HiddenNodeContent>,
     // STENT TODO add leaf node here with FullNodeContent
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
@@ -94,7 +94,7 @@ impl InclusionProof {
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
     pub fn generate(
-        path: Path<FullNodeContent>,
+        path: PathSiblings<FullNodeContent>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
@@ -257,7 +257,7 @@ impl InclusionProof {
 #[derive(thiserror::Error, Debug)]
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
-    TreePathError(#[from] crate::binary_tree::PathError),
+    TreePathSiblingsError(#[from] crate::binary_tree::PathSiblingsError),
     #[error("Issues with range proof")]
     RangeProofError(#[from] RangeProofError),
     #[error("Error serializing/deserializing file")]
@@ -319,7 +319,7 @@ mod tests {
     //  x| 0     1     2     3     4     5     6     7   //
     //                                                   //
     ///////////////////////////////////////////////////////
-    fn build_test_path() -> (Path<FullNodeContent>, RistrettoPoint, H256) {
+    fn build_test_path() -> (PathSiblings<FullNodeContent>, RistrettoPoint, H256) {
         // leaf at (2,0)
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
@@ -393,7 +393,7 @@ mod tests {
         );
 
         (
-            Path {
+            PathSiblings {
                 siblings: vec![sibling1, sibling2, sibling3],
                 leaf,
             },

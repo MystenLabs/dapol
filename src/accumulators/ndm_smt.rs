@@ -284,7 +284,7 @@ pub enum NdmSmtError {
     #[error("Number of entities cannot be bigger than 2^(height-1)")]
     HeightTooSmall(#[from] x_coord_generator::OutOfBoundsError),
     #[error("Inclusion proof generation failed when trying to build the path in the tree")]
-    InclusionProofPathGenerationError(#[from] crate::binary_tree::PathBuildError),
+    InclusionProofPathSiblingsGenerationError(#[from] crate::binary_tree::PathSiblingsBuildError),
     #[error("Inclusion proof generation failed")]
     InclusionProofGenerationError(#[from] crate::inclusion_proof::InclusionProofError),
     #[error("Entity ID not found in the entity mapping")]
