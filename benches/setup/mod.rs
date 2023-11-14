@@ -101,11 +101,51 @@ pub(crate) fn get_leaf_nodes(
     leaf_nodes
 }
 
-fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
+pub(crate) fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
     |_coord: &Coordinate| -> BenchTestContent {
         BenchTestContent {
             value: 0,
             hash: H256::default(),
         }
     }
+}
+
+pub(crate) fn get_threads(num_cores: u8) -> Vec<u8> {
+    let mut range: Vec<u8> = Vec::new();
+    match num_cores {
+        _ if num_cores <= 8 => {
+            for i in 1..(num_cores) {
+                range.push(i);
+                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i)
+            }
+        }
+
+        _ if num_cores > 8 && num_cores <= 32 => {
+            for i in 1..(num_cores / 5) {
+                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i)
+            }
+        }
+
+        _ if num_cores > 32 && num_cores <= 64 => {
+            for i in 1..(num_cores / 10) {
+                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+            }
+        }
+
+        _ if num_cores > 64 && num_cores <= 128 => {
+            for i in 1..(num_cores / 20) {
+                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+            }
+        }
+
+        _ if num_cores > 128 => {
+            for i in 1..(num_cores / 40) {
+                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+            }
+        }
+
+        _ => panic!("Thread count overflow"),
+    }
+
+    range
 }
