@@ -183,9 +183,7 @@ impl InclusionProof {
                 },
             };
 
-            let constructed_root = self
-                .path_siblings
-                .construct_root_node(&hidden_leaf_node)?;
+            let constructed_root = self.path_siblings.construct_root_node(&hidden_leaf_node)?;
 
             if constructed_root != root {
                 return Err(InclusionProofError::RootMismatch);
@@ -332,7 +330,12 @@ mod tests {
     //  x| 0     1     2     3     4     5     6     7   //
     //                                                   //
     ///////////////////////////////////////////////////////
-    fn build_test_path() -> (PathSiblings<FullNodeContent>, RistrettoPoint, H256) {
+    fn build_test_path() -> (
+        Node<FullNodeContent>,
+        PathSiblings<FullNodeContent>,
+        RistrettoPoint,
+        H256,
+    ) {
         // leaf at (2,0)
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
@@ -406,10 +409,8 @@ mod tests {
         );
 
         (
-            PathSiblings {
-                siblings: vec![sibling1, sibling2, sibling3],
-                leaf,
-            },
+            leaf,
+            PathSiblings(vec![sibling1, sibling2, sibling3]),
             root_commitment,
             root_hash,
         )
@@ -442,8 +443,8 @@ mod tests {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
 
-        let (path, _, _) = build_test_path();
-        InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+        let (leaf, path, _, _) = build_test_path();
+        InclusionProof::generate(leaf, path, aggregation_factor, upper_bound_bit_length).unwrap();
     }
 
     #[test]
@@ -451,10 +452,12 @@ mod tests {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
 
-        let (path, _root_commitment, root_hash) = build_test_path();
+        let (leaf, path, _root_commitment, root_hash) = build_test_path();
 
         let proof =
-            InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+            InclusionProof::generate(leaf, path, aggregation_factor, upper_bound_bit_length)
+                .unwrap();
+
         proof.verify(root_hash).unwrap();
     }
 

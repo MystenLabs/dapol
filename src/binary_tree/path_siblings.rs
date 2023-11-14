@@ -413,17 +413,23 @@ mod tests {
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_single_threaded
-            .path_builder()
-            .with_leaf_x_coord(10)
-            .build_using_single_threaded_algorithm(get_padding_function())
-            .expect("PathSiblings generation should have been successful");
+        let leaf_node = tree_single_threaded.get_leaf_node(10).unwrap();
 
-        check_path_siblings(&tree_single_threaded, &proof);
+        let siblings = PathSiblings::build_using_single_threaded_algorithm(
+            &tree_single_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_single_threaded.root())
-            .expect("PathSiblings verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_single_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_single_threaded.root()
+        );
     }
 
     #[test]
@@ -439,17 +445,23 @@ mod tests {
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_multi_threaded
-            .path_builder()
-            .with_leaf_x_coord(10)
-            .build_using_multi_threaded_algorithm(get_padding_function())
-            .expect("PathSiblings generation should have been successful");
+        let leaf_node = tree_multi_threaded.get_leaf_node(10).unwrap();
 
-        check_path_siblings(&tree_multi_threaded, &proof);
+        let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+            &tree_multi_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_multi_threaded.root())
-            .expect("PathSiblings verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_multi_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_multi_threaded.root()
+        );
     }
 
     #[test]
@@ -465,17 +477,23 @@ mod tests {
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_single_threaded
-            .path_builder()
-            .with_leaf_x_coord(6)
-            .build_using_single_threaded_algorithm(get_padding_function())
-            .expect("PathSiblings generation should have been successful");
+        let leaf_node = tree_single_threaded.get_leaf_node(6).unwrap();
 
-        check_path_siblings(&tree_single_threaded, &proof);
+        let siblings = PathSiblings::build_using_single_threaded_algorithm(
+            &tree_single_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_single_threaded.root())
-            .expect("PathSiblings verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_single_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_single_threaded.root()
+        );
     }
 
     #[test]
@@ -491,17 +509,23 @@ mod tests {
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_multi_threaded
-            .path_builder()
-            .with_leaf_x_coord(6)
-            .build_using_multi_threaded_algorithm(get_padding_function())
-            .expect("PathSiblings generation should have been successful");
+        let leaf_node = tree_multi_threaded.get_leaf_node(6).unwrap();
 
-        check_path_siblings(&tree_multi_threaded, &proof);
+        let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+            &tree_multi_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_multi_threaded.root())
-            .expect("PathSiblings verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_multi_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_multi_threaded.root()
+        );
     }
 
     #[test]
@@ -518,17 +542,23 @@ mod tests {
                 .build_using_single_threaded_algorithm(get_padding_function())
                 .unwrap();
 
-            let proof = tree_single_threaded
-                .path_builder()
-                .with_leaf_x_coord(i)
-                .build_using_single_threaded_algorithm(get_padding_function())
-                .expect("PathSiblings generation should have been successful");
+            let leaf_node = tree_single_threaded.get_leaf_node(i).unwrap();
 
-            check_path_siblings(&tree_single_threaded, &proof);
+            let siblings = PathSiblings::build_using_single_threaded_algorithm(
+                &tree_single_threaded,
+                &leaf_node,
+                get_padding_function(),
+            )
+            .expect("PathSiblings generation should have been successful");
 
-            proof
-                .verify(tree_single_threaded.root())
-                .expect("PathSiblings verification should have been successful");
+            assert_eq!(
+                siblings.len() as u8,
+                tree_single_threaded.height().as_y_coord()
+            );
+            assert_eq!(
+                &siblings.construct_root_node(&leaf_node).unwrap(),
+                tree_single_threaded.root()
+            );
         }
     }
 
@@ -536,8 +566,8 @@ mod tests {
     fn path_works_for_multi_leaf_multi_threaded() {
         let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(&height) {
-            let leaf_node = vec![single_leaf(i)];
+        for x_coord in 0..max_bottom_layer_nodes(&height) {
+            let leaf_node = vec![single_leaf(x_coord)];
 
             let tree_multi_threaded = TreeBuilder::new()
                 .with_height(height.clone())
@@ -546,17 +576,23 @@ mod tests {
                 .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
 
-            let proof = tree_multi_threaded
-                .path_builder()
-                .with_leaf_x_coord(i)
-                .build_using_multi_threaded_algorithm(get_padding_function())
-                .expect("PathSiblings generation should have been successful");
+            let leaf_node = tree_multi_threaded.get_leaf_node(x_coord).unwrap();
 
-            check_path_siblings(&tree_multi_threaded, &proof);
+            let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+                &tree_multi_threaded,
+                &leaf_node,
+                get_padding_function(),
+            )
+            .expect("PathSiblings build should have been successful");
 
-            proof
-                .verify(tree_multi_threaded.root())
-                .expect("PathSiblings verification should have been successful");
+            assert_eq!(
+                siblings.len() as u8,
+                tree_multi_threaded.height().as_y_coord()
+            );
+            assert_eq!(
+                &siblings.construct_root_node(&leaf_node).unwrap(),
+                tree_multi_threaded.root()
+            );
         }
     }
 }
