@@ -51,3 +51,29 @@ where
 
     tree
 }
+
+pub(crate) fn get_leaf_nodes(
+    num_leaves: usize,
+    height: Height,
+) -> Vec<InputLeafNode<BenchTestContent>> {
+    let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
+
+    assert!(
+        num_leaves <= max_bottom_layer_nodes,
+        "Number of leaves exceeds maximum bottom layer nodes"
+    );
+
+    let mut leaf_nodes: Vec<InputLeafNode<BenchTestContent>> = Vec::new();
+
+    for i in 0..num_leaves {
+        leaf_nodes.push(InputLeafNode::<BenchTestContent> {
+            x_coord: i as u64,
+            content: BenchTestContent {
+                hash: H256::random(),
+                value: i as u32,
+            },
+        });
+    }
+
+    leaf_nodes
+}
