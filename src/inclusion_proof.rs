@@ -107,7 +107,7 @@ impl InclusionProof {
         let tree_height = Height::from_y_coord(path_siblings.len() as u8);
         let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
-        let mut nodes_for_aggregation = path_siblings.build_path(leaf_node.clone())?;
+        let mut nodes_for_aggregation = path_siblings.construct_path(leaf_node.clone())?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
@@ -162,6 +162,8 @@ impl InclusionProof {
         // be more siblings than max(u8).
         let tree_height = Height::from_y_coord(self.path_siblings.len() as u8);
 
+        let hidden_leaf_node: Node<HiddenNodeContent> = self.leaf_node.clone().convert();
+
         {
             // Merkle tree path verification
 
@@ -172,6 +174,7 @@ impl InclusionProof {
             // make this whatever we like
             let dummy_commitment =
                 PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+
             let root = Node {
                 content: HiddenNodeContent::new(dummy_commitment, root_hash),
                 coord: Coordinate {
@@ -180,7 +183,13 @@ impl InclusionProof {
                 },
             };
 
-            self.path_siblings.verify(self.leaf_node.clone().convert(), &root)?;
+            let constructed_root = self
+                .path_siblings
+                .construct_root_node(&hidden_leaf_node)?;
+
+            if constructed_root != root {
+                return Err(InclusionProofError::RootMismatch);
+            }
         }
 
         {
@@ -190,7 +199,7 @@ impl InclusionProof {
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
                 .path_siblings
-                .build_path(self.leaf_node.clone().convert())?
+                .construct_path(hidden_leaf_node)?
                 .iter()
                 .map(|node| node.content.commitment.compress())
                 .collect();
@@ -260,6 +269,8 @@ impl InclusionProof {
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
     TreePathSiblingsError(#[from] crate::binary_tree::PathSiblingsError),
+    #[error("Calculated root content does not match provided root content")]
+    RootMismatch,
     #[error("Issues with range proof")]
     RangeProofError(#[from] RangeProofError),
     #[error("Error serializing/deserializing file")]
@@ -291,7 +302,7 @@ mod tests {
     use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
-    // Tree that is built, with path highlighted.
+    // The tree that is built, with path highlighted.
     ///////////////////////////////////////////////////////
     //    |                   [root]                     //
     //  3 |                     224                      //

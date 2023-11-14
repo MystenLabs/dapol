@@ -1,14 +1,18 @@
-//! PathSiblings [STENT TODO need to redo these docs] in a tree.
+//! Sibling nodes to the ones in a tree path.
 //!
 //! A path in a binary tree goes from a leaf node to the root node. For each
 //! node (starting from the leaf node) one follows the path by moving to the
 //! parent node; since the root node has no parent this is the end of the path.
-//!
 //! A path is uniquely determined by a leaf node. It can thus be referred to as
 //! the leaf node's path.
 //!
-//! The path is built using a builder pattern, which has 2 options in terms of
-//! algorithms: sequential and multi-threaded. If the tree store is full (i.e.
+//! [PathSiblings] contains all the nodes that are siblings to the ones in a
+//! path. This structure is used in inclusion proof generation & verification.
+//! One can construct a leaf node's path using the leaf node together with the
+//! path siblings. See [crate][InclusionProof] for more details.
+//!
+//! There are 2 different algorithms for constructing the sibling nodes:
+//! sequential and multi-threaded. If the tree store is full (i.e.
 //! every node that was used to construct the root node is in the store) then
 //! the 2 build algorithms are identical. The difference only comes in when the
 //! store is not full (which is useful to save on space) and some nodes need to
@@ -23,7 +27,7 @@ use crate::utils::Consume;
 use std::fmt::Debug;
 
 // -------------------------------------------------------------------------------------------------
-// Main struct.
+// Main struct and build functions.
 
 /// Contains all the information for a path in a [BinaryTree].
 ///
@@ -33,16 +37,6 @@ use std::fmt::Debug;
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PathSiblings<C>(Vec<Node<C>>);
-
-// -------------------------------------------------------------------------------------------------
-// Builder.
-
-/// A builder pattern is used to construct [PathSiblings].
-/// Since a path is uniquely determined by a leaf node all we need is the tree
-/// and the leaf node's x-coord.
-pub struct PathSiblingsBuilder<'a, C> {
-    tree: Option<&'a BinaryTree<C>>,
-}
 
 impl<C> PathSiblings<C> {
     /// High performance build algorithm utilizing parallelization.
@@ -184,7 +178,8 @@ impl<C> PathSiblings<C> {
     fn build<F>(
         tree: &BinaryTree<C>,
         leaf_node: &Node<C>,
-        node_builder: F) -> Result<PathSiblings<C>, PathSiblingsBuildError>
+        node_builder: F,
+    ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
         C: Debug + Clone,
         F: Fn(&Coordinate, &BinaryTree<C>) -> Node<C>,
@@ -212,41 +207,40 @@ impl<C> PathSiblings<C> {
 // Implementation.
 
 impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
-    // STENT TODO docs
+    /// Number of sibling nodes.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// Verify that the given list of sibling nodes + the base leaf node matches
-    /// the given root node.
-    ///
-    /// This is done by reconstructing each node in the path, from bottom layer
-    /// to the root, using the given leaf and sibling nodes, and then
-    /// comparing the resulting root node to the given root node.
+    /// Reconstructing each node in the path, from bottom layer
+    /// to the root, using the given leaf and sibling nodes.
     ///
     /// An error is returned if the number of siblings is less than the min
-    /// amount, or the constructed root node does not match the given one.
-    // STENT TODO add leaf as parameter, also change the name of this to something explaining that it is building the path
-    // in fact it's probably better to move the verify to InclusionProof because this function is basically the same as the below function
-    pub fn verify(&self, leaf: Node<C>, root: &Node<C>) -> Result<(), PathSiblingsError> {
+    /// amount.
+    pub fn construct_root_node(&self, leaf: &Node<C>) -> Result<Node<C>, PathSiblingsError> {
         use super::MIN_HEIGHT;
-
-        let mut parent = leaf;
 
         if self.len() < MIN_HEIGHT.as_usize() {
             return Err(PathSiblingsError::TooFewSiblings);
         }
 
-        for node in &self.0 {
+        let mut sibling_iterator = self.0.iter();
+        let pair = MatchedPairRef::new(
+            sibling_iterator
+                .next()
+                // We checked the length of the underlying vector above so this
+                // should never panic.
+                .expect("There should be at least 1 sibling node"),
+            leaf,
+        )?;
+        let mut parent = pair.merge();
+
+        for node in sibling_iterator {
             let pair = MatchedPairRef::new(node, &parent)?;
             parent = pair.merge();
         }
 
-        if parent == *root {
-            Ok(())
-        } else {
-            Err(PathSiblingsError::RootMismatch)
-        }
+        Ok(parent)
     }
 
     /// Return a vector containing only the nodes in the tree path.
@@ -256,7 +250,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
     /// returned path nodes is bottom first (leaf) and top last (root).
     ///
     /// An error is returned if the [PathSiblings] data is invalid.
-    pub fn build_path(&self, leaf: Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
+    pub fn construct_path(&self, leaf: Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
         // +1 because the root node is included in the returned vector
         let mut nodes = Vec::<Node<C>>::with_capacity(self.len() + 1);
 
@@ -306,8 +300,6 @@ pub enum PathSiblingsBuildError {
 
 #[derive(thiserror::Error, Debug)]
 pub enum PathSiblingsError {
-    #[error("Calculated root content does not match provided root content")]
-    RootMismatch,
     #[error("Provided node ({sibling_given:?}) is not a sibling of the calculated node ({node_that_needs_sibling:?})")]
     InvalidSibling {
         node_that_needs_sibling: Coordinate,
