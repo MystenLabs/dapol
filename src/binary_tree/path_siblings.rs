@@ -395,11 +395,6 @@ mod tests {
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
 
-    // STENT TODO change name of proof
-    fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &PathSiblings<TestContent>) {
-        assert_eq!(proof.len() as u8, tree.height().as_y_coord());
-    }
-
     #[test]
     fn path_works_for_full_base_layer_single_threaded() {
         let height = Height::from(8u8);

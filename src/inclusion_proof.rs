@@ -231,8 +231,6 @@ impl InclusionProof {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    // STENT TODO don't need entity_id as param, need to change Path to accept
-    // another generic type
     pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<(), InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');

@@ -299,7 +299,7 @@ impl<C> Node<C> {
         }
     }
 
-    // STENT TODO docs
+    /// Return reference to underlying coordinate.
     pub fn coord(&self) -> &Coordinate {
         &self.coord
     }
