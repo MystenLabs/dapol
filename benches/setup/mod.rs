@@ -4,6 +4,8 @@ use dapol::{Hasher, Height};
 use primitive_types::H256;
 use serde::Serialize;
 
+pub(crate) const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub(crate) struct BenchTestContent {
     pub value: u32,
