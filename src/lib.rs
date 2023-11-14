@@ -16,7 +16,7 @@ pub use accumulators::{
     Accumulator, AccumulatorError,
 };
 
-pub mod binary_tree;
+pub mod binary_tree; // TODO: maybe leave this as private in production 
 pub use binary_tree::Height;
 
 mod secret;
