@@ -1,14 +1,18 @@
-//! Path in a tree.
+//! Sibling nodes to the ones in a tree path.
 //!
 //! A path in a binary tree goes from a leaf node to the root node. For each
 //! node (starting from the leaf node) one follows the path by moving to the
 //! parent node; since the root node has no parent this is the end of the path.
-//!
 //! A path is uniquely determined by a leaf node. It can thus be referred to as
 //! the leaf node's path.
 //!
-//! The path is built using a builder pattern, which has 2 options in terms of
-//! algorithms: sequential and multi-threaded. If the tree store is full (i.e.
+//! [PathSiblings] contains all the nodes that are siblings to the ones in a
+//! path. This structure is used in inclusion proof generation & verification.
+//! One can construct a leaf node's path using the leaf node together with the
+//! path siblings. See [crate][InclusionProof] for more details.
+//!
+//! There are 2 different algorithms for constructing the sibling nodes:
+//! sequential and multi-threaded. If the tree store is full (i.e.
 //! every node that was used to construct the root node is in the store) then
 //! the 2 build algorithms are identical. The difference only comes in when the
 //! store is not full (which is useful to save on space) and some nodes need to
@@ -17,13 +21,13 @@
 //! [super][tree_builder][multi_threaded] and
 //! [super][tree_builder][single_threaded].
 
-use crate::utils::Consume;
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
+use crate::utils::Consume;
 
 use std::fmt::Debug;
 
 // -------------------------------------------------------------------------------------------------
-// Main struct.
+// Main struct and build functions.
 
 /// Contains all the information for a path in a [BinaryTree].
 ///
@@ -32,40 +36,9 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Path<C> {
-    pub leaf: Node<C>,
-    pub siblings: Vec<Node<C>>,
-}
+pub struct PathSiblings<C>(pub Vec<Node<C>>);
 
-// -------------------------------------------------------------------------------------------------
-// Builder.
-
-/// A builder pattern is used to construct [Path].
-/// Since a path is uniquely determined by a leaf node all we need is the tree
-/// and the leaf node's x-coord.
-pub struct PathBuilder<'a, C> {
-    tree: Option<&'a BinaryTree<C>>,
-    leaf_x_coord: Option<u64>,
-}
-
-impl<'a, C> PathBuilder<'a, C> {
-    pub fn new() -> Self {
-        PathBuilder {
-            tree: None,
-            leaf_x_coord: None,
-        }
-    }
-
-    pub fn with_tree(mut self, tree: &'a BinaryTree<C>) -> Self {
-        self.tree = Some(tree);
-        self
-    }
-
-    pub fn with_leaf_x_coord(mut self, leaf_x_coord: u64) -> Self {
-        self.leaf_x_coord = Some(leaf_x_coord);
-        self
-    }
-
+impl<C> PathSiblings<C> {
     /// High performance build algorithm utilizing parallelization.
     /// Uses the same code in [super][tree_builder][multi_threaded].
     ///
@@ -78,9 +51,10 @@ impl<'a, C> PathBuilder<'a, C> {
     /// This function defines a closure for building nodes that are not found
     /// in the store, which is then passed to [build].
     pub fn build_using_multi_threaded_algorithm<F>(
-        self,
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
         new_padding_node_content: F,
-    ) -> Result<Path<C>, PathBuildError>
+    ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
         C: Debug + Clone + Mergeable + Send + Sync + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
@@ -91,7 +65,7 @@ impl<'a, C> PathBuilder<'a, C> {
 
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
-        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+        let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
             let params = RecursionParams::from_coordinate(coord)
                 // We don't want to store anything because the store already exists
                 // inside the binary tree struct.
@@ -108,7 +82,6 @@ impl<'a, C> PathBuilder<'a, C> {
                 });
             }
 
-            // if coord.y == 1 {
             // If the above vector is empty then we know this node needs to be a
             // padding node.
             if leaf_nodes.is_empty() {
@@ -126,7 +99,7 @@ impl<'a, C> PathBuilder<'a, C> {
             )
         };
 
-        self.build(node_builder)
+        PathSiblings::build(tree, leaf_node, node_builder)
     }
 
     /// Sequential build algorithm.
@@ -138,16 +111,17 @@ impl<'a, C> PathBuilder<'a, C> {
     ///
     /// `new_padding_node_content` is needed to generate new nodes.
     pub fn build_using_single_threaded_algorithm<F>(
-        self,
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
         new_padding_node_content: F,
-    ) -> Result<Path<C>, PathBuildError>
+    ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
         C: Debug + Clone + Mergeable,
         F: Fn(&Coordinate) -> C,
     {
         use super::tree_builder::single_threaded::build_node;
 
-        let node_builder = |coord: &Coordinate, tree: &'a BinaryTree<C>| {
+        let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
             // We don't want to store anything because the store already exists
             // inside the binary tree struct.
             let store_depth = MIN_STORE_DEPTH;
@@ -187,7 +161,7 @@ impl<'a, C> PathBuilder<'a, C> {
             node
         };
 
-        self.build(node_builder)
+        PathSiblings::build(tree, leaf_node, node_builder)
     }
 
     /// Private build function that is to be called only by
@@ -196,30 +170,23 @@ impl<'a, C> PathBuilder<'a, C> {
     ///
     /// The path is traced from the leaf node to the root node. At every layer
     /// in the tree the sibling node is grabbed from the store (or generated if
-    /// it is not in the store) and added to the vector in [Path].
+    /// it is not in the store) and added to the vector in [PathSiblings].
     ///
     /// Since the store is expected to contain all non-padding leaf nodes an
     /// error will be returned if the leaf node at the given x-coord is not
     /// found in the store.
-    fn build<F>(self, node_builder: F) -> Result<Path<C>, PathBuildError>
+    fn build<F>(
+        tree: &BinaryTree<C>,
+        leaf_node: &Node<C>,
+        node_builder: F,
+    ) -> Result<PathSiblings<C>, PathSiblingsBuildError>
     where
         C: Debug + Clone,
-        F: Fn(&Coordinate, &'a BinaryTree<C>) -> Node<C>,
+        F: Fn(&Coordinate, &BinaryTree<C>) -> Node<C>,
     {
-        let tree = self.tree.ok_or(PathBuildError::NoTreeProvided)?;
-
-        let leaf_x_coord = self.leaf_x_coord.ok_or(PathBuildError::NoLeafProvided)?;
-        let leaf_coord = Coordinate::bottom_layer_leaf_from(leaf_x_coord);
-
-        let leaf =
-            tree.get_leaf_node(leaf_x_coord)
-                .ok_or_else(|| PathBuildError::LeafNodeNotFound {
-                    coord: leaf_coord.clone(),
-                })?;
-
         let mut siblings = Vec::with_capacity(tree.height().as_usize());
         let max_y_coord = tree.height().as_y_coord();
-        let mut current_coord = leaf_coord;
+        let mut current_coord = leaf_node.coord().clone();
 
         for _y in 0..max_y_coord {
             let sibling_coord = current_coord.sibling_coord();
@@ -232,72 +199,69 @@ impl<'a, C> PathBuilder<'a, C> {
             current_coord = current_coord.parent_coord();
         }
 
-        Ok(Path {
-            leaf: leaf.clone(),
-            siblings,
-        })
-    }
-}
-
-impl<C> BinaryTree<C> {
-    pub fn path_builder(&self) -> PathBuilder<C> {
-        PathBuilder::new().with_tree(self)
+        Ok(PathSiblings(siblings))
     }
 }
 
 // -------------------------------------------------------------------------------------------------
-// Path verification.
+// Implementation.
 
-impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
-    /// Verify that the given list of sibling nodes + the base leaf node matches
-    /// the given root node.
-    ///
-    /// This is done by reconstructing each node in the path, from bottom layer
-    /// to the root, using the given leaf and sibling nodes, and then
-    /// comparing the resulting root node to the given root node.
+impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
+    /// Number of sibling nodes.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Reconstructing each node in the path, from bottom layer
+    /// to the root, using the given leaf and sibling nodes.
     ///
     /// An error is returned if the number of siblings is less than the min
-    /// amount, or the constructed root node does not match the given one.
-    pub fn verify(&self, root: &Node<C>) -> Result<(), PathError> {
+    /// amount.
+    pub fn construct_root_node(&self, leaf: &Node<C>) -> Result<Node<C>, PathSiblingsError> {
         use super::MIN_HEIGHT;
 
-        let mut parent = self.leaf.clone();
-
-        if self.siblings.len() < MIN_HEIGHT.as_usize() {
-            return Err(PathError::TooFewSiblings);
+        if self.len() < MIN_HEIGHT.as_usize() {
+            return Err(PathSiblingsError::TooFewSiblings);
         }
 
-        for node in &self.siblings {
-            let pair = MatchedPairRef::new(node, &parent)?;
+        let mut sibling_iterator = self.0.iter();
+        let pair = MatchedPairRef::from(
+            sibling_iterator
+                .next()
+                // We checked the length of the underlying vector above so this
+                // should never panic.
+                .expect("There should be at least 1 sibling node"),
+            leaf,
+        )?;
+        let mut parent = pair.merge();
+
+        for node in sibling_iterator {
+            let pair = MatchedPairRef::from(node, &parent)?;
             parent = pair.merge();
         }
 
-        if parent == *root {
-            Ok(())
-        } else {
-            Err(PathError::RootMismatch)
-        }
+        Ok(parent)
     }
 
     /// Return a vector containing only the nodes in the tree path.
     ///
     /// The path nodes have to be constructed using the leaf & sibling nodes in
-    /// [Path] because they are not stored explicitly. The order of the
+    /// [PathSiblings] because they are not stored explicitly. The order of the
     /// returned path nodes is bottom first (leaf) and top last (root).
     ///
-    /// An error is returned if the [Path] data is invalid.
-    pub fn nodes_from_bottom_to_top(&self) -> Result<Vec<Node<C>>, PathError> {
+    /// An error is returned if the [PathSiblings] data is invalid.
+    pub fn construct_path(&self, leaf: Node<C>) -> Result<Vec<Node<C>>, PathSiblingsError> {
         // +1 because the root node is included in the returned vector
-        let mut nodes = Vec::<Node<C>>::with_capacity(self.siblings.len() + 1);
+        let mut nodes = Vec::<Node<C>>::with_capacity(self.len() + 1);
 
-        nodes.push(self.leaf.clone());
+        nodes.push(leaf);
 
-        for node in &self.siblings {
+        for node in &self.0 {
             // this should never panic because we pushed the leaf node before the loop
             let parent = nodes
                 .last()
                 .expect("[Bug in path generation] Empty node vector");
-            let pair = MatchedPairRef::new(node, parent)?;
+            let pair = MatchedPairRef::from(node, parent)?;
             nodes.push(pair.merge());
         }
 
@@ -306,31 +270,24 @@ impl<C: Debug + Clone + Mergeable + PartialEq> Path<C> {
 }
 
 // -------------------------------------------------------------------------------------------------
-// Path conversion.
+// PathSiblings conversion.
 
-impl<C> Path<C> {
-    /// Convert `Path<C>` to `Path<D>`.
+impl<C> PathSiblings<C> {
+    /// Convert `PathSiblings<C>` to `PathSiblings<D>`.
     ///
     /// `convert` is called on each of the sibling nodes & leaf node.
-    pub fn convert<B: From<C>>(self) -> Path<B> {
-        Path {
-            siblings: self
-                .siblings
-                .into_iter()
-                .map(|node| node.convert())
-                .collect(),
-            leaf: self.leaf.convert(),
-        }
+    pub fn convert<B: From<C>>(self) -> PathSiblings<B> {
+        PathSiblings(self.0.into_iter().map(|node| node.convert()).collect())
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(thiserror::Error, Debug)]
-pub enum PathBuildError {
+pub enum PathSiblingsBuildError {
     #[error("The builder must be given a padding node generator function before building")]
     NoPaddingNodeContentGeneratorProvided,
     #[error("The builder must be given a tree before building")]
@@ -342,9 +299,7 @@ pub enum PathBuildError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum PathError {
-    #[error("Calculated root content does not match provided root content")]
-    RootMismatch,
+pub enum PathSiblingsError {
     #[error("Provided node ({sibling_given:?}) is not a sibling of the calculated node ({node_that_needs_sibling:?})")]
     InvalidSibling {
         node_that_needs_sibling: Coordinate,
@@ -399,7 +354,7 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
     /// Construct a [MatchedPairRef] using the 2 given nodes.
     /// Only build the pair if the 2 nodes are siblings, otherwise return an
     /// error.
-    fn new(left: &'a Node<C>, right: &'a Node<C>) -> Result<Self, PathError>
+    fn from(left: &'a Node<C>, right: &'a Node<C>) -> Result<Self, PathSiblingsError>
     where
         C: Clone,
     {
@@ -414,7 +369,7 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
                 right: RightSiblingRef(left),
             })
         } else {
-            Err(PathError::InvalidSibling {
+            Err(PathSiblingsError::InvalidSibling {
                 node_that_needs_sibling: right.coord.clone(),
                 sibling_given: left.coord.clone(),
             })
@@ -440,10 +395,6 @@ mod tests {
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
     };
 
-    fn check_path_siblings(tree: &BinaryTree<TestContent>, proof: &Path<TestContent>) {
-        assert_eq!(proof.siblings.len() as u8, tree.height().as_y_coord());
-    }
-
     #[test]
     fn path_works_for_full_base_layer_single_threaded() {
         let height = Height::from(8u8);
@@ -457,17 +408,23 @@ mod tests {
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_single_threaded
-            .path_builder()
-            .with_leaf_x_coord(10)
-            .build_using_single_threaded_algorithm(get_padding_function())
-            .expect("Path generation should have been successful");
+        let leaf_node = tree_single_threaded.get_leaf_node(10).unwrap();
 
-        check_path_siblings(&tree_single_threaded, &proof);
+        let siblings = PathSiblings::build_using_single_threaded_algorithm(
+            &tree_single_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_single_threaded.root())
-            .expect("Path verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_single_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_single_threaded.root()
+        );
     }
 
     #[test]
@@ -483,17 +440,23 @@ mod tests {
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_multi_threaded
-            .path_builder()
-            .with_leaf_x_coord(10)
-            .build_using_multi_threaded_algorithm(get_padding_function())
-            .expect("Path generation should have been successful");
+        let leaf_node = tree_multi_threaded.get_leaf_node(10).unwrap();
 
-        check_path_siblings(&tree_multi_threaded, &proof);
+        let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+            &tree_multi_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_multi_threaded.root())
-            .expect("Path verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_multi_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_multi_threaded.root()
+        );
     }
 
     #[test]
@@ -509,17 +472,23 @@ mod tests {
             .build_using_single_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_single_threaded
-            .path_builder()
-            .with_leaf_x_coord(6)
-            .build_using_single_threaded_algorithm(get_padding_function())
-            .expect("Path generation should have been successful");
+        let leaf_node = tree_single_threaded.get_leaf_node(6).unwrap();
 
-        check_path_siblings(&tree_single_threaded, &proof);
+        let siblings = PathSiblings::build_using_single_threaded_algorithm(
+            &tree_single_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_single_threaded.root())
-            .expect("Path verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_single_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_single_threaded.root()
+        );
     }
 
     #[test]
@@ -535,17 +504,23 @@ mod tests {
             .build_using_multi_threaded_algorithm(get_padding_function())
             .unwrap();
 
-        let proof = tree_multi_threaded
-            .path_builder()
-            .with_leaf_x_coord(6)
-            .build_using_multi_threaded_algorithm(get_padding_function())
-            .expect("Path generation should have been successful");
+        let leaf_node = tree_multi_threaded.get_leaf_node(6).unwrap();
 
-        check_path_siblings(&tree_multi_threaded, &proof);
+        let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+            &tree_multi_threaded,
+            &leaf_node,
+            get_padding_function(),
+        )
+        .expect("PathSiblings generation should have been successful");
 
-        proof
-            .verify(tree_multi_threaded.root())
-            .expect("Path verification should have been successful");
+        assert_eq!(
+            siblings.len() as u8,
+            tree_multi_threaded.height().as_y_coord()
+        );
+        assert_eq!(
+            &siblings.construct_root_node(&leaf_node).unwrap(),
+            tree_multi_threaded.root()
+        );
     }
 
     #[test]
@@ -562,17 +537,23 @@ mod tests {
                 .build_using_single_threaded_algorithm(get_padding_function())
                 .unwrap();
 
-            let proof = tree_single_threaded
-                .path_builder()
-                .with_leaf_x_coord(i)
-                .build_using_single_threaded_algorithm(get_padding_function())
-                .expect("Path generation should have been successful");
+            let leaf_node = tree_single_threaded.get_leaf_node(i).unwrap();
 
-            check_path_siblings(&tree_single_threaded, &proof);
+            let siblings = PathSiblings::build_using_single_threaded_algorithm(
+                &tree_single_threaded,
+                &leaf_node,
+                get_padding_function(),
+            )
+            .expect("PathSiblings generation should have been successful");
 
-            proof
-                .verify(tree_single_threaded.root())
-                .expect("Path verification should have been successful");
+            assert_eq!(
+                siblings.len() as u8,
+                tree_single_threaded.height().as_y_coord()
+            );
+            assert_eq!(
+                &siblings.construct_root_node(&leaf_node).unwrap(),
+                tree_single_threaded.root()
+            );
         }
     }
 
@@ -580,8 +561,8 @@ mod tests {
     fn path_works_for_multi_leaf_multi_threaded() {
         let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(&height) {
-            let leaf_node = vec![single_leaf(i)];
+        for x_coord in 0..max_bottom_layer_nodes(&height) {
+            let leaf_node = vec![single_leaf(x_coord)];
 
             let tree_multi_threaded = TreeBuilder::new()
                 .with_height(height.clone())
@@ -590,17 +571,23 @@ mod tests {
                 .build_using_multi_threaded_algorithm(get_padding_function())
                 .unwrap();
 
-            let proof = tree_multi_threaded
-                .path_builder()
-                .with_leaf_x_coord(i)
-                .build_using_multi_threaded_algorithm(get_padding_function())
-                .expect("Path generation should have been successful");
+            let leaf_node = tree_multi_threaded.get_leaf_node(x_coord).unwrap();
 
-            check_path_siblings(&tree_multi_threaded, &proof);
+            let siblings = PathSiblings::build_using_multi_threaded_algorithm(
+                &tree_multi_threaded,
+                &leaf_node,
+                get_padding_function(),
+            )
+            .expect("PathSiblings build should have been successful");
 
-            proof
-                .verify(tree_multi_threaded.root())
-                .expect("Path verification should have been successful");
+            assert_eq!(
+                siblings.len() as u8,
+                tree_multi_threaded.height().as_y_coord()
+            );
+            assert_eq!(
+                &siblings.construct_root_node(&leaf_node).unwrap(),
+                tree_multi_threaded.root()
+            );
         }
     }
 }

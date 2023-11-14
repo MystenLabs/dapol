@@ -20,7 +20,7 @@ use std::fmt::Debug;
 
 use log::warn;
 use logging_timer::stime;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::binary_tree::max_bottom_layer_nodes;
 
@@ -51,7 +51,7 @@ pub fn build_tree<C, F>(
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
     C: Debug + Clone + Mergeable + 'static, /* This static is needed for the boxed
-                                                         * hashmap. */
+                                             * hashmap. */
     F: Fn(&Coordinate) -> C,
 {
     use super::verify_no_duplicate_leaves;
@@ -126,15 +126,15 @@ impl<C> MaybeUnmatchedPair<C> {
         F: Fn(&Coordinate) -> C,
     {
         match (self.left, self.right) {
-            (Some(left), Some(right)) => MatchedPair { left, right },
-            (Some(left), None) => MatchedPair {
-                right: left.new_sibling_padding_node(new_padding_node_content),
+            (Some(left), Some(right)) => MatchedPair::from(left, right),
+            (Some(left), None) => MatchedPair::from(
+                left.new_sibling_padding_node(new_padding_node_content),
                 left,
-            },
-            (None, Some(right)) => MatchedPair {
-                left: right.new_sibling_padding_node(new_padding_node_content),
+            ),
+            (None, Some(right)) => MatchedPair::from(
+                right.new_sibling_padding_node(new_padding_node_content),
                 right,
-            },
+            ),
             (None, None) => {
                 panic!("{} Invalid pair (None, None) found", BUG)
             }
@@ -446,10 +446,12 @@ mod tests {
             .unwrap();
 
         for leaf in leaf_nodes {
-            tree.get_leaf_node(leaf.x_coord).unwrap_or_else(|| panic!(
-                "Leaf node at x-coord {} is not present in the store",
-                leaf.x_coord
-            ));
+            tree.get_leaf_node(leaf.x_coord).unwrap_or_else(|| {
+                panic!(
+                    "Leaf node at x-coord {} is not present in the store",
+                    leaf.x_coord
+                )
+            });
         }
     }
 

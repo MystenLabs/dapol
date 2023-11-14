@@ -44,7 +44,7 @@ use std::{fmt::Debug, path::PathBuf};
 
 use log::info;
 
-use crate::binary_tree::{Coordinate, Height, Node, Path};
+use crate::binary_tree::{Coordinate, Height, Node, PathSiblings};
 use crate::node_content::{FullNodeContent, HiddenNodeContent};
 use crate::{read_write_utils, EntityId};
 
@@ -70,7 +70,8 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
-    path: Path<HiddenNodeContent>,
+    path_siblings: PathSiblings<HiddenNodeContent>,
+    leaf_node: Node<FullNodeContent>,
     individual_range_proofs: Option<Vec<IndividualRangeProof>>,
     aggregated_range_proof: Option<AggregatedRangeProof>,
     aggregation_factor: AggregationFactor,
@@ -93,7 +94,8 @@ impl InclusionProof {
     /// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
     /// an Err.
     pub fn generate(
-        path: Path<FullNodeContent>,
+        leaf_node: Node<FullNodeContent>,
+        path_siblings: PathSiblings<FullNodeContent>,
         aggregation_factor: AggregationFactor,
         upper_bound_bit_length: u8,
     ) -> Result<Self, InclusionProofError> {
@@ -102,10 +104,10 @@ impl InclusionProof {
         // be more siblings than max(u8). TODO might be worth using a bounded
         // vector for siblings. If the tree height changes type for some
         // reason then this code would fail silently.
-        let tree_height = Height::from_y_coord(path.siblings.len() as u8);
+        let tree_height = Height::from_y_coord(path_siblings.len() as u8);
         let aggregation_index = aggregation_factor.apply_to(&tree_height);
 
-        let mut nodes_for_aggregation = path.nodes_from_bottom_to_top()?;
+        let mut nodes_for_aggregation = path_siblings.construct_path(leaf_node.clone())?;
         let nodes_for_individual_proofs =
             nodes_for_aggregation.split_off(aggregation_index as usize);
 
@@ -140,7 +142,8 @@ impl InclusionProof {
         };
 
         Ok(InclusionProof {
-            path: path.convert(),
+            path_siblings: path_siblings.convert(),
+            leaf_node,
             individual_range_proofs,
             aggregated_range_proof,
             aggregation_factor,
@@ -157,7 +160,9 @@ impl InclusionProof {
         // Is this cast safe? Yes because the tree height (which is the same as the
         // length of the input) is also stored as a u8, and so there would never
         // be more siblings than max(u8).
-        let tree_height = Height::from_y_coord(self.path.siblings.len() as u8);
+        let tree_height = Height::from_y_coord(self.path_siblings.len() as u8);
+
+        let hidden_leaf_node: Node<HiddenNodeContent> = self.leaf_node.clone().convert();
 
         {
             // Merkle tree path verification
@@ -169,6 +174,7 @@ impl InclusionProof {
             // make this whatever we like
             let dummy_commitment =
                 PedersenGens::default().commit(Scalar::from(0u8), Scalar::from(0u8));
+
             let root = Node {
                 content: HiddenNodeContent::new(dummy_commitment, root_hash),
                 coord: Coordinate {
@@ -177,7 +183,11 @@ impl InclusionProof {
                 },
             };
 
-            self.path.verify(&root)?;
+            let constructed_root = self.path_siblings.construct_root_node(&hidden_leaf_node)?;
+
+            if constructed_root != root {
+                return Err(InclusionProofError::RootMismatch);
+            }
         }
 
         {
@@ -186,8 +196,8 @@ impl InclusionProof {
             let aggregation_index = self.aggregation_factor.apply_to(&tree_height) as usize;
 
             let mut commitments_for_aggregated_proofs: Vec<CompressedRistretto> = self
-                .path
-                .nodes_from_bottom_to_top()?
+                .path_siblings
+                .construct_path(hidden_leaf_node)?
                 .iter()
                 .map(|node| node.content.commitment.compress())
                 .collect();
@@ -221,8 +231,6 @@ impl InclusionProof {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    // STENT TODO don't need entity_id as param, need to change Path to accept
-    // another generic type
     pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<(), InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');
@@ -256,7 +264,9 @@ impl InclusionProof {
 #[derive(thiserror::Error, Debug)]
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]
-    TreePathError(#[from] crate::binary_tree::PathError),
+    TreePathSiblingsError(#[from] crate::binary_tree::PathSiblingsError),
+    #[error("Calculated root content does not match provided root content")]
+    RootMismatch,
     #[error("Issues with range proof")]
     RangeProofError(#[from] RangeProofError),
     #[error("Error serializing/deserializing file")]
@@ -288,7 +298,7 @@ mod tests {
     use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
     use primitive_types::H256;
 
-    // Tree that is built, with path highlighted.
+    // The tree that is built, with path highlighted.
     ///////////////////////////////////////////////////////
     //    |                   [root]                     //
     //  3 |                     224                      //
@@ -318,7 +328,12 @@ mod tests {
     //  x| 0     1     2     3     4     5     6     7   //
     //                                                   //
     ///////////////////////////////////////////////////////
-    fn build_test_path() -> (Path<FullNodeContent>, RistrettoPoint, H256) {
+    fn build_test_path() -> (
+        Node<FullNodeContent>,
+        PathSiblings<FullNodeContent>,
+        RistrettoPoint,
+        H256,
+    ) {
         // leaf at (2,0)
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
@@ -392,10 +407,8 @@ mod tests {
         );
 
         (
-            Path {
-                siblings: vec![sibling1, sibling2, sibling3],
-                leaf,
-            },
+            leaf,
+            PathSiblings(vec![sibling1, sibling2, sibling3]),
             root_commitment,
             root_hash,
         )
@@ -428,8 +441,8 @@ mod tests {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
 
-        let (path, _, _) = build_test_path();
-        InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+        let (leaf, path, _, _) = build_test_path();
+        InclusionProof::generate(leaf, path, aggregation_factor, upper_bound_bit_length).unwrap();
     }
 
     #[test]
@@ -437,10 +450,12 @@ mod tests {
         let aggregation_factor = AggregationFactor::Divisor(2u8);
         let upper_bound_bit_length = 64u8;
 
-        let (path, _root_commitment, root_hash) = build_test_path();
+        let (leaf, path, _root_commitment, root_hash) = build_test_path();
 
         let proof =
-            InclusionProof::generate(path, aggregation_factor, upper_bound_bit_length).unwrap();
+            InclusionProof::generate(leaf, path, aggregation_factor, upper_bound_bit_length)
+                .unwrap();
+
         proof.verify(root_hash).unwrap();
     }
 

@@ -5,12 +5,12 @@
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::{ristretto::RistrettoPoint, scalar::Scalar};
 use primitive_types::H256;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::secret::Secret;
 use crate::entity::EntityId;
 use crate::hasher::Hasher;
+use crate::secret::Secret;
 
 use super::FullNodeContent;
 
@@ -33,10 +33,7 @@ impl PartialEq for HiddenNodeContent {
 impl HiddenNodeContent {
     /// Simple constructor
     pub fn new(commitment: RistrettoPoint, hash: H256) -> Self {
-        HiddenNodeContent {
-            commitment,
-            hash,
-        }
+        HiddenNodeContent { commitment, hash }
     }
 
     /// Create the content for a leaf node.
@@ -71,10 +68,7 @@ impl HiddenNodeContent {
         hasher.update(&entity_salt_bytes);
         let hash = hasher.finalize();
 
-        HiddenNodeContent {
-            commitment,
-            hash,
-        }
+        HiddenNodeContent { commitment, hash }
     }
 
     /// Create the content for a new padding node.
@@ -98,10 +92,7 @@ impl HiddenNodeContent {
         hasher.update(&salt_bytes);
         let hash = hasher.finalize();
 
-        HiddenNodeContent {
-            commitment,
-            hash,
-        }
+        HiddenNodeContent { commitment, hash }
     }
 }
 
@@ -159,12 +150,7 @@ mod tests {
         let entity_id = EntityId::from_str("some entity").unwrap();
         let entity_salt = 13u64.into();
 
-        HiddenNodeContent::new_leaf(
-            liability,
-            blinding_factor,
-            entity_id,
-            entity_salt,
-        );
+        HiddenNodeContent::new_leaf(liability, blinding_factor, entity_id, entity_salt);
     }
 
     #[test]
@@ -182,23 +168,15 @@ mod tests {
         let blinding_factor_1 = 7u64.into();
         let entity_id_1 = EntityId::from_str("some entity 1").unwrap();
         let entity_salt_1 = 13u64.into();
-        let node_1 = HiddenNodeContent::new_leaf(
-            liability_1,
-            blinding_factor_1,
-            entity_id_1,
-            entity_salt_1,
-        );
+        let node_1 =
+            HiddenNodeContent::new_leaf(liability_1, blinding_factor_1, entity_id_1, entity_salt_1);
 
         let liability_2 = 21u64;
         let blinding_factor_2 = 27u64.into();
         let entity_id_2 = EntityId::from_str("some entity 2").unwrap();
         let entity_salt_2 = 23u64.into();
-        let node_2 = HiddenNodeContent::new_leaf(
-            liability_2,
-            blinding_factor_2,
-            entity_id_2,
-            entity_salt_2,
-        );
+        let node_2 =
+            HiddenNodeContent::new_leaf(liability_2, blinding_factor_2, entity_id_2, entity_salt_2);
 
         HiddenNodeContent::merge(&node_1, &node_2);
     }
