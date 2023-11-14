@@ -16,7 +16,7 @@
 //!
 //! # Path to the secrets file.
 //! # If not present the secrets will be generated randomly.
-//! secrets_file_path = "./examples/secrets_example.toml"
+//! secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
 //!
 //! # At least one of file_path & generate_random must be present.
 //! # If both are given then file_path is prioritized.
@@ -42,7 +42,7 @@
 //!
 //! let config = NdmSmtConfigBuilder::default()
 //!     .height(height)
-//!     .secrets_file_path(PathBuf::from("./examples/secrets_example.toml"))
+//!     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
 //!     .entities_path(PathBuf::from("./examples/entities_example.csv"))
 //!     .build()
 //!     .unwrap();
@@ -172,7 +172,7 @@ mod tests {
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
-        let secrets_file_path = resources_dir.join("secrets_example.toml");
+        let secrets_file_path = resources_dir.join("ndm_smt_secrets_example.toml");
         let entities_file_path = resources_dir.join("entities_example.csv");
 
         let entities_file = File::open(entities_file_path.clone()).unwrap();
@@ -200,7 +200,7 @@ mod tests {
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
-        let secrets_file = resources_dir.join("secrets_example.toml");
+        let secrets_file = resources_dir.join("ndm_smt_secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
             .height(height.clone())
@@ -221,7 +221,7 @@ mod tests {
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
-        let secrets_file = resources_dir.join("secrets_example.toml");
+        let secrets_file = resources_dir.join("ndm_smt_secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
             .secrets_file_path(secrets_file)

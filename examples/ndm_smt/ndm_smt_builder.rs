@@ -6,7 +6,7 @@ pub fn build_ndm_smt_using_builder_pattern() -> dapol::NdmSmt {
     let src_dir = env!("CARGO_MANIFEST_DIR");
     let resources_dir = Path::new(&src_dir).join("examples");
 
-    let secrets_file = resources_dir.join("secrets_example.toml");
+    let secrets_file = resources_dir.join("ndm_smt_secrets_example.toml");
     let entities_file = resources_dir.join("entities_example.csv");
 
     let height = dapol::Height::from(16);

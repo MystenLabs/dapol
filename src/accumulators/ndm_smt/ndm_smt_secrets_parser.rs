@@ -135,7 +135,7 @@ mod tests {
     fn parser_toml_file_happy_case() {
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
-        let path = resources_dir.join("secrets_example.toml");
+        let path = resources_dir.join("ndm_smt_secrets_example.toml");
 
         let secrets = NdmSmtSecretsParser::from_path(path).parse().unwrap();
 

@@ -8,21 +8,13 @@ use primitive_types::H256;
 use serde::{Serialize, Deserialize};
 
 use crate::binary_tree::{Coordinate, Mergeable};
-use crate::utils::H256Finalizable;
 use crate::secret::Secret;
 use crate::entity::EntityId;
+use crate::hasher::Hasher;
 
 use super::FullNodeContent;
 
-// Hash function used in the merge function.
-type Hash = blake3::Hasher;
-
 /// Main struct containing the Pedersen commitment & hash.
-///
-/// The hash function needs to be a generic parameter because when implementing
-/// [crate][binary_tree][`Mergeable`] one needs to define the merge function,
-/// and the merge function in this case needs to use a generic hash function. One way to
-/// solve this is to have a generic parameter on this struct and a phantom field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct HiddenNodeContent {
     pub commitment: RistrettoPoint,
@@ -73,11 +65,11 @@ impl HiddenNodeContent {
         let entity_salt_bytes: [u8; 32] = entity_salt.into();
 
         // Compute the hash: `H("leaf" | entity_id | entity_salt)`
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("leaf".as_bytes());
         hasher.update(&entity_id_bytes);
         hasher.update(&entity_salt_bytes);
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
 
         HiddenNodeContent {
             commitment,
@@ -100,11 +92,11 @@ impl HiddenNodeContent {
         let salt_bytes: [u8; 32] = salt.into();
 
         // Compute the hash: `H("pad" | coordinate | salt)`
-        let mut hasher = Hash::new();
+        let mut hasher = Hasher::new();
         hasher.update("pad".as_bytes());
         hasher.update(&coord.as_bytes());
         hasher.update(&salt_bytes);
-        let hash = hasher.finalize_as_h256();
+        let hash = hasher.finalize();
 
         HiddenNodeContent {
             commitment,
@@ -135,12 +127,12 @@ impl Mergeable for HiddenNodeContent {
 
         // `hash = H(left.com | right.com | left.hash | right.hash`
         let parent_hash = {
-            let mut hasher = Hash::new();
+            let mut hasher = Hasher::new();
             hasher.update(left_sibling.commitment.compress().as_bytes());
             hasher.update(right_sibling.commitment.compress().as_bytes());
             hasher.update(left_sibling.hash.as_bytes());
             hasher.update(right_sibling.hash.as_bytes());
-            hasher.finalize_as_h256()
+            hasher.finalize()
         };
 
         HiddenNodeContent {

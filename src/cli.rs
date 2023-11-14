@@ -220,7 +220,7 @@ height = 16
 
 # Path to the secrets file.
 # If not present the secrets will be generated randomly.
-secrets_file_path = \"./examples/secrets_example.toml\"
+secrets_file_path = \"./examples/ndm_smt_secrets_example.toml\"
 
 # Can be a file or directory (default file name given in this case)
 # If not present then no serialization is done.

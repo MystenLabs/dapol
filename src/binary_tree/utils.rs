@@ -18,21 +18,12 @@ pub fn max_bottom_layer_nodes(height: &Height) -> u64 {
 pub mod test_utils {
     use super::super::*;
     use primitive_types::H256;
+    use crate::hasher::Hasher;
 
     #[derive(Clone, Debug, PartialEq, Serialize)]
     pub struct TestContent {
         pub value: u32,
         pub hash: H256,
-    }
-
-    pub trait H256Finalizable {
-        fn finalize_as_h256(&self) -> H256;
-    }
-
-    impl H256Finalizable for blake3::Hasher {
-        fn finalize_as_h256(&self) -> H256 {
-            H256(*self.finalize().as_bytes())
-        }
     }
 
     impl Mergeable for TestContent {
@@ -42,12 +33,12 @@ pub mod test_utils {
 
             // H(parent) = Hash(C(L) | C(R) | H(L) | H(R))
             let parent_hash = {
-                let mut hasher = blake3::Hasher::new();
+                let mut hasher = Hasher::new();
                 hasher.update(&left_sibling.value.to_le_bytes());
                 hasher.update(&right_sibling.value.to_le_bytes());
                 hasher.update(left_sibling.hash.as_bytes());
                 hasher.update(right_sibling.hash.as_bytes());
-                hasher.finalize_as_h256()
+                hasher.finalize()
             };
 
             TestContent {
