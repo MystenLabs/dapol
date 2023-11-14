@@ -37,7 +37,6 @@ impl Mergeable for BenchTestContent {
 pub(crate) fn build_tree<F>(
     height: Height,
     leaf_nodes: Vec<InputLeafNode<BenchTestContent>>,
-    // padding_node_content: impl Fn(&Coordinate) -> BenchTestContent + Send + Sync + 'static,
 ) -> BinaryTree<BenchTestContent> {
     let builder = TreeBuilder::<BenchTestContent>::new()
         .with_height(height)
