@@ -5,6 +5,15 @@ use primitive_types::H256;
 use serde::Serialize;
 
 pub(crate) const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
+pub(crate) const NUM_USERS: (u32, u32, u32, [u32; 5], [u32; 5], [u32; 5], [u32; 5]) = (
+    250_000_000,
+    125_000_000,
+    100_000_000,
+    [10_000_000, 20_000_000, 40_000_000, 60_000_000, 80_000_000],
+    [1_000_000, 2_000_000, 4_000_000, 6_000_000, 8_000_000],
+    [100_000, 200_000, 400_000, 600_000, 800_000],
+    [10_000, 20_000, 40_000, 60_000, 80_000],
+);
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub(crate) struct BenchTestContent {
