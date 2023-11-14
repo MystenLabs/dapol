@@ -1,8 +1,11 @@
-use core::fmt::Debug;
 use dapol::binary_tree::{BinaryTree, Coordinate, InputLeafNode, Mergeable, TreeBuilder};
 use dapol::{Hasher, Height};
+
+use log::error;
 use primitive_types::H256;
 use serde::Serialize;
+
+use core::fmt::Debug;
 
 pub(crate) const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
 pub(crate) const NUM_USERS: (u32, u32, u32, [u32; 5], [u32; 5], [u32; 5], [u32; 5]) = (
@@ -14,6 +17,20 @@ pub(crate) const NUM_USERS: (u32, u32, u32, [u32; 5], [u32; 5], [u32; 5], [u32; 
     [100_000, 200_000, 400_000, 600_000, 800_000],
     [10_000, 20_000, 40_000, 60_000, 80_000],
 );
+
+// This is used to determine the number of threads to spawn in the
+// multi-threaded builder.
+pub(crate) fn MAX_THREAD_COUNT() -> Option<u8> {
+    dapol::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+        *opt.borrow_mut() = std::thread::available_parallelism()
+            .map_err(|err| {
+                error!("Problem accessing machine parallelism: {}", err);
+                err
+            })
+            .map_or(None, |par| Some(par.get() as u8));
+        opt.clone().into_inner()
+    })
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub(crate) struct BenchTestContent {
