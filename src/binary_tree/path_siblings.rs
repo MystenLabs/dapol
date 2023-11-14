@@ -36,7 +36,7 @@ use std::fmt::Debug;
 /// (last, not included). The leaf node + the siblings can be used to
 /// reconstruct the actual nodes in the path as well as the root node.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PathSiblings<C>(Vec<Node<C>>);
+pub struct PathSiblings<C>(pub Vec<Node<C>>);
 
 impl<C> PathSiblings<C> {
     /// High performance build algorithm utilizing parallelization.
@@ -225,7 +225,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
         }
 
         let mut sibling_iterator = self.0.iter();
-        let pair = MatchedPairRef::new(
+        let pair = MatchedPairRef::from(
             sibling_iterator
                 .next()
                 // We checked the length of the underlying vector above so this
@@ -236,7 +236,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
         let mut parent = pair.merge();
 
         for node in sibling_iterator {
-            let pair = MatchedPairRef::new(node, &parent)?;
+            let pair = MatchedPairRef::from(node, &parent)?;
             parent = pair.merge();
         }
 
@@ -261,7 +261,7 @@ impl<C: Debug + Clone + Mergeable + PartialEq> PathSiblings<C> {
             let parent = nodes
                 .last()
                 .expect("[Bug in path generation] Empty node vector");
-            let pair = MatchedPairRef::new(node, parent)?;
+            let pair = MatchedPairRef::from(node, parent)?;
             nodes.push(pair.merge());
         }
 
@@ -354,7 +354,7 @@ impl<'a, C: Mergeable> MatchedPairRef<'a, C> {
     /// Construct a [MatchedPairRef] using the 2 given nodes.
     /// Only build the pair if the 2 nodes are siblings, otherwise return an
     /// error.
-    fn new(left: &'a Node<C>, right: &'a Node<C>) -> Result<Self, PathSiblingsError>
+    fn from(left: &'a Node<C>, right: &'a Node<C>) -> Result<Self, PathSiblingsError>
     where
         C: Clone,
     {

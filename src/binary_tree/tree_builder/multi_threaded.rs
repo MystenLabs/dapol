@@ -191,31 +191,15 @@ impl<C: Mergeable> MatchedPair<C> {
     {
         let sibling = Sibling::from_node(node);
         match sibling {
-            Sibling::Left(left) => MatchedPair {
-                right: left.new_sibling_padding_node_arc(new_padding_node_content),
+            Sibling::Left(left) => MatchedPair::from(
+                left.new_sibling_padding_node_arc(new_padding_node_content),
                 left,
-            },
-            Sibling::Right(right) => MatchedPair {
-                left: right.new_sibling_padding_node_arc(new_padding_node_content),
+            ),
+            Sibling::Right(right) => MatchedPair::from(
+                right.new_sibling_padding_node_arc(new_padding_node_content),
                 right,
-            },
+            ),
         }
-    }
-
-    /// Create a new pair from 2 sibling nodes.
-    ///
-    /// Panic if the given nodes are not a siblings.
-    /// Since this code is only used internally for tree construction, and this
-    /// state is unrecoverable, panicking is the best option. It is a sanity
-    /// check and should never actually happen unless code is changed.
-    fn from_siblings(left: Node<C>, right: Node<C>) -> Self {
-        if !left.is_left_sibling_of(&right) {
-            panic!(
-                "{} The given left node is not a left sibling of the given right node",
-                BUG
-            )
-        }
-        MatchedPair { left, right }
     }
 }
 
@@ -447,7 +431,7 @@ where
             map.insert(left.coord.clone(), left.clone());
             map.insert(right.coord.clone(), right.clone());
 
-            MatchedPair::from_siblings(left, right)
+            MatchedPair::from(left, right)
         } else {
             let node = leaves.pop().unwrap();
 
@@ -503,7 +487,7 @@ where
                     .join()
                     .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
-                MatchedPair { left, right }
+                MatchedPair::from(left, right)
             } else {
                 let right = build_node(
                     params.clone().into_right_child(),
@@ -519,7 +503,7 @@ where
                     Arc::clone(&map),
                 );
 
-                MatchedPair { left, right }
+                MatchedPair::from(left, right)
             }
         }
         NumNodes::Full => {
@@ -531,7 +515,7 @@ where
                 Arc::clone(&map),
             );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
-            MatchedPair { left, right }
+            MatchedPair::from(left, right)
         }
         NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
@@ -542,7 +526,7 @@ where
                 Arc::clone(&map),
             );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
-            MatchedPair { left, right }
+            MatchedPair::from(left, right)
         }
     };
 
@@ -700,10 +684,12 @@ mod tests {
             .unwrap();
 
         for leaf in leaf_nodes {
-            tree.get_leaf_node(leaf.x_coord).unwrap_or_else(|| panic!(
-                "Leaf node at x-coord {} is not present in the store",
-                leaf.x_coord
-            ));
+            tree.get_leaf_node(leaf.x_coord).unwrap_or_else(|| {
+                panic!(
+                    "Leaf node at x-coord {} is not present in the store",
+                    leaf.x_coord
+                )
+            });
         }
     }
 

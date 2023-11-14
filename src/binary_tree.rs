@@ -360,8 +360,6 @@ enum Sibling<C> {
     Right(Node<C>),
 }
 
-// TODO we should have a `from` function for this with an error check, just to
-// be extra careful
 /// A pair of sibling nodes.
 struct MatchedPair<C> {
     left: Node<C>,
@@ -384,6 +382,31 @@ impl<C: Mergeable> MatchedPair<C> {
         Node {
             coord: self.left.parent_coord(),
             content: C::merge(&self.left.content, &self.right.content),
+        }
+    }
+}
+
+impl<C> MatchedPair<C> {
+    /// Construct a [MatchedPair] using the 2 given nodes.
+    ///
+    /// Only build the pair if the 2 nodes are siblings, otherwise panic.
+    /// Since this code is only used internally for tree construction, and this
+    /// state is unrecoverable, panicking is the best option. It is a sanity
+    /// check and should never actually happen unless code is changed.
+    fn from(sibling_a: Node<C>, sibling_b: Node<C>) -> Self {
+        if sibling_b.is_right_sibling_of(&sibling_a) {
+            MatchedPair { left: sibling_a, right: sibling_b }
+        } else if sibling_b.is_left_sibling_of(&sibling_a) {
+            MatchedPair {
+                left: sibling_b,
+                right: sibling_a,
+            }
+        } else {
+            panic!(
+                "A pair cannot be made from 2 nodes that are not siblings {:?} {:?}",
+                sibling_a.coord.clone(),
+                sibling_b.coord.clone(),
+            )
         }
     }
 }
@@ -571,7 +594,7 @@ mod tests {
         let x_coord = 16;
         let left = single_leaf(x_coord).into_node();
 
-        let pair = MatchedPair { left, right };
+        let pair = MatchedPair::from(left, right);
         let parent = pair.merge();
 
         assert_eq!(
