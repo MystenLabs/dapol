@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Stenton Mayne <stentonian@protonmail.com>"]
 edition = "2021"
 description = "DAPOL+ Proof of Liabilities protocol in Rust"
+license = "MIT"
 
 [lib]
 bench = false
@@ -14,13 +15,13 @@ primitive-types = { version = "0.12.1", features = ["serde"] } # H256 & U256 (I 
 
 # crypto
 rand = "0.8.5"
+hkdf = "0.12.3"
+sha2 = "0.10.8"
 blake3 = "1.5.0"
 digest = "0.10.7"
 merlin = "3.0.0" # Transcript is required by bulletproofs library
 bulletproofs = "4.0.0"
 curve25519-dalek-ng = "4.1.1"
-hkdf = "0.12.3"
-sha2 = "0.10.8"
 
 # concurrency
 thiserror = "1.0"
