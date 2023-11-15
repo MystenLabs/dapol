@@ -6,7 +6,8 @@
 use super::Height;
 
 /// The maximum number of leaf nodes on the bottom layer of the binary tree.
-/// TODO latex `max = 2^(height-1)`
+///
+/// $$\text{max} = 2^{\text{height}-1}$$
 pub fn max_bottom_layer_nodes(height: &Height) -> u64 {
     2u64.pow(height.as_u32() - 1)
 }
