@@ -16,9 +16,9 @@ pub struct Percentage {
 impl Percentage {
     /// Returns a new `Percentage` with the given value.
     /// Returns an error if the value is greater than 100.
-    pub fn from_with_err(value: u8) -> Result<Percentage, ParsePercentageError> {
+    pub fn from_with_err(value: u8) -> Result<Percentage, PercentageParserError> {
         if value > 100 {
-            Err(ParsePercentageError::InputTooBig(value))
+            Err(PercentageParserError::InputTooBig(value))
         } else {
             Ok(Percentage { value })
         }
@@ -49,7 +49,7 @@ impl Percentage {
 // Errors.
 
 #[derive(thiserror::Error, Debug)]
-pub enum ParsePercentageError {
+pub enum PercentageParserError {
     #[error("Input value {0} cannot be greater than 100")]
     InputTooBig(u8),
     #[error("Malformed string input for u8")]
@@ -60,7 +60,7 @@ pub enum ParsePercentageError {
 // From traits for the CLI.
 
 impl FromStr for Percentage {
-    type Err = ParsePercentageError;
+    type Err = PercentageParserError;
 
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn from_should_give_err_if_value_is_over_100() {
         let res = Percentage::from_with_err(101);
-        assert_err!(res, Err(ParsePercentageError::InputTooBig(101)));
+        assert_err!(res, Err(PercentageParserError::InputTooBig(101)));
     }
 
     #[test]
