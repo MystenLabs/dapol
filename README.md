@@ -1,5 +1,13 @@
 # Proof of Liabilities protocol implemented in Rust
 
+[![Crates.io](https://img.shields.io/crates/v/dapol?style=flat-square)](https://crates.io/crates/dapol)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/silversixpence-crypto/dapol/ci.yml?branch=main&style=flat-square)](https://github.com/silversixpence-crypto/dapol/actions/workflows/ci.yml?query=branch%3Amain)
+
+Licensed under [MIT](LICENSE).
+
+## About
+
 Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available here: https://eprint.iacr.org/2021/1350
 
 Top-level doc for the project: https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA
