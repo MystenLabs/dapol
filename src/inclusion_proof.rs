@@ -1,42 +1,3 @@
-//! Inclusion proof struct and methods.
-//!
-//! The inclusion proof generation and verification algorithms are very closely
-//! related to the node content type, and so the main inclusion proof struct was
-//! not made generic for node content type. Instead specific node content types
-//! were chosen. If other node contents are to be supported then new inclusion
-//! proof structs and methods will need to be written.
-//!
-//! There are 2 parts to an inclusion proof:
-//! - the path in the tree
-//! - the range proofs for the Pedersen commitments
-//!
-//! The tree path is taken to be of type [hidden node content] because
-//! sharing a [full node content] type with entities would leak secret
-//! information such as other entity's liabilities and the total sum of
-//! liabilities.
-//!
-//! The Bulletproofs protocol is used for the range proofs. Bulletproofs allows
-//! aggregating multiple range proofs into 1 proof, which is more efficient to
-//! produce & verify than doing them individually. Both aggregated and
-//! individual range proofs are supported, and a mixture of both can be used.
-//!
-//! There are 2 adjustable parameters that have an affect on the Bulletproofs
-//! algorithm:
-//! - `aggregation_factor` is used to determine how many of the range proofs
-//! are aggregated. Those that do not form part of the aggregated proof
-//! are just proved individually. The aggregation is a feature of the
-//! Bulletproofs protocol that improves efficiency.
-//! - `upper_bound_bit_length` is used to determine the upper bound for the
-//! range proof, which is set to `2^upper_bound_bit_length` i.e. the
-//! range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
-//! some liability. The type is set to `u8` because we are not expected
-//! to require bounds higher than $2^256$. Note that if the value is set
-//! to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
-//! an Err.
-//!
-//! [hidden node content]: crate::node_content::HiddenNodeContent
-//! [full node content]: crate::node_content::FullNodeContent
-
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
@@ -69,6 +30,43 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 // Main struct & implementation.
 
 /// Inclusion proof for a PoL Merkle Tree.
+///
+/// The inclusion proof generation and verification algorithms are very closely
+/// related to the node content type, and so the main inclusion proof struct was
+/// not made generic for node content type. Instead specific node content types
+/// were chosen. If other node contents are to be supported then new inclusion
+/// proof structs and methods will need to be written.
+///
+/// There are 2 parts to an inclusion proof:
+/// - the path in the tree
+/// - the range proofs for the Pedersen commitments
+///
+/// The tree path is taken to be of type [hidden node content] because
+/// sharing a [full node content] type with entities would leak secret
+/// information such as other entity's liabilities and the total sum of
+/// liabilities.
+///
+/// The Bulletproofs protocol is used for the range proofs. Bulletproofs allows
+/// aggregating multiple range proofs into 1 proof, which is more efficient to
+/// produce & verify than doing them individually. Both aggregated and
+/// individual range proofs are supported, and a mixture of both can be used.
+///
+/// There are 2 adjustable parameters that have an affect on the Bulletproofs
+/// algorithm:
+/// - `aggregation_factor` is used to determine how many of the range proofs
+/// are aggregated. Those that do not form part of the aggregated proof
+/// are just proved individually. The aggregation is a feature of the
+/// Bulletproofs protocol that improves efficiency.
+/// - `upper_bound_bit_length` is used to determine the upper bound for the
+/// range proof, which is set to `2^upper_bound_bit_length` i.e. the
+/// range proof shows `0 <= liability <= 2^upper_bound_bit_length` for
+/// some liability. The type is set to `u8` because we are not expected
+/// to require bounds higher than $2^256$. Note that if the value is set
+/// to anything other than 8, 16, 32 or 64 the Bulletproofs code will return
+/// an Err.
+///
+/// [hidden node content]: crate::node_content::HiddenNodeContent
+/// [full node content]: crate::node_content::FullNodeContent
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
     path_siblings: PathSiblings<HiddenNodeContent>,

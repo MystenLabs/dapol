@@ -180,7 +180,7 @@ pub use binary_tree::Height;
 mod secret;
 pub use secret::{Secret, SecretParserError};
 
-pub mod inclusion_proof;
+mod inclusion_proof;
 pub use inclusion_proof::{
     AggregationFactor, InclusionProof, InclusionProofError,
     DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,

@@ -1,5 +1,3 @@
-//! Abstracted height data type.
-
 use clap::builder::{OsStr, Str};
 use log::error;
 use serde::{Serialize, Deserialize};
