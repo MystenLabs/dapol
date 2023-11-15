@@ -327,7 +327,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
     group.measurement_time(Duration::from_secs(120));
 
-    // TREE_HEIGHT = 8
+    // TREE_HEIGHT = 4
     group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
         bench.iter(|| {
             let tree_height = Height::from(TREE_HEIGHTS[0]);
