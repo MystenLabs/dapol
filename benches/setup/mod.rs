@@ -18,20 +18,6 @@ pub(crate) const NUM_USERS: (u32, u32, u32, [u32; 5], [u32; 5], [u32; 5], [u32; 
     [10_000, 20_000, 40_000, 60_000, 80_000],
 );
 
-// This is used to determine the number of threads to spawn in the
-// multi-threaded builder.
-pub(crate) fn MAX_THREAD_COUNT() -> Option<u8> {
-    dapol::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-        *opt.borrow_mut() = std::thread::available_parallelism()
-            .map_err(|err| {
-                error!("Problem accessing machine parallelism: {}", err);
-                err
-            })
-            .map_or(None, |par| Some(par.get() as u8));
-        opt.clone().into_inner()
-    })
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub(crate) struct BenchTestContent {
     pub value: u32,

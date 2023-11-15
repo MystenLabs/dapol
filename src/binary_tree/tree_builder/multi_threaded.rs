@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{info, warn};
+use log::{info, warn, error};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -242,6 +242,20 @@ pub struct RecursionParams {
 /// determined from the underlying hardware. 4 was chosen as the default because
 /// most modern (circa 2023) architectures will have at least 4 cores.
 const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
+
+// This is used to determine the number of threads to spawn in the
+// multi-threaded builder.
+fn MAX_THREAD_COUNT() -> u8 {
+    crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+        *opt.borrow_mut() = std::thread::available_parallelism()
+            .map_err(|err| {
+                error!("Problem accessing machine parallelism: {}", err);
+                err
+            })
+            .map_or(None, |par| Some(par.get() as u8));
+        opt.clone().into_inner().unwrap_or(4)
+    })
+}
 
 /// Private functions for use within this file only.
 impl RecursionParams {
