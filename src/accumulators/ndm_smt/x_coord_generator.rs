@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// to generate new values requires keeping a memory of previously used values
 /// so that it can generate new ones that are different from previous ones.
 ///
-/// Fields:
+/// Private fields:
 /// - `rng` is a cryptographically secure pseudo-random number generator.
 /// - The `used_x_coords` map keeps track of which x-coords have already been
 /// generated.
@@ -31,8 +31,8 @@ use std::collections::HashMap;
 /// If the function is called more than `max_x_coord` times an error will be
 /// returned.
 ///
-/// The random values are generated using Durstenfeld’s shuffle algorithm
-/// optimized by HashMap. This algorithm wraps the `rng`, efficiently avoiding
+/// The random values are generated using Durstenfeld’s shuffle algorithm,
+/// optimized by a HashMap. This algorithm wraps the `rng`, efficiently avoiding
 /// collisions. Here is some pseudo code explaining how it works:
 ///
 /// ```bash,ignore
@@ -46,14 +46,13 @@ use std::collections::HashMap;
 /// - set map[k] = i
 /// ```
 ///
-/// Assuming `rng` is constant time the above algorithm has time complexity
+/// Assuming `rng` is constant-time the above algorithm has time complexity
 /// `O(N)`. Note that the second loop (the while loop) will only execute a
 /// total of `N` times throughout the entire loop cycle of the first loop.
 /// This is because the second loop will only execute if a chain in the map
 /// exists, and the worst case happens when there is 1 long chain containing
 /// all the elements of the map; in this case the second loop will only execute
 /// on 1 of the iterations of the first loop.
-// TODO DOCS the above explanation is not so good, improve it
 pub struct RandomXCoordGenerator {
     rng: ThreadRng,
     used_x_coords: HashMap<u64, u64>,

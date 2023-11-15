@@ -6,9 +6,9 @@
 //!
 //! Note `upper_bound_bit_length` parameter is in u8 because it is not expected
 //! to require bounds higher than $2^256$.
-//!
-//! TODO more docs, on Pedersen gens maybe, on bulletproof gens maybe, on
-//! transcript maybe
+
+// TODO more docs, on Pedersen gens maybe, on bulletproof gens maybe, on
+// transcript maybe
 
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use curve25519_dalek_ng::{ristretto::CompressedRistretto, scalar::Scalar};
