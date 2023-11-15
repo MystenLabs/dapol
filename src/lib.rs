@@ -1,5 +1,5 @@
 mod kdf;
-mod node_content;
+pub mod node_content; // TODO: this as private in production
 
 pub mod cli;
 pub mod percentage;
@@ -16,7 +16,7 @@ pub use accumulators::{
     Accumulator, AccumulatorError,
 };
 
-pub mod binary_tree; // TODO: maybe leave this as private in production
+pub mod binary_tree; // TODO: this as private in production
 pub use binary_tree::{Height, MAX_THREAD_COUNT};
 
 mod secret;

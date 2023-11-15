@@ -1,61 +1,3 @@
-// use core::fmt::Debug;
-// use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, SamplingMode};
-// use dapol::{
-//     utils::get_secret, Dapol, DapolNode, RangeProofPadding, RangeProofSplitting, RangeProvable,
-//     RangeVerifiable,
-// };
-// use digest::Digest;
-// use rand::{distributions::Uniform, thread_rng, Rng};
-// use smtree::{
-//     index::TreeIndex,
-//     traits::{ProofExtractable, Rand, Serializable, TypeName},
-// };
-// use std::time::Duration;
-
-// // CONSTANTS
-// // ================================================================================================
-
-// const TREE_HEIGHTS: [usize; 3] = [16, 24, 32];
-// const NUM_USERS: [usize; 3] = [1024, 2048, 4096];
-
-// // BENCHMARKS
-// // ================================================================================================
-
-// fn build_dapol(c: &mut Criterion) {
-//     let mut group = c.benchmark_group("build");
-//     group.sample_size(10);
-//     group.sampling_mode(SamplingMode::Flat);
-//     group.measurement_time(Duration::from_secs(20));
-
-//     // bench tree height = 16
-//     let tree_height = 16;
-//     for &num_leaves in NUM_USERS.iter() {
-//         let items = build_item_list(num_leaves, tree_height);
-//         group.bench_function(BenchmarkId::new("height_16", num_leaves), |bench| {
-//             bench.iter(|| {
-//                 // we bench range proof padding only because building a tree does not depend on
-//                 // the type of range proof we do
-//                 build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height)
-//             });
-//         });
-//     }
-
-//     // bench tree height = 32
-//     let tree_height = 32;
-//     for &num_leaves in NUM_USERS.iter() {
-//         let items = build_item_list(num_leaves, tree_height);
-//         group.bench_function(BenchmarkId::new("height_32", num_leaves), |bench| {
-//             bench.iter(|| {
-//                 // we bench range proof padding only because building a tree does not depend on
-//                 // the type of range proof we do
-//                 build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height)
-//             });
-//         });
-//     }
-
-//     group.finish();
-// }
-
 // fn generate_proof(c: &mut Criterion) {
 //     let mut group = c.benchmark_group("prove");
 //     group.sample_size(10);
@@ -143,8 +85,8 @@
 // criterion_group!(dapol_group, build_dapol, generate_proof, verify_proof);
 // criterion_main!(dapol_group);
 
-// // HELPER FUNCTIONS
-// // ================================================================================================
+// HELPER FUNCTIONS
+// ================================================================================================
 
 // fn build_dapol_tree<D, R>(items: &[(TreeIndex, DapolNode<D>)], tree_height: usize) -> Dapol<D, R>
 // where
@@ -174,94 +116,26 @@
 //     result
 // }
 
-// mod setup;
-
-// use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
-// use dapol::Height;
-// use setup::{get_leaf_nodes, NUM_USERS, TREE_HEIGHTS};
-// use std::time::Duration;
-
-// fn bench_build_tree(c: &mut Criterion) {
-//     let mut group = c.benchmark_group("build");
-
-//     group.sample_size(10);
-//     group.sampling_mode(SamplingMode::Flat);
-//     group.measurement_time(Duration::from_secs(20));
-
-//     // TREE_HEIGHT = 4
-//     let num_leaves = NUM_USERS.0; // 16 (i.e., 2^4)
-//     group.bench_function(BenchmarkId::new("height_4", num_leaves), |bench| {
-//         bench.iter(|| {
-//             let tree_height = Height::from(TREE_HEIGHTS[0]);
-//             let leaf_nodes = get_leaf_nodes(num_leaves, &tree_height);
-//             setup::build_tree(tree_height, leaf_nodes);
-//             ()
-//         })
-//     });
-
-//     // TREE_HEIGHT = 8
-//     let num_leaves = NUM_USERS.1; // 256 (i.e., 2^8)
-//     group.bench_function(BenchmarkId::new("height_8", num_leaves), |bench| {
-//         bench.iter(|| {
-//             let tree_height = Height::from(TREE_HEIGHTS[1]);
-//             let leaf_nodes = get_leaf_nodes(num_leaves, &tree_height);
-//             setup::build_tree(tree_height, leaf_nodes);
-//             ()
-//         })
-//     });
-
-//     // TREE_HEIGHT = 16
-//     let num_leaves = NUM_USERS.2; // [1024, 2048, 4096] (i.e., 2^10, 2^11, 2^12)
-//     for l in num_leaves.into_iter() {
-//         group.bench_function(BenchmarkId::new("height_16", l), |bench| {
-//             bench.iter(|| {
-//                 let tree_height = Height::from(TREE_HEIGHTS[2]);
-//                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-//                 setup::build_tree(tree_height, leaf_nodes);
-//                 ()
-//             })
-//         });
-//     }
-
-//     // TREE_HEIGHT = 32
-//     let num_leaves = NUM_USERS.3; // [4096, 8192, 16384] (i.e., 2^12, 2^13, 2^14)
-//     for l in num_leaves.into_iter() {
-//         group.bench_function(BenchmarkId::new("height_32", l), |bench| {
-//             bench.iter(|| {
-//                 let tree_height = Height::from(TREE_HEIGHTS[3]);
-//                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-//                 setup::build_tree(tree_height, leaf_nodes);
-//                 ()
-//             })
-//         });
-//     }
-
-//     // TREE_HEIGHT = 64
-//     let num_leaves = NUM_USERS.4; // [16384, 32768, 65536] (i.e., 2^14, 2^15, 2^16)
-//     for l in num_leaves.into_iter() {
-//         group.bench_function(BenchmarkId::new("height_64", l), |bench| {
-//             bench.iter(|| {
-//                 let tree_height = Height::from(TREE_HEIGHTS[4]);
-//                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-//                 setup::build_tree(tree_height, leaf_nodes);
-//                 ()
-//             })
-//         });
-//     }
-
-//     group.finish();
-// }
-
+use bulletproofs::PedersenGens;
+use curve25519_dalek_ng::scalar::Scalar;
 use dapol::binary_tree::{
-    BinaryTree, Coordinate, InputLeafNode, Mergeable, TreeBuilder, MAX_THREAD_COUNT,
+    BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
+    MAX_THREAD_COUNT,
 };
-use dapol::{Hasher, Height};
+use dapol::node_content::FullNodeContent;
+use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
 
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
 use primitive_types::H256;
+use rand::distributions::Uniform;
+use rand::{thread_rng, Rng};
 use serde::Serialize;
 
 use core::fmt::Debug;
 use std::time::Duration;
+
+// CONSTANTS
+// ================================================================================================
 
 pub const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
 pub const NUM_USERS: [usize; 23] = [
@@ -289,6 +163,9 @@ pub const NUM_USERS: [usize; 23] = [
     125_000_000,
     250_000_000,
 ];
+
+// STRUCTS
+// ================================================================================================
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct BenchTestContent {
@@ -318,7 +195,8 @@ impl Mergeable for BenchTestContent {
     }
 }
 
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
+// BENCHMARKS
+// ================================================================================================
 
 pub fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
@@ -332,7 +210,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
         bench.iter(|| {
             let tree_height = Height::from(TREE_HEIGHTS[0]);
             let leaf_nodes = get_leaf_nodes(8, &tree_height);
-            build_tree(tree_height, leaf_nodes);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
             ()
         })
     });
@@ -342,7 +220,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
         bench.iter(|| {
             let tree_height = Height::from(TREE_HEIGHTS[1]);
             let leaf_nodes = get_leaf_nodes(128, &tree_height);
-            build_tree(tree_height, leaf_nodes);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
             ()
         })
     });
@@ -353,7 +231,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[2]);
                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-                build_tree(tree_height, leaf_nodes);
+                build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
         });
@@ -365,7 +243,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[3]);
                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-                build_tree(tree_height, leaf_nodes);
+                build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
         });
@@ -377,7 +255,8 @@ pub fn bench_build_tree(c: &mut Criterion) {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[4]);
                 let leaf_nodes = get_leaf_nodes(l, &tree_height);
-                build_tree(tree_height, leaf_nodes);
+
+                build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
         });
@@ -386,19 +265,84 @@ pub fn bench_build_tree(c: &mut Criterion) {
     group.finish();
 }
 
-pub fn build_tree(
+fn bench_generate_proof(c: &mut Criterion) {
+    let mut group = c.benchmark_group("prove");
+    group.sample_size(10);
+
+    // NUM_USERS is not applicable for this benchmark
+    let num_leaves = NUM_USERS[0];
+
+    for h in TREE_HEIGHTS.into_iter() {
+        let tree_height = Height::from(TREE_HEIGHTS[h as usize]);
+        let leaf_nodes = get_leaf_nodes(num_leaves, &tree_height);
+        let mut rng = rand::thread_rng();
+
+        let node_range = Uniform::new(0usize, num_leaves);
+
+        let tree = build_tree(tree_height, leaf_nodes, get_full_padding_node_content());
+
+        group.bench_function(BenchmarkId::new("splitting", h), |bench| {
+            bench.iter(|| {
+                let leaf_node = leaf_nodes[rng.sample(node_range)];
+                generate_proof(tree, leaf_node);
+            });
+        });
+    }
+}
+
+// HELPER FUNCTIONS
+// ================================================================================================
+
+pub fn build_tree<C, F>(
     height: Height,
-    leaf_nodes: Vec<InputLeafNode<BenchTestContent>>,
-) -> BinaryTree<BenchTestContent> {
-    let builder = TreeBuilder::<BenchTestContent>::new()
+    leaf_nodes: Vec<InputLeafNode<C>>,
+    new_padding_node_content: F,
+) -> BinaryTree<C>
+where
+    C: Clone + Debug + Mergeable + Serialize + Send + Sync,
+    F: Fn(&Coordinate) -> C + Send + Sync + 'static,
+{
+    let builder = TreeBuilder::<C>::new()
         .with_height(height)
         .with_leaf_nodes(leaf_nodes);
 
     let tree = builder
-        .build_using_multi_threaded_algorithm(get_padding_node_content())
+        .build_using_multi_threaded_algorithm(new_padding_node_content)
         .expect("Unable to build tree");
 
     tree
+}
+
+fn generate_proof(tree: BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeContent>) {
+    let aggregation_factor = AggregationFactor::Divisor(2u8);
+    let upper_bound_bit_length = 64u8;
+
+    // leaf at (2,0)
+    let liability = 27u64;
+    let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
+    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    let mut hasher = Hasher::new();
+    hasher.update("leaf".as_bytes());
+    let hash = hasher.finalize();
+    let leaf = Node {
+        coord: Coordinate { x: 2u64, y: 0u8 },
+        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+    };
+
+    let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
+        &tree,
+        &leaf_node,
+        get_full_padding_node_content(),
+    )
+    .expect("Unable to generate path siblings");
+
+    InclusionProof::generate(
+        leaf_node,
+        path_siblings,
+        aggregation_factor,
+        upper_bound_bit_length,
+    )
+    .expect("Unable to generate proof");
 }
 
 pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<InputLeafNode<BenchTestContent>> {
@@ -430,6 +374,19 @@ pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
             value: 0,
             hash: H256::default(),
         }
+    }
+}
+
+pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeContent {
+    |_coord: &Coordinate| -> FullNodeContent {
+        let liability = 27u64;
+        let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let mut hasher = Hasher::new();
+        hasher.update("leaf".as_bytes());
+        let hash = hasher.finalize();
+
+        FullNodeContent::new(liability, blinding_factor, commitment, hash)
     }
 }
 
