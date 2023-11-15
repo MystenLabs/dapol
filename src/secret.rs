@@ -1,8 +1,3 @@
-//! Secret data type.
-//!
-//! The main struct is a wrapper around a byte array that is used to hold secret
-//! data such as a nonce or the blinding factor for a Pedersen commitment.
-
 use std::convert::From;
 use std::str::FromStr;
 
@@ -18,7 +13,10 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 // -------------------------------------------------------------------------------------------------
 // Main struct & implementations.
 
-/// 256-bit data packet.
+/// Secret data type: a 256-bit data packet.
+///
+/// It is a wrapper around a byte array that is used to hold secret
+/// data such as a nonce or the blinding factor for a Pedersen commitment.
 ///
 /// The main purpose for this struct is to abstract away the [u8; 32] storage
 /// array and offer functions for moving data as apposed to copying.
