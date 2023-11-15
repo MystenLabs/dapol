@@ -9,7 +9,8 @@ use serde::Serialize;
 use core::fmt::Debug;
 
 pub(crate) const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
-pub(crate) const NUM_USERS: (u32, u32, u32, [u32; 5], [u32; 5], [u32; 5], [u32; 5]) = (
+pub(crate) const NUM_LEAVES: [usize; 5] = [16, 256, 1024, 4096, 8192];
+pub(crate) const NUM_USERS: (usize, usize, usize, [usize; 5], [usize; 5], [usize; 5], [usize; 5]) = (
     250_000_000,
     125_000_000,
     100_000_000,
