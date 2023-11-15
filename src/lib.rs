@@ -88,7 +88,7 @@
 //! }
 //!
 //! /// Example on how to use the builder pattern to construct an NDM-SMT tree.
-//! pub fn build_ndm_smt_using_builder_pattern() -> dapol::NdmSmt {
+//! pub fn build_ndm_smt_using_builder_pattern() -> dapol::accumulators::NdmSmt {
 //!     let src_dir = env!("CARGO_MANIFEST_DIR");
 //!     let resources_dir = Path::new(&src_dir).join("examples");
 //!
@@ -97,7 +97,7 @@
 //!
 //!     let height = dapol::Height::from(16);
 //!
-//!     let config = dapol::NdmSmtConfigBuilder::default()
+//!     let config = dapol::accumulators::NdmSmtConfigBuilder::default()
 //!         .height(height)
 //!         .secrets_file_path(secrets_file)
 //!         .entities_path(entities_file)
@@ -109,7 +109,7 @@
 //!
 //! /// An inclusion proof can be generated from only a tree + entity ID.
 //! pub fn simple_inclusion_proof_generation_and_verification(
-//!     ndm_smt: &dapol::NdmSmt,
+//!     ndm_smt: &dapol::accumulators::NdmSmt,
 //!     entity_id: dapol::EntityId,
 //! ) {
 //!     let inclusion_proof = ndm_smt.generate_inclusion_proof(&entity_id).unwrap();
@@ -119,7 +119,7 @@
 //! /// The inclusion proof generation algorithm can be customized via some
 //! /// parameters. See [dapol][InclusionProof] for more details.
 //! pub fn advanced_inclusion_proof_generation_and_verification(
-//!     ndm_smt: &dapol::NdmSmt,
+//!     ndm_smt: &dapol::accumulators::NdmSmt,
 //!     entity_id: dapol::EntityId,
 //! ) {
 //!     // Determines how many of the range proofs in the inclusion proof are
@@ -171,12 +171,8 @@ pub mod utils;
 mod hasher;
 pub use hasher::Hasher;
 
-mod accumulators;
-pub use accumulators::{
-    config::{AccumulatorConfig, AccumulatorConfigError},
-    ndm_smt::{NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtParserError},
-    Accumulator, AccumulatorError,
-};
+pub mod accumulators;
+pub use accumulators::{Accumulator, AccumulatorConfig, AccumulatorConfigError, AccumulatorError};
 
 mod binary_tree;
 pub use binary_tree::Height;
@@ -184,7 +180,7 @@ pub use binary_tree::Height;
 mod secret;
 pub use secret::{Secret, SecretParserError};
 
-mod inclusion_proof;
+pub mod inclusion_proof;
 pub use inclusion_proof::{
     AggregationFactor, InclusionProof, InclusionProofError,
     DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,

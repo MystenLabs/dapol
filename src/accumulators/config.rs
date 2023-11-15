@@ -1,25 +1,3 @@
-//! Configuration for the various accumulator types.
-//!
-//! Currently only TOML files are supported for config files. The only
-//! config requirement at this level (not including the specific accumulator
-//! config) is the accumulator type:
-//!
-//! ```toml,ignore
-//! accumulator_type = "ndm-smt"
-//! ```
-//!
-//! The rest of the config details can be found in the submodules:
-//! - [ndm_smt][ndm_smt_config]
-//!
-//! Config deserialization example:
-//! ```
-//! use std::path::PathBuf;
-//! use dapol::AccumulatorConfig;
-//!
-//! let file_path = PathBuf::from("./examples/tree_config_example.toml");
-//! let config = AccumulatorConfig::deserialize(file_path).unwrap();
-//! ```
-
 use log::debug;
 use serde::Deserialize;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
@@ -27,6 +5,26 @@ use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 use super::{ndm_smt, Accumulator};
 
 /// Configuration required for building various accumulator types.
+///
+/// Currently only TOML files are supported for config files. The only
+/// config requirement at this level (not including the specific accumulator
+/// config) is the accumulator type:
+///
+/// ```toml,ignore
+/// accumulator_type = "ndm-smt"
+/// ```
+///
+/// The rest of the config details can be found in the submodules:
+/// - [ndm_smt][ndm_smt_config]
+///
+/// Config deserialization example:
+/// ```
+/// use std::path::PathBuf;
+/// use dapol::AccumulatorConfig;
+///
+/// let file_path = PathBuf::from("./examples/tree_config_example.toml");
+/// let config = AccumulatorConfig::deserialize(file_path).unwrap();
+/// ```
 #[derive(Deserialize, Debug)]
 #[serde(tag = "accumulator_type", rename_all = "kebab-case")]
 pub enum AccumulatorConfig {

@@ -1,53 +1,3 @@
-//! Configuration for the NDM-SMT.
-//!
-//! The config is defined by a struct. A builder pattern is used to construct
-//! the config, but it can also be constructed by deserializing a file.
-//! Construction is handled by [super][super][AccumulatorConfig] and so have
-//! a look there for more details on file format for deserialization or examples
-//! on how to use the parser. Currently only toml files are supported, with the
-//! following format:
-//!
-//! ```toml,ignore
-//! accumulator_type = "ndm-smt"
-//!
-//! # Height of the tree.
-//! # If the height is not set the default height will be used.
-//! height = 32
-//!
-//! # Path to the secrets file.
-//! # If not present the secrets will be generated randomly.
-//! secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
-//!
-//! # At least one of file_path & generate_random must be present.
-//! # If both are given then file_path is prioritized.
-//! [entities]
-//!
-//! # Path to a file containing a list of entity IDs and their liabilities.
-//! file_path = "./examples/entities_example.csv"
-//!
-//! # Generate the given number of entities, with random IDs & liabilities.
-//! generate_random = 4
-//! ```
-//!
-//! Construction of this tree using a config file must be done via
-//! [super][super][config][AccumulatorConfig].
-//!
-//! Example how to use the builder:
-//! ```
-//! use std::path::PathBuf;
-//! use dapol::Height;
-//! use dapol::NdmSmtConfigBuilder;
-//!
-//! let height = Height::from(8);
-//!
-//! let config = NdmSmtConfigBuilder::default()
-//!     .height(height)
-//!     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
-//!     .entities_path(PathBuf::from("./examples/entities_example.csv"))
-//!     .build()
-//!     .unwrap();
-//! ```
-
 use std::path::PathBuf;
 
 use derive_builder::Builder;
@@ -61,6 +11,54 @@ use crate::utils::LogOnErr;
 use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 
 /// Configuration needed to construct an NDM-SMT.
+///
+/// The config is defined by a struct. A builder pattern is used to construct
+/// the config, but it can also be constructed by deserializing a file.
+/// Construction is handled by [super][super][AccumulatorConfig] and so have
+/// a look there for more details on file format for deserialization or examples
+/// on how to use the parser. Currently only toml files are supported, with the
+/// following format:
+///
+/// ```toml,ignore
+/// accumulator_type = "ndm-smt"
+///
+/// # Height of the tree.
+/// # If the height is not set the default height will be used.
+/// height = 32
+///
+/// # Path to the secrets file.
+/// # If not present the secrets will be generated randomly.
+/// secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
+///
+/// # At least one of file_path & generate_random must be present.
+/// # If both are given then file_path is prioritized.
+/// [entities]
+///
+/// # Path to a file containing a list of entity IDs and their liabilities.
+/// file_path = "./examples/entities_example.csv"
+///
+/// # Generate the given number of entities, with random IDs & liabilities.
+/// generate_random = 4
+/// ```
+///
+/// Construction of this tree using a config file must be done via
+/// [super][super][config][AccumulatorConfig].
+///
+/// Example how to use the builder:
+/// ```
+/// use std::path::PathBuf;
+/// use dapol::Height;
+/// use dapol::accumulators::NdmSmtConfigBuilder;
+///
+/// let height = Height::from(8);
+///
+/// let config = NdmSmtConfigBuilder::default()
+///     .height(height)
+///     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
+///     .entities_path(PathBuf::from("./examples/entities_example.csv"))
+///     .build()
+///     .unwrap();
+/// ```
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
     #[builder(setter(name = "height_opt"), default)]

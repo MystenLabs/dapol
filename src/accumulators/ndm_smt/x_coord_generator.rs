@@ -1,52 +1,59 @@
-//! Used for generating unique x-coordinate values on the bottom layer of the
-//! tree.
-//!
-//! A struct is needed as apposed to just a function because the algorithm used
-//! to generate new values requires keeping a memory of previously used values
-//! so that it can generate new ones that are different from previous ones.
-//!
-//! Fields:
-//! - `rng` is a cryptographically secure pseudo-random number generator.
-//! - The `used_x_coords` map keeps track of which x-coords have already been
-//! generated.
-//! - `max_x_coord` is the upper bound on the generated values, 0 being the
-//! lower bound.
-//! - `i` is used to track the current position of the algorithm.
-//!
-//! Usage:
-//! After creating the struct the calling code can repeatedly call
-//! `new_unique_x_coord` any number of times in the range `[1, max_x_coord]`.
-//! If the function is called more than `max_x_coord` times an error will be
-//! returned.
-//!
-//! The random values are generated using Durstenfeld’s shuffle algorithm
-//! optimized by HashMap. This algorithm wraps the `rng`, efficiently avoiding
-//! collisions. Here is some pseudo code explaining how it works:
-//!
-//! ```bash,ignore
-//! if N > max_x_coord throw error
-//! for i in range [0, N]:
-//! - pick random k in range [i, max_x_coord]
-//! - if k in map then set v = map[k]
-//!   - while map[v] exists: v = map[v]
-//!   - result = v
-//! - else result = k
-//! - set map[k] = i
-//! ```
-//!
-//! Assuming `rng` is constant time the above algorithm has time complexity
-//! `O(N)`. Note that the second loop (the while loop) will only execute a
-//! total of `N` times throughout the entire loop cycle of the first loop.
-//! This is because the second loop will only execute if a chain in the map
-//! exists, and the worst case happens when there is 1 long chain containing
-//! all the elements of the map; in this case the second loop will only execute
-//! on 1 of the iterations of the first loop.
-// TODO DOCS the above explanation is not so good, improve it
-
 use crate::binary_tree::Height;
 use rand::{distributions::Uniform, rngs::ThreadRng, thread_rng, Rng};
 use std::collections::HashMap;
 
+/// Used for generating unique x-coordinate values on the bottom layer of the
+/// tree.
+///
+/// A struct is needed as apposed to just a function because the algorithm used
+/// to generate new values requires keeping a memory of previously used values
+/// so that it can generate new ones that are different from previous ones.
+///
+/// Fields:
+/// - `rng` is a cryptographically secure pseudo-random number generator.
+/// - The `used_x_coords` map keeps track of which x-coords have already been
+/// generated.
+/// - `max_x_coord` is the upper bound on the generated values, 0 being the
+/// lower bound.
+/// - `i` is used to track the current position of the algorithm.
+///
+/// Example:
+/// ```
+/// use dapol::accumulators::RandomXCoordGenerator;
+///
+/// let height = dapol::Height::default();
+/// let mut x_coord_generator = RandomXCoordGenerator::from(&height);
+/// let x_coord = x_coord_generator.new_unique_x_coord().unwrap();
+/// ```
+///
+/// After creating the struct you can repeatedly call
+/// `new_unique_x_coord` any number of times in the range `[1, max_x_coord]`.
+/// If the function is called more than `max_x_coord` times an error will be
+/// returned.
+///
+/// The random values are generated using Durstenfeld’s shuffle algorithm
+/// optimized by HashMap. This algorithm wraps the `rng`, efficiently avoiding
+/// collisions. Here is some pseudo code explaining how it works:
+///
+/// ```bash,ignore
+/// if N > max_x_coord throw error
+/// for i in range [0, N]:
+/// - pick random k in range [i, max_x_coord]
+/// - if k in map then set v = map[k]
+///   - while map[v] exists: v = map[v]
+///   - result = v
+/// - else result = k
+/// - set map[k] = i
+/// ```
+///
+/// Assuming `rng` is constant time the above algorithm has time complexity
+/// `O(N)`. Note that the second loop (the while loop) will only execute a
+/// total of `N` times throughout the entire loop cycle of the first loop.
+/// This is because the second loop will only execute if a chain in the map
+/// exists, and the worst case happens when there is 1 long chain containing
+/// all the elements of the map; in this case the second loop will only execute
+/// on 1 of the iterations of the first loop.
+// TODO DOCS the above explanation is not so good, improve it
 pub struct RandomXCoordGenerator {
     rng: ThreadRng,
     used_x_coords: HashMap<u64, u64>,

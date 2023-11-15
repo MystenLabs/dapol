@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-pub fn build_ndm_smt_using_builder_pattern() -> dapol::NdmSmt {
+pub fn build_ndm_smt_using_builder_pattern() -> dapol::accumulators::NdmSmt {
     let src_dir = env!("CARGO_MANIFEST_DIR");
     let resources_dir = Path::new(&src_dir).join("examples");
 
@@ -11,7 +11,7 @@ pub fn build_ndm_smt_using_builder_pattern() -> dapol::NdmSmt {
 
     let height = dapol::Height::from(16);
 
-    let config = dapol::NdmSmtConfigBuilder::default()
+    let config = dapol::accumulators::NdmSmtConfigBuilder::default()
         .height(height)
         .secrets_file_path(secrets_file)
         .entities_path(entities_file)
