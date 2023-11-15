@@ -280,21 +280,21 @@ impl RecursionParams {
         // y-coords also start from 0, hence the `- 1`.
         let y_coord = height.as_y_coord();
 
-        let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
-        crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-            match *opt.borrow() {
-                None =>
-                    warn!("No default parallelism found, defaulting to {}", max_thread_count)
-                ,
-                Some(par) => {
-                    max_thread_count = par;
-                    info!(
-                        "Available parallelism detected: {}. This will be the max number of threads spawned.",
-                        max_thread_count
-                    );
-                }
-            }
-        });
+        // let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
+        // crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
+        //     match *opt.borrow() {
+        //         None =>
+        //             warn!("No default parallelism found, defaulting to {}", max_thread_count)
+        //         ,
+        //         Some(par) => {
+        //             max_thread_count = par;
+        //             info!(
+        //                 "Available parallelism detected: {}. This will be the max number of threads spawned.",
+        //                 max_thread_count
+        //             );
+        //         }
+        //     }
+        // });
 
         RecursionParams {
             x_coord_min,
@@ -303,7 +303,7 @@ impl RecursionParams {
             y_coord,
             // TODO need to unit test that this number matches actual thread count
             thread_count: Arc::new(Mutex::new(1)),
-            max_thread_count,
+            max_thread_count: MAX_THREAD_COUNT(),
             store_depth: MIN_STORE_DEPTH,
             height,
         }
