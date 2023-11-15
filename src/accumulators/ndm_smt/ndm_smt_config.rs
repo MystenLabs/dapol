@@ -14,7 +14,7 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 ///
 /// The config is defined by a struct. A builder pattern is used to construct
 /// the config, but it can also be constructed by deserializing a file.
-/// Construction is handled by [super][super][AccumulatorConfig] and so have
+/// Construction is handled by [crate][AccumulatorConfig] and so have
 /// a look there for more details on file format for deserialization or examples
 /// on how to use the parser. Currently only toml files are supported, with the
 /// following format:
@@ -42,7 +42,7 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// ```
 ///
 /// Construction of this tree using a config file must be done via
-/// [super][super][config][AccumulatorConfig].
+/// [crate][AccumulatorConfig].
 ///
 /// Example how to use the builder:
 /// ```
@@ -77,7 +77,7 @@ pub struct EntityConfig {
 
 impl NdmSmtConfig {
     /// Try to construct an NDM-SMT from the config.
-    pub fn parse(self) -> Result<NdmSmt, NdmSmtParserError> {
+    pub fn parse(self) -> Result<NdmSmt, NdmSmtConfigParserError> {
         debug!("Parsing config to create a new NDM-SMT: {:?}", self);
 
         let secrets = NdmSmtSecretsParser::from_path_opt(self.secrets_file_path)
@@ -145,9 +145,9 @@ impl NdmSmtConfigBuilder {
     }
 }
 
-/// Errors encountered when handling [NdmSmtParser].
+/// Errors encountered when parsing [crate][accumulators][NdmSmtConfig].
 #[derive(thiserror::Error, Debug)]
-pub enum NdmSmtParserError {
+pub enum NdmSmtConfigParserError {
     #[error("Secrets parsing failed while trying to parse NDM-SMT config")]
     SecretsError(#[from] ndm_smt_secrets_parser::NdmSmtSecretsParserError),
     #[error("Entities parsing failed while trying to parse NDM-SMT config")]

@@ -24,7 +24,7 @@ use crate::secret::SecretParserError;
 /// salt_s = "salt_s"
 /// ```
 ///
-/// See [super][ndm_smt_secrets][NdmSmtSecrets] for more details about the
+/// See [crate][accumulators][NdmSmtSecrets] for more details about the
 /// secret values.
 pub struct NdmSmtSecretsParser {
     path: Option<PathBuf>,
@@ -34,7 +34,7 @@ impl NdmSmtSecretsParser {
     /// Constructor.
     ///
     /// `Option` is used to wrap the parameter to make the code work more
-    /// seamlessly with the config builders in [super][super][accumulators].
+    /// seamlessly with the config builders in [crate][accumulators].
     pub fn from_path_opt(path: Option<PathBuf>) -> Self {
         NdmSmtSecretsParser { path }
     }

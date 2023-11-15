@@ -32,8 +32,8 @@ pub use config::{AccumulatorConfig, AccumulatorConfigError, AccumulatorParserErr
 
 mod ndm_smt;
 pub use ndm_smt::{
-    NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtParserError, NdmSmtSecrets,
-    NdmSmtSecretsParser, RandomXCoordGenerator,
+    NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtConfigParserError, NdmSmtSecrets,
+    NdmSmtSecretsParser, RandomXCoordGenerator
 };
 
 const SERIALIZED_ACCUMULATOR_EXTENSION: &str = "dapoltree";

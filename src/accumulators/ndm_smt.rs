@@ -28,7 +28,7 @@ mod x_coord_generator;
 pub use x_coord_generator::RandomXCoordGenerator;
 
 mod ndm_smt_config;
-pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtParserError};
+pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.

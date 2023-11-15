@@ -24,7 +24,7 @@ use rand::{
 /// The names of the fields are exactly the same as the ones given in the
 /// DAPOL+ paper.
 ///
-/// See [super][ndm_smt_secrets_parser][NdmSmtSecretsParser] for how to
+/// See [crate][accumulators][NdmSmtSecretsParser] for how to
 /// build this struct.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NdmSmtSecrets {

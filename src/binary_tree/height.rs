@@ -53,14 +53,14 @@ impl Height {
 
     /// Return the height for the given y-coord.
     /// Why the offset? `y` starts from 0 but height starts from 1.
-    /// See [super][Coordinate] for more details.
+    /// See [crate][binary_tree][Coordinate] for more details.
     pub fn from_y_coord(y_coord: u8) -> Self {
         Self::from(y_coord + 1)
     }
 
     /// Return the y-coord for the given height.
     /// Why the offset? `y` starts from 0 but height starts from 1.
-    /// See [super][Coordinate] for more details.
+    /// See [crate][binary_tree][Coordinate] for more details.
     pub fn as_y_coord(&self) -> u8 {
         self.0 - 1
     }

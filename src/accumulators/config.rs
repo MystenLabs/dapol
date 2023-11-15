@@ -15,7 +15,7 @@ use super::{ndm_smt, Accumulator};
 /// ```
 ///
 /// The rest of the config details can be found in the submodules:
-/// - [ndm_smt][ndm_smt_config]
+/// - [crate][accumulators][NdmSmtConfig]
 ///
 /// Config deserialization example:
 /// ```
@@ -114,5 +114,5 @@ pub enum AccumulatorConfigError {
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorParserError {
     #[error("Error parsing NDM-SMT config")]
-    NdmSmtError(#[from] ndm_smt::NdmSmtParserError),
+    NdmSmtError(#[from] ndm_smt::NdmSmtConfigParserError),
 }

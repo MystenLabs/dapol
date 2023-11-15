@@ -10,7 +10,7 @@ use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 /// The entity IDs file is expected to be a list of entity IDs, each on a new
 /// line.    All file formats are accepted. It is also possible to use the same
 /// entity IDs &    liabilities file that is accepted by
-/// [super][EntitiesParser].
+/// [crate][EntitiesParser].
 ///
 /// Example:
 /// ```
