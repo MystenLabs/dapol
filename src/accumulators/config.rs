@@ -26,6 +26,7 @@ use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::{ndm_smt, Accumulator};
 
+/// Configuration required for building various accumulator types.
 #[derive(Deserialize, Debug)]
 #[serde(tag = "accumulator_type", rename_all = "kebab-case")]
 pub enum AccumulatorConfig {
@@ -99,6 +100,7 @@ impl FromStr for FileType {
     }
 }
 
+/// Errors encountered when handling [AccumulatorConfig].
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorConfigError {
     #[error("Unable to find file extension for path {0:?}")]

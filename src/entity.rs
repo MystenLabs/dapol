@@ -25,6 +25,7 @@ pub use entity_ids_parser::{EntityIdsParser, EntityIdsParserError};
 // -------------------------------------------------------------------------------------------------
 // Main structs & implementations.
 
+/// Container for single liability & ID entry into the tree.
 #[derive(Deserialize, PartialEq)]
 pub struct Entity {
     pub liability: u64,

@@ -17,6 +17,7 @@
 
 use primitive_types::H256;
 
+/// Abstraction of a hash function, allows easy switching of hash function.
 pub struct Hasher(blake3::Hasher);
 
 impl Hasher {

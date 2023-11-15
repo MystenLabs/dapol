@@ -34,6 +34,7 @@ use crate::{
 
 use serde::{Deserialize, Serialize};
 
+/// For adjusting range proof aggregation in the Bulletproofs protocol.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum AggregationFactor {
     Divisor(u8),

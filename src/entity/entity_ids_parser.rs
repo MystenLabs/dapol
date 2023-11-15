@@ -22,6 +22,7 @@ use log::debug;
 
 use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 
+/// Entity IDs file parser.
 pub struct EntityIdsParser {
     path: Option<PathBuf>,
 }
@@ -86,6 +87,7 @@ impl FromStr for FileType {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+/// Errors encountered when handling [EntityIdsParser].
 #[derive(thiserror::Error, Debug)]
 pub enum EntityIdsParserError {
     #[error("Expected path to be set but found none")]

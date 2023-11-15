@@ -182,7 +182,7 @@ mod binary_tree;
 pub use binary_tree::Height;
 
 mod secret;
-pub use secret::{Secret, SecretParseError};
+pub use secret::{Secret, SecretParserError};
 
 mod inclusion_proof;
 pub use inclusion_proof::{

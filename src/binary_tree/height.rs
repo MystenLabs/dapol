@@ -26,6 +26,7 @@ pub type XCoord = u64;
 /// to have for any protocol involving people as the entities.
 pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 
+/// Height of the tree.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Height(UnderlyingInt);
 

@@ -60,6 +60,7 @@ use crate::utils::LogOnErr;
 
 use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 
+/// Configuration needed to construct an NDM-SMT.
 #[derive(Deserialize, Debug, Builder)]
 pub struct NdmSmtConfig {
     #[builder(setter(name = "height_opt"), default)]
@@ -146,6 +147,7 @@ impl NdmSmtConfigBuilder {
     }
 }
 
+/// Errors encountered when handling [NdmSmtParser].
 #[derive(thiserror::Error, Debug)]
 pub enum NdmSmtParserError {
     #[error("Secrets parsing failed while trying to parse NDM-SMT config")]

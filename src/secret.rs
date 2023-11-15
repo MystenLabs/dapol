@@ -53,13 +53,13 @@ impl From<u64> for Secret {
 }
 
 impl FromStr for Secret {
-    type Err = SecretParseError;
+    type Err = SecretParserError;
 
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then [Err] is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.len() > MAX_LENGTH_BYTES {
-            Err(SecretParseError::StringTooLongError)
+            Err(SecretParserError::StringTooLongError)
         } else {
             let mut arr = [0u8; 32];
             // this works because string slices are stored fundamentally as u8 arrays
@@ -78,8 +78,9 @@ impl From<Secret> for [u8; 32] {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+/// Errors encountered when parsing [Secret].
 #[derive(Debug, thiserror::Error)]
-pub enum SecretParseError {
+pub enum SecretParserError {
     #[error("The given string has more than the max allowed bytes of {MAX_LENGTH_BYTES}")]
     StringTooLongError,
 }

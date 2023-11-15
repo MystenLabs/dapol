@@ -68,6 +68,7 @@ const SERIALIZED_PROOF_EXTENSION: &str = "dapolproof";
 // -------------------------------------------------------------------------------------------------
 // Main struct & implementation.
 
+/// Inclusion proof for a PoL Merkle Tree.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct InclusionProof {
     path_siblings: PathSiblings<HiddenNodeContent>,
@@ -261,6 +262,7 @@ impl InclusionProof {
 // -------------------------------------------------------------------------------------------------
 // Errors
 
+/// Errors encountered when handling [InclusionProof].
 #[derive(thiserror::Error, Debug)]
 pub enum InclusionProofError {
     #[error("Siblings path verification failed")]

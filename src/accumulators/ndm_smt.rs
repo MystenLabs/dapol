@@ -44,6 +44,8 @@ pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtParserError};
 
 type Content = FullNodeContent;
 
+/// Non-Deterministic Mapping Sparse Merkle Tree accumulator type.
+///
 /// Main struct containing tree object, master secret and the salts.
 ///
 /// The entity mapping structure is required because each entity is randomly
@@ -278,6 +280,7 @@ fn new_padding_node_content_closure(
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+/// Errors encountered when handling [NdmSmt].
 #[derive(thiserror::Error, Debug)]
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]

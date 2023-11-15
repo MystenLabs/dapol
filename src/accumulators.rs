@@ -166,6 +166,7 @@ impl Accumulator {
     }
 }
 
+/// Errors encountered when handling an [Accumulator].
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorError {
     #[error("Error serializing/deserializing file")]

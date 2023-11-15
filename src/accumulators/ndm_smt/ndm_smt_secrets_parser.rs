@@ -24,7 +24,7 @@ use log::{info, warn};
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::ndm_smt_secrets::{NdmSmtSecrets, NdmSmtSecretsInput};
-use crate::secret::SecretParseError;
+use crate::secret::SecretParserError;
 
 /// Parser requires a valid path to a file.
 pub struct NdmSmtSecretsParser {
@@ -114,7 +114,7 @@ pub enum NdmSmtSecretsParserError {
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error converting string found in file to Secret")]
-    StringConversionError(#[from] SecretParseError),
+    StringConversionError(#[from] SecretParserError),
     #[error("Error reading the file")]
     FileReadError(#[from] std::io::Error),
     #[error("Deserialization process failed")]
