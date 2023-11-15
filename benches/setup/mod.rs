@@ -9,8 +9,17 @@ use serde::Serialize;
 use core::fmt::Debug;
 
 pub(crate) const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
-pub(crate) const NUM_LEAVES: [usize; 5] = [16, 256, 1024, 4096, 8192];
-pub(crate) const NUM_USERS: (usize, usize, usize, [usize; 5], [usize; 5], [usize; 5], [usize; 5]) = (
+pub(crate) const NUM_LEAVES: (usize, usize, [usize; 3], [usize; 3], [usize; 3]) =
+    (16, 256, [1024, 2048, 4096], [4096, 8192, 16384], [16384, 32768, 65536]);
+pub(crate) const NUM_USERS: (
+    usize,
+    usize,
+    usize,
+    [usize; 5],
+    [usize; 5],
+    [usize; 5],
+    [usize; 5],
+) = (
     250_000_000,
     125_000_000,
     100_000_000,
@@ -48,7 +57,7 @@ impl Mergeable for BenchTestContent {
     }
 }
 
-pub(crate) fn build_tree<F>(
+pub(crate) fn build_tree(
     height: Height,
     leaf_nodes: Vec<InputLeafNode<BenchTestContent>>,
 ) -> BinaryTree<BenchTestContent> {
@@ -65,7 +74,7 @@ pub(crate) fn build_tree<F>(
 
 pub(crate) fn get_leaf_nodes(
     num_leaves: usize,
-    height: Height,
+    height: &Height,
 ) -> Vec<InputLeafNode<BenchTestContent>> {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
