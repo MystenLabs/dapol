@@ -274,7 +274,8 @@ fn bench_generate_proof(c: &mut Criterion) {
 
     for h in TREE_HEIGHTS.into_iter() {
         let tree_height = Height::from(TREE_HEIGHTS[h as usize]);
-        let leaf_nodes = get_leaf_nodes(num_leaves, &tree_height);
+        // TODO: these need to be FullNodeContents not LeafNodes
+        let leaf_nodes = get_full_node_contents();
         let mut rng = rand::thread_rng();
 
         let node_range = Uniform::new(0usize, num_leaves);
@@ -295,7 +296,7 @@ fn bench_generate_proof(c: &mut Criterion) {
 
 pub fn build_tree<C, F>(
     height: Height,
-    leaf_nodes: Vec<InputLeafNode<C>>,
+    leaf_nodes: Vec<Node<C>>,
     new_padding_node_content: F,
 ) -> BinaryTree<C>
 where
@@ -366,6 +367,71 @@ pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<InputLeafNode<B
     }
 
     leaf_nodes
+}
+
+pub fn get_full_node_contents() -> Vec<Node<FullNodeContent>> {
+    // leaf at (2,0)
+    let liability = 27u64;
+    let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
+    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    let mut hasher = Hasher::new();
+    hasher.update("leaf".as_bytes());
+    let hash = hasher.finalize();
+    let leaf = Node {
+        coord: Coordinate { x: 2u64, y: 0u8 },
+        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+    };
+
+    // sibling at (3,0)
+    let liability = 23u64;
+    let blinding_factor = Scalar::from_bytes_mod_order(*b"22223333444455556666777788881111");
+    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    let mut hasher = Hasher::new();
+    hasher.update("sibling1".as_bytes());
+    let hash = hasher.finalize();
+    let sibling1 = Node {
+        coord: Coordinate { x: 3u64, y: 0u8 },
+        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+    };
+
+    // we need to construct the root hash & commitment for verification testing
+    let (parent_hash, parent_commitment) = build_parent(
+        leaf.content.commitment,
+        sibling1.content.commitment,
+        leaf.content.hash,
+        sibling1.content.hash,
+    );
+
+    // sibling at (0,1)
+    let liability = 30u64;
+    let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
+    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    let mut hasher = Hasher::new();
+    hasher.update("sibling2".as_bytes());
+    let hash = hasher.finalize();
+    let sibling2 = Node {
+        coord: Coordinate { x: 0u64, y: 1u8 },
+        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+    };
+
+    // we need to construct the root hash & commitment for verification testing
+    let (parent_hash, parent_commitment) = build_parent(
+        sibling2.content.commitment,
+        parent_commitment,
+        sibling2.content.hash,
+        parent_hash,
+    );
+
+    // sibling at (1,2)
+    let liability = 144u64;
+    let blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
+    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    let mut hasher = Hasher::new();
+    hasher.update("sibling3".as_bytes());
+    let hash = hasher.finalize();
+    let sibling3 = FullNodeContent::new(liability, blinding_factor, commitment, hash);
+
+    [leaf, sibling1, sibling2, sibling3].to_vec()
 }
 
 pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
