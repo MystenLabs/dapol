@@ -16,8 +16,8 @@ pub use accumulators::{
     Accumulator, AccumulatorError,
 };
 
-pub mod binary_tree; // TODO: maybe leave this as private in production 
-pub use binary_tree::Height;
+pub mod binary_tree; // TODO: maybe leave this as private in production
+pub use binary_tree::{Height, MAX_THREAD_COUNT};
 
 mod secret;
 pub use secret::{Secret, SecretParseError};

@@ -36,8 +36,9 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 mod tree_builder;
+pub use tree_builder::multi_threaded::{self, MAX_THREAD_COUNT};
 pub use tree_builder::{
-    multi_threaded, single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
+    single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
 };
 
 mod path_siblings;
@@ -395,7 +396,10 @@ impl<C> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from(sibling_a: Node<C>, sibling_b: Node<C>) -> Self {
         if sibling_b.is_right_sibling_of(&sibling_a) {
-            MatchedPair { left: sibling_a, right: sibling_b }
+            MatchedPair {
+                left: sibling_a,
+                right: sibling_b,
+            }
         } else if sibling_b.is_left_sibling_of(&sibling_a) {
             MatchedPair {
                 left: sibling_b,

@@ -1,7 +1,8 @@
-use dapol::binary_tree::{BinaryTree, Coordinate, InputLeafNode, Mergeable, TreeBuilder};
+use dapol::binary_tree::{
+    BinaryTree, Coordinate, InputLeafNode, Mergeable, TreeBuilder, MAX_THREAD_COUNT,
+};
 use dapol::{Hasher, Height};
 
-use log::error;
 use primitive_types::H256;
 use serde::Serialize;
 
@@ -102,31 +103,31 @@ pub(crate) fn get_threads(num_cores: u8) -> Vec<u8> {
         _ if num_cores <= 8 => {
             for i in 1..(num_cores) {
                 range.push(i);
-                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i)
+                range.push(MAX_THREAD_COUNT() / i)
             }
         }
 
         _ if num_cores > 8 && num_cores <= 32 => {
             for i in 1..(num_cores / 5) {
-                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i)
+                range.push(MAX_THREAD_COUNT() / i)
             }
         }
 
         _ if num_cores > 32 && num_cores <= 64 => {
             for i in 1..(num_cores / 10) {
-                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+                range.push(MAX_THREAD_COUNT() / i);
             }
         }
 
         _ if num_cores > 64 && num_cores <= 128 => {
             for i in 1..(num_cores / 20) {
-                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+                range.push(MAX_THREAD_COUNT() / i);
             }
         }
 
         _ if num_cores > 128 => {
             for i in 1..(num_cores / 40) {
-                range.push(MAX_THREAD_COUNT().unwrap_or(4) / i);
+                range.push(MAX_THREAD_COUNT() / i);
             }
         }
 

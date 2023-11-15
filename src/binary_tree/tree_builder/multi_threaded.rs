@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{info, warn, error};
+use log::{error, info, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -245,7 +245,7 @@ const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 
 // This is used to determine the number of threads to spawn in the
 // multi-threaded builder.
-fn MAX_THREAD_COUNT() -> u8 {
+pub fn MAX_THREAD_COUNT() -> u8 {
     crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
         *opt.borrow_mut() = std::thread::available_parallelism()
             .map_err(|err| {
@@ -253,7 +253,14 @@ fn MAX_THREAD_COUNT() -> u8 {
                 err
             })
             .map_or(None, |par| Some(par.get() as u8));
-        opt.clone().into_inner().unwrap_or(4)
+
+        if let Some(t) = opt.clone().into_inner() {
+            info!("Available parallelism detected: {}. This will be the max number of threads spawned.", t);
+            t
+        } else {
+            warn!("No default parallelism found, defaulting to {}", DEFAULT_MAX_THREAD_COUNT);
+            DEFAULT_MAX_THREAD_COUNT
+        }
     })
 }
 
