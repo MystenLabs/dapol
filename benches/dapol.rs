@@ -293,6 +293,8 @@ fn bench_generate_proof(c: &mut Criterion) {
             });
         });
     }
+
+    group.finish();
 }
 
 // HELPER FUNCTIONS
@@ -499,5 +501,5 @@ pub fn get_threads(num_cores: u8) -> Vec<u8> {
     range
 }
 
-criterion_group!(benches, bench_build_tree);
+criterion_group!(benches, bench_build_tree, bench_generate_proof);
 criterion_main!(benches);
