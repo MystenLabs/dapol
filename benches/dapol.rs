@@ -280,12 +280,16 @@ fn bench_generate_proof(c: &mut Criterion) {
 
         let node_range = Uniform::new(0usize, num_leaves);
 
-        let tree = build_tree(tree_height, leaf_nodes, get_full_padding_node_content());
+        let tree = build_tree(
+            tree_height,
+            leaf_nodes.clone(),
+            get_full_padding_node_content(),
+        );
 
         group.bench_function(BenchmarkId::new("splitting", h), |bench| {
             bench.iter(|| {
-                let leaf_node = leaf_nodes[rng.sample(node_range)];
-                generate_proof(tree, leaf_node);
+                let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
+                generate_proof(&tree, leaf_node);
             });
         });
     }
@@ -300,12 +304,21 @@ pub fn build_tree<C, F>(
     new_padding_node_content: F,
 ) -> BinaryTree<C>
 where
-    C: Clone + Debug + Mergeable + Serialize + Send + Sync,
+    C: Clone + Debug + Mergeable + Serialize + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
+    let mut input_leaf_nodes: Vec<InputLeafNode<C>> = Vec::new();
+
+    leaf_nodes.into_iter().for_each(|n| {
+        input_leaf_nodes.push(InputLeafNode {
+            content: n.content.clone(),
+            x_coord: n.coord.x,
+        })
+    });
+
     let builder = TreeBuilder::<C>::new()
         .with_height(height)
-        .with_leaf_nodes(leaf_nodes);
+        .with_leaf_nodes(input_leaf_nodes);
 
     let tree = builder
         .build_using_multi_threaded_algorithm(new_padding_node_content)
@@ -314,7 +327,7 @@ where
     tree
 }
 
-fn generate_proof(tree: BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeContent>) {
+fn generate_proof(tree: &BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeContent>) {
     let aggregation_factor = AggregationFactor::Divisor(2u8);
     let upper_bound_bit_length = 64u8;
 
@@ -338,7 +351,7 @@ fn generate_proof(tree: BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeCon
     .expect("Unable to generate path siblings");
 
     InclusionProof::generate(
-        leaf_node,
+        leaf_node.clone(),
         path_siblings,
         aggregation_factor,
         upper_bound_bit_length,
@@ -346,7 +359,7 @@ fn generate_proof(tree: BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeCon
     .expect("Unable to generate proof");
 }
 
-pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<InputLeafNode<BenchTestContent>> {
+pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
     assert!(
@@ -354,16 +367,19 @@ pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<InputLeafNode<B
         "Number of leaves exceeds maximum bottom layer nodes"
     );
 
-    let mut leaf_nodes: Vec<InputLeafNode<BenchTestContent>> = Vec::new();
+    let mut leaf_nodes: Vec<Node<BenchTestContent>> = Vec::new();
 
     for i in 0..num_leaves {
-        leaf_nodes.push(InputLeafNode::<BenchTestContent> {
-            x_coord: i as u64,
-            content: BenchTestContent {
-                hash: H256::random(),
-                value: i as u32,
-            },
-        });
+        leaf_nodes.push(
+            InputLeafNode::<BenchTestContent> {
+                x_coord: i as u64,
+                content: BenchTestContent {
+                    hash: H256::random(),
+                    value: i as u32,
+                },
+            }
+            .into_node(),
+        );
     }
 
     leaf_nodes
@@ -394,14 +410,6 @@ pub fn get_full_node_contents() -> Vec<Node<FullNodeContent>> {
         content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
     };
 
-    // we need to construct the root hash & commitment for verification testing
-    let (parent_hash, parent_commitment) = build_parent(
-        leaf.content.commitment,
-        sibling1.content.commitment,
-        leaf.content.hash,
-        sibling1.content.hash,
-    );
-
     // sibling at (0,1)
     let liability = 30u64;
     let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
@@ -414,14 +422,6 @@ pub fn get_full_node_contents() -> Vec<Node<FullNodeContent>> {
         content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
     };
 
-    // we need to construct the root hash & commitment for verification testing
-    let (parent_hash, parent_commitment) = build_parent(
-        sibling2.content.commitment,
-        parent_commitment,
-        sibling2.content.hash,
-        parent_hash,
-    );
-
     // sibling at (1,2)
     let liability = 144u64;
     let blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
@@ -429,7 +429,10 @@ pub fn get_full_node_contents() -> Vec<Node<FullNodeContent>> {
     let mut hasher = Hasher::new();
     hasher.update("sibling3".as_bytes());
     let hash = hasher.finalize();
-    let sibling3 = FullNodeContent::new(liability, blinding_factor, commitment, hash);
+    let sibling3 = Node {
+        coord: Coordinate { x: 1u64, y: 2u8 },
+        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
+    };
 
     [leaf, sibling1, sibling2, sibling3].to_vec()
 }
