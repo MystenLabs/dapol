@@ -61,7 +61,6 @@ use std::time::Duration;
 
 use dapol::binary_tree::{
     BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
-    MAX_THREAD_COUNT,
 };
 use dapol::node_content::FullNodeContent;
 use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
@@ -136,7 +135,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
 
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
-    group.measurement_time(Duration::from_secs(120));
+    // group.measurement_time(Duration::from_secs(120));
 
     // TREE_HEIGHT = 4
     group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
@@ -408,45 +407,8 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
     }
 }
 
-pub fn get_threads(num_cores: u8) -> Vec<u8> {
-    let mut range: Vec<u8> = Vec::new();
-    match num_cores {
-        _ if num_cores <= 8 => {
-            for i in 1..(num_cores) {
-                range.push(i);
-                range.push(MAX_THREAD_COUNT() / i)
-            }
-        }
-
-        _ if num_cores > 8 && num_cores <= 32 => {
-            for i in 1..(num_cores / 5) {
-                range.push(MAX_THREAD_COUNT() / i)
-            }
-        }
-
-        _ if num_cores > 32 && num_cores <= 64 => {
-            for i in 1..(num_cores / 10) {
-                range.push(MAX_THREAD_COUNT() / i);
-            }
-        }
-
-        _ if num_cores > 64 && num_cores <= 128 => {
-            for i in 1..(num_cores / 20) {
-                range.push(MAX_THREAD_COUNT() / i);
-            }
-        }
-
-        _ if num_cores > 128 => {
-            for i in 1..(num_cores / 40) {
-                range.push(MAX_THREAD_COUNT() / i);
-            }
-        }
-
-        _ => panic!("Thread count overflow"),
-    }
-
-    range
-}
-
-criterion_group!(benches, /* bench_build_tree, */ bench_generate_proof);
+criterion_group!(
+    benches,
+    /* bench_build_tree, */ bench_generate_proof, /* bench_verify_proof */
+);
 criterion_main!(benches);
