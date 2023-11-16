@@ -3,8 +3,24 @@ name = "dapol"
 version = "0.1.0"
 authors = ["Stenton Mayne <stentonian@protonmail.com>"]
 edition = "2021"
-description = "DAPOL+ Proof of Liabilities protocol in Rust"
+description = "DAPOL+ Proof of Liabilities protocol"
 license = "MIT"
+repository = "https://github.com/silversixpence-crypto/dapol"
+categories = ["cryptography"]
+keywords = [
+    "cryptography",
+    "crypto",
+    "zero-knowledge",
+    "bulletproofs",
+    "cli"
+]
+
+# This enables Latex for the docs.
+[package.metadata.docs.rs]
+rustdoc-args = [
+    "--html-in-header",
+    "katex-header.html",
+]
 
 [lib]
 bench = false
@@ -47,12 +63,6 @@ serde_bytes = "0.11.12"
 bincode = "1.3.3"
 chrono = "0.4.31"
 derive_builder = "0.12.0"
-
-[package.metadata.docs.rs]
-rustdoc-args = [
-    "--html-in-header",
-    "katex-header.html",
-]
 
 [dev-dependencies]
 criterion = "0.4.0"
