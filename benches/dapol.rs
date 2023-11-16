@@ -49,7 +49,7 @@
 // }
 
 use bulletproofs::PedersenGens;
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, SamplingMode};
 use curve25519_dalek_ng::scalar::Scalar;
 use primitive_types::H256;
 use rand::distributions::Uniform;
@@ -202,7 +202,6 @@ pub fn bench_build_tree(c: &mut Criterion) {
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
-    group.sampling_mode(SamplingMode::Flat);
     group.measurement_time(Duration::from_secs(120));
 
     // changing NUM_USERS is not applicable for this benchmark
@@ -216,11 +215,42 @@ fn bench_generate_proof(c: &mut Criterion) {
 
         let tree = build_tree(height, leaf_nodes.clone(), get_full_padding_node_content());
 
+        let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
+
         group.bench_function(BenchmarkId::new("inclusion_proof", h), |bench| {
             bench.iter(|| {
-                let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
-                generate_proof(&tree, leaf_node);
+                generate_proof(&tree, &leaf_node);
             });
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_verify_proof(c: &mut Criterion) {
+    let mut group = c.benchmark_group("verify");
+    group.sample_size(10);
+
+    // changing NUM_USERS is not applicable for this benchmark
+    let num_leaves = NUM_USERS[0];
+
+    for h in TREE_HEIGHTS.into_iter() {
+        let height = Height::from(h);
+        let leaf_nodes = get_full_node_content(num_leaves, &height);
+        let mut rng = rand::thread_rng();
+        let node_range = Uniform::new(0usize, num_leaves);
+
+        let tree = build_tree(height, leaf_nodes.clone(), get_full_padding_node_content());
+        let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
+
+        group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
+            bench.iter_batched(
+                || generate_proof(&tree, &leaf_node),
+                |(proof)| {
+                    // verify_proof
+                },
+                BatchSize::SmallInput,
+            );
         });
     }
 
@@ -259,7 +289,10 @@ where
     tree
 }
 
-fn generate_proof(tree: &BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeContent>) {
+fn generate_proof(
+    tree: &BinaryTree<FullNodeContent>,
+    leaf_node: &Node<FullNodeContent>,
+) -> InclusionProof {
     let aggregation_factor = AggregationFactor::Divisor(2u8);
     let upper_bound_bit_length = 64u8;
 
@@ -270,13 +303,15 @@ fn generate_proof(tree: &BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeCo
     )
     .expect("Unable to generate path siblings");
 
-    InclusionProof::generate(
-        leaf_node,
+    let proof = InclusionProof::generate(
+        leaf_node.clone(),
         path_siblings,
         aggregation_factor,
         upper_bound_bit_length,
     )
     .expect("Unable to generate proof");
+
+    proof
 }
 
 pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
