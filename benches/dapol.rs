@@ -50,6 +50,7 @@
 
 use bulletproofs::PedersenGens;
 use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, SamplingMode};
+use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
 use primitive_types::H256;
 use rand::distributions::Uniform;
@@ -339,50 +340,166 @@ pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<Benc
     leaf_nodes
 }
 
-pub fn get_full_node_content(num_leaves: usize, height: &Height) -> Vec<Node<FullNodeContent>> {
+pub fn get_full_node_content(height: &Height) -> (
+        Node<FullNodeContent>,
+        PathSiblings<FullNodeContent>,
+        RistrettoPoint,
+        H256,
+     {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
-    assert!(
-        num_leaves <= max_bottom_layer_nodes,
-        "Number of leaves exceeds maximum bottom layer nodes"
-    );
-
     let mut rng = rand::thread_rng();
-    let node_range = Uniform::new(4, height.as_y_coord());
-    let liability_range = Uniform::new(1, u32::MAX);
+    let liability_range = Uniform::new(1, u64::MAX);
 
-    let blinding_factors = [
-        b"90998600161833439099840024221618",
-        b"34334644060024221618334357559098",
-        b"16183433909906002422161834335755",
-        b"46442422181134335755929806001618",
-        b"90980600242216183433575590980600",
-        b"18113433575590998600161834339299",
-        b"57551618343357559099860018113433",
-        b"57559099860016183433909986002422",
-        b"34335755909986001618343390990400",
-        b"06001618343390998000242216183433",
+    let liabilities = [
+        rng.sample(liability_range),
+        rng.sample(liability_range),
+        rng.sample(liability_range),
+        rng.sample(liability_range),
     ];
 
-    let mut leaf_nodes: Vec<Node<FullNodeContent>> = Vec::new();
+    let blinding_factors = [
+        Scalar::from_bytes_mod_order(*b"90998600161833439099840024221618"),
+        Scalar::from_bytes_mod_order(*b"34334644060024221618334357559098"),
+        Scalar::from_bytes_mod_order(*b"16183433909906002422161834335755"),
+        Scalar::from_bytes_mod_order(*b"46442422181134335755929806001618"),
+        //     "90980600242216183433575590980600",
+        //     "18113433575590998600161834339299",
+        //     "57551618343357559099860018113433",
+        //     "57559099860016183433909986002422",
+        //     "34335755909986001618343390990400",
+        //     "06001618343390998000242216183433",
+    ];
 
-    for i in 0..num_leaves {
-        let liability = rng.sample(liability_range) as u64;
-        let blinding_factor =
-            Scalar::from_bytes_mod_order(*blinding_factors[i % blinding_factors.len()]);
-        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-        let leaf = Node {
-            coord: Coordinate {
-                x: i as u64,
-                y: rng.sample(node_range),
-            },
-            content: FullNodeContent::new(liability, blinding_factor, commitment, H256::random()),
-        };
+    let commitments = [
+        PedersenGens::default().commit(Scalar::from(liabilities[0]), blinding_factors[0]),
+        PedersenGens::default().commit(Scalar::from(liabilities[1]), blinding_factors[1]),
+        PedersenGens::default().commit(Scalar::from(liabilities[2]), blinding_factors[2]),
+        PedersenGens::default().commit(Scalar::from(liabilities[3]), blinding_factors[3]),
+    ];
 
-        leaf_nodes.push(leaf)
+    let mut hashers: Vec<Hasher> = Vec::with_capacity(4);
+
+    let bytes = [
+        b"leafleafleafleafleafleafleafleaf",
+        b"sibling1sibling1sibling1sibling1",
+        b"sibling2sibling2sibling2sibling2",
+        b"sibling3sibling3sibling3sibling3",
+    ];
+
+    for (i, mut hasher) in hashers.into_iter().enumerate() {
+        hasher.update(bytes[i]);
+        hashers.push(hasher);
     }
 
-    leaf_nodes
+    let leaf = Node {
+        coord: Coordinate { x: 2u64, y: 0u8 },
+        content: FullNodeContent::new(
+            liabilities[0],
+            blinding_factors[0],
+            commitments[0],
+            hashers[0].finalize(),
+        ),
+    };
+
+    let sibling1 = Node {
+        coord: Coordinate { x: 3u64, y: 0u8 },
+        content: FullNodeContent::new(
+            liabilities[1],
+            blinding_factors[1],
+            commitments[1],
+            hashers[1].finalize(),
+        ),
+    };
+
+    let (parent_commitment, parent_hash) = get_parent_node(
+        leaf.content.commitment,
+        sibling1.content.commitment,
+        leaf.content.hash,
+        sibling1.content.hash,
+    );
+
+    let sibling2 = Node {
+        coord: Coordinate { x: 0u64, y: 1u8 },
+        content: FullNodeContent::new(
+            liabilities[2],
+            blinding_factors[2],
+            commitments[2],
+            hashers[2].finalize(),
+        ),
+    };
+
+    let (parent_commitment, parent_hash) = get_parent_node(
+        sibling2.content.commitment,
+        parent_commitment,
+        sibling2.content.hash,
+        parent_hash,
+    );
+
+    let sibling3 = Node {
+        coord: Coordinate { x: 1u64, y: 2u8 },
+        content: FullNodeContent::new(
+            liabilities[3],
+            blinding_factors[3],
+            commitments[3],
+            hashers[3].finalize(),
+        ),
+    };
+
+    let (root_commitment, root_hash) = get_parent_node(
+        sibling3.content.commitment,
+        parent_commitment,
+        sibling3.content.hash,
+        parent_hash,
+    );
+
+    (
+        leaf,
+        PathSiblings(vec![sibling1, sibling2, sibling3]),
+        root_commitment,
+        root_hash,
+    )
+
+    // let mut leaf_nodes: Vec<Node<FullNodeContent>> = Vec::new();
+
+    // for i in 0..num_leaves {
+    //     let liability = rng.sample(liability_range) as u64;
+    //     let blinding_factor =
+    //         Scalar::from_bytes_mod_order(*blinding_factors[i % blinding_factors.len()]);
+    //     let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+    //     let leaf = Node {
+    //         coord: Coordinate {
+    //             x: i as u64,
+    //             y: rng.sample(node_range),
+    //         },
+    //         content: FullNodeContent::new(liability, blinding_factor, commitment, H256::random()),
+    //     };
+
+    //     leaf_nodes.push(leaf)
+    // }
+
+    // leaf_nodes
+}
+
+fn get_parent_node(
+    left_commitment: RistrettoPoint,
+    right_commitment: RistrettoPoint,
+    left_hash: H256,
+    right_hash: H256,
+) -> (RistrettoPoint, H256) {
+    let parent_commitment: RistrettoPoint = left_commitment + right_commitment;
+
+    let mut hasher = Hasher::new();
+
+    let parent_hash: H256 = {
+        hasher.update(left_commitment.compress().as_bytes());
+        hasher.update(right_commitment.compress().as_bytes());
+        hasher.update(left_hash.as_bytes());
+        hasher.update(right_hash.as_bytes());
+        hasher.finalize()
+    };
+
+    (parent_commitment, parent_hash)
 }
 
 pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
