@@ -1,55 +1,6 @@
-// fn verify_proof(c: &mut Criterion) {
-//     let mut group = c.benchmark_group("verify");
-//     group.sample_size(10);
-
-//     // this benchmark depends on the tree height and not the number of leaves,
-//     // so we just pick the smallest number of leaves
-//     let num_leaves = NUM_USERS[0];
-//     for &tree_height in TREE_HEIGHTS.iter() {
-//         let items = build_item_list(num_leaves, tree_height);
-//         let mut rng = thread_rng();
-//         let item_range = Uniform::new(0usize, num_leaves);
-
-//         let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(&items, tree_height);
-//         group.bench_function(BenchmarkId::new("splitting", tree_height), |bench| {
-//             bench.iter_batched(
-//                 || {
-//                     // generate a proof
-//                     let item_idx = rng.sample(item_range);
-//                     let tree_index = &items[item_idx].0;
-//                     (item_idx, dapol.generate_proof(tree_index).unwrap())
-//                 },
-//                 |(item_idx, proof)| {
-//                     // time proof verification
-//                     proof.verify(&dapol.root(), &items[item_idx].1.get_proof_node())
-//                 },
-//                 BatchSize::SmallInput,
-//             );
-//         });
-
-//         let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
-//         group.bench_function(BenchmarkId::new("padding", tree_height), |bench| {
-//             bench.iter_batched(
-//                 || {
-//                     // generate a proof
-//                     let item_idx = rng.sample(item_range);
-//                     let tree_index = &items[item_idx].0;
-//                     (item_idx, dapol.generate_proof(tree_index).unwrap())
-//                 },
-//                 |(item_idx, proof)| {
-//                     // time proof verification
-//                     proof.verify(&dapol.root(), &items[item_idx].1.get_proof_node())
-//                 },
-//                 BatchSize::SmallInput,
-//             );
-//         });
-//     }
-
-//     group.finish();
-// }
-
 use bulletproofs::PedersenGens;
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, SamplingMode};
+use criterion::{criterion_group, criterion_main};
+use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode};
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
 use primitive_types::H256;
@@ -58,7 +9,6 @@ use rand::Rng;
 use serde::Serialize;
 
 use core::fmt::Debug;
-use std::time::Duration;
 
 use dapol::binary_tree::{
     BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
@@ -236,7 +186,7 @@ fn bench_verify_proof(c: &mut Criterion) {
         group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
             bench.iter_batched(
                 || generate_proof(&tree, &leaf_node),
-                |(proof)| proof.verify(root_hash),
+                |proof| proof.verify(root_hash),
                 BatchSize::SmallInput,
             );
         });
@@ -377,7 +327,7 @@ pub fn get_full_node_contents(// height: &Height,
 
     let mut hasher = Hasher::new();
     hasher.update(bytes[1]);
-    let has = hasher.finalize();
+    let hash = hasher.finalize();
 
     let sibling1 = Node {
         coord: Coordinate { x: 3u64, y: 0u8 },
@@ -473,6 +423,8 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
 
 criterion_group!(
     benches,
-    /* bench_build_tree, */ bench_generate_proof, /* bench_verify_proof */
+    bench_build_tree,
+    bench_generate_proof,
+    bench_verify_proof
 );
 criterion_main!(benches);
