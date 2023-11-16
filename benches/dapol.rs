@@ -266,7 +266,9 @@ fn bench_verify() -> () {
     let proof = black_box(setup_verify().0);
     let root_hash = black_box(setup_verify().1);
 
-    proof.verify(root_hash).expect("Unable to verify proof")
+    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+
+    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 // HELPER FUNCTIONS
@@ -495,17 +497,18 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
     }
 }
 
-// criterion_group!(
-//     benches,
-//     bench_build_tree,
-//     bench_generate_proof,
-//     bench_verify_proof
-// );
+criterion_group!(
+    benches,
+    bench_build_tree,
+    bench_generate_proof,
+    bench_verify_proof
+);
+
 // criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64,  bench_generate, /*  bench_verify */
+    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64,  bench_generate,  /* bench_verify */
 );
 
 main!(library_benchmark_groups = bench_dapol);
