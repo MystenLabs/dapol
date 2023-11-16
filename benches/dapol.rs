@@ -120,7 +120,7 @@ use bulletproofs::PedersenGens;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
 use curve25519_dalek_ng::scalar::Scalar;
 use primitive_types::H256;
-use rand::distributions::Uniform;
+use rand::distributions::{Alphanumeric, Standard, Uniform};
 use rand::Rng;
 use serde::Serialize;
 
@@ -137,7 +137,8 @@ use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
 // CONSTANTS
 // ================================================================================================
 
-pub const TREE_HEIGHTS: [u8; 5] = [4, 8, 16, 32, 64];
+// TREE_HEIGHT = 4 and 8 are hard coded in benchmarks
+pub const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
 pub const NUM_USERS: [usize; 23] = [
     10_000,
     20_000,
@@ -205,32 +206,33 @@ pub fn bench_build_tree(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
     group.measurement_time(Duration::from_secs(120));
 
-    // TREE_HEIGHT = 4
-    group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(TREE_HEIGHTS[0]);
-            let leaf_nodes = get_leaf_nodes(8, &tree_height);
-            build_tree(tree_height, leaf_nodes, get_padding_node_content());
-            ()
-        })
-    });
+    // // TREE_HEIGHT = 4
+    // group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
+    //     bench.iter(|| {
+    //         let tree_height = Height::from(4);
+    //         let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
+    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //         ()
+    //     })
+    // });
 
-    // TREE_HEIGHT = 8
-    group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(TREE_HEIGHTS[1]);
-            let leaf_nodes = get_leaf_nodes(128, &tree_height);
-            build_tree(tree_height, leaf_nodes, get_padding_node_content());
-            ()
-        })
-    });
+    // // TREE_HEIGHT = 8
+    // group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
+    //     bench.iter(|| {
+    //         let tree_height = Height::from(8);
+    //         let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
+    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //         ()
+    //     })
+    // });
 
     // TREE_HEIGHT = 16
+    // NUM_USERS starts at 10_000, so these are hardcoded for benchmarking
     for l in [4096, 8192, 16_384, 32_768].into_iter() {
         group.bench_function(BenchmarkId::new("height_16", l), |bench| {
             bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[2]);
-                let leaf_nodes = get_leaf_nodes(l, &tree_height);
+                let tree_height = Height::from(TREE_HEIGHTS[0]);
+                let leaf_nodes = get_input_leaf_nodes(l, &tree_height);
                 build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
@@ -238,11 +240,11 @@ pub fn bench_build_tree(c: &mut Criterion) {
     }
 
     // TREE_HEIGHT = 32
-    for l in NUM_USERS.into_iter() {
+    for l in NUM_USERS[0..10].into_iter() {
         group.bench_function(BenchmarkId::new("height_32", l), |bench| {
             bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[3]);
-                let leaf_nodes = get_leaf_nodes(l, &tree_height);
+                let tree_height = Height::from(TREE_HEIGHTS[1]);
+                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
                 build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
@@ -250,11 +252,11 @@ pub fn bench_build_tree(c: &mut Criterion) {
     }
 
     // TREE_HEIGHT = 64
-    for l in NUM_USERS.into_iter() {
+    for l in NUM_USERS[0..10].into_iter() {
         group.bench_function(BenchmarkId::new("height_64", l), |bench| {
             bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[4]);
-                let leaf_nodes = get_leaf_nodes(l, &tree_height);
+                let tree_height = Height::from(TREE_HEIGHTS[2]);
+                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
 
                 build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
@@ -268,23 +270,19 @@ pub fn bench_build_tree(c: &mut Criterion) {
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
+    group.sampling_mode(SamplingMode::Flat);
+    group.measurement_time(Duration::from_secs(30));
 
-    // NUM_USERS is not applicable for this benchmark
-    let num_leaves = NUM_USERS[0];
+    // changing NUM_USERS is not applicable for this benchmark
+    let num_leaves = NUM_USERS[0]; // 16 users
 
     for h in TREE_HEIGHTS.into_iter() {
-        let tree_height = Height::from(TREE_HEIGHTS[h as usize]);
-        // TODO: these need to be FullNodeContents not LeafNodes
-        let leaf_nodes = get_full_node_contents();
+        let height = Height::from(TREE_HEIGHTS[h as usize]);
+        let leaf_nodes = get_full_node_content(num_leaves, &height);
         let mut rng = rand::thread_rng();
-
         let node_range = Uniform::new(0usize, num_leaves);
 
-        let tree = build_tree(
-            tree_height,
-            leaf_nodes.clone(),
-            get_full_padding_node_content(),
-        );
+        let tree = build_tree(height, leaf_nodes.clone(), get_full_padding_node_content());
 
         group.bench_function(BenchmarkId::new("splitting", h), |bench| {
             bench.iter(|| {
@@ -349,7 +347,7 @@ fn generate_proof(tree: &BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeCo
     .expect("Unable to generate proof");
 }
 
-pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
+pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
     assert!(
@@ -375,56 +373,50 @@ pub fn get_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestC
     leaf_nodes
 }
 
-pub fn get_full_node_contents() -> Vec<Node<FullNodeContent>> {
-    // leaf at (2,0)
-    let liability = 27u64;
-    let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
-    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    let mut hasher = Hasher::new();
-    hasher.update("leaf".as_bytes());
-    let hash = hasher.finalize();
-    let leaf = Node {
-        coord: Coordinate { x: 2u64, y: 0u8 },
-        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
-    };
+pub fn get_full_node_content(num_leaves: usize, height: &Height) -> Vec<Node<FullNodeContent>> {
+    let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
-    // sibling at (3,0)
-    let liability = 23u64;
-    let blinding_factor = Scalar::from_bytes_mod_order(*b"22223333444455556666777788881111");
-    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    let mut hasher = Hasher::new();
-    hasher.update("sibling1".as_bytes());
-    let hash = hasher.finalize();
-    let sibling1 = Node {
-        coord: Coordinate { x: 3u64, y: 0u8 },
-        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
-    };
+    assert!(
+        num_leaves <= max_bottom_layer_nodes,
+        "Number of leaves exceeds maximum bottom layer nodes"
+    );
 
-    // sibling at (0,1)
-    let liability = 30u64;
-    let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
-    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    let mut hasher = Hasher::new();
-    hasher.update("sibling2".as_bytes());
-    let hash = hasher.finalize();
-    let sibling2 = Node {
-        coord: Coordinate { x: 0u64, y: 1u8 },
-        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
-    };
+    let mut rng = rand::thread_rng();
+    let node_range = Uniform::new(4, height.as_y_coord());
+    let liability_range = Uniform::new(1, u32::MAX);
 
-    // sibling at (1,2)
-    let liability = 144u64;
-    let blinding_factor = Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");
-    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    let mut hasher = Hasher::new();
-    hasher.update("sibling3".as_bytes());
-    let hash = hasher.finalize();
-    let sibling3 = Node {
-        coord: Coordinate { x: 1u64, y: 2u8 },
-        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
-    };
+    let blinding_factors = [
+        b"90998600161833439099840024221618",
+        b"34334644060024221618334357559098",
+        b"16183433909906002422161834335755",
+        b"46442422181134335755929806001618",
+        b"90980600242216183433575590980600",
+        b"18113433575590998600161834339299",
+        b"57551618343357559099860018113433",
+        b"57559099860016183433909986002422",
+        b"34335755909986001618343390990400",
+        b"06001618343390998000242216183433",
+    ];
 
-    [leaf, sibling1, sibling2, sibling3].to_vec()
+    let mut leaf_nodes: Vec<Node<FullNodeContent>> = Vec::new();
+
+    for i in 0..num_leaves {
+        let liability = rng.sample(liability_range) as u64;
+        let blinding_factor =
+            Scalar::from_bytes_mod_order(*blinding_factors[i % blinding_factors.len()]);
+        let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
+        let leaf = Node {
+            coord: Coordinate {
+                x: i as u64,
+                y: rng.sample(node_range),
+            },
+            content: FullNodeContent::new(liability, blinding_factor, commitment, H256::random()),
+        };
+
+        leaf_nodes.push(leaf)
+    }
+
+    leaf_nodes
 }
 
 pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
@@ -489,5 +481,5 @@ pub fn get_threads(num_cores: u8) -> Vec<u8> {
     range
 }
 
-criterion_group!(benches, bench_build_tree, bench_generate_proof);
+criterion_group!(benches, /* bench_build_tree, */ bench_generate_proof);
 criterion_main!(benches);
