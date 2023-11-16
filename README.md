@@ -1,5 +1,3 @@
-[![Coverage Status](https://coveralls.io/repos/github/silversixpence-crypto/dapol/badge.svg?branch=main)](https://coveralls.io/github/silversixpence-crypto/dapol?branch=main)
-
 # Proof of Liabilities protocol implemented in Rust
 
 Implementation of the DAPOL+ protocol introduced in the "Generalized Proof of Liabilities" by Yan Ji and Konstantinos Chalkias ACM CCS 2021 paper, available here: https://eprint.iacr.org/2021/1350
