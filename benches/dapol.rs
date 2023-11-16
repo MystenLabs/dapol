@@ -108,13 +108,12 @@ pub fn bench_build_tree(c: &mut Criterion) {
         })
     });
 
-    // TREE_HEIGHT = 16
-    // NUM_USERS starts at 10_000, so these are hardcoded for benchmarking
-    for l in [4096, 8192, 16_384, 32_768].into_iter() {
+    // TREE_HEIGHT = 16 (max. NUM_USERS is 32_768)
+    for l in NUM_USERS[0..2].into_iter() {
         group.bench_function(BenchmarkId::new("height_16", l), |bench| {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[0]);
-                let leaf_nodes = get_input_leaf_nodes(l, &tree_height);
+                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
                 build_tree(tree_height, leaf_nodes, get_padding_node_content());
                 ()
             })
@@ -122,7 +121,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
     }
 
     // TREE_HEIGHT = 32
-    for l in NUM_USERS[0..10].into_iter() {
+    for l in NUM_USERS[0..16].into_iter() {
         group.bench_function(BenchmarkId::new("height_32", l), |bench| {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[1]);
@@ -134,7 +133,7 @@ pub fn bench_build_tree(c: &mut Criterion) {
     }
 
     // TREE_HEIGHT = 64
-    for l in NUM_USERS[0..10].into_iter() {
+    for l in NUM_USERS[0..16].into_iter() {
         group.bench_function(BenchmarkId::new("height_64", l), |bench| {
             bench.iter(|| {
                 let tree_height = Height::from(TREE_HEIGHTS[2]);
