@@ -117,22 +117,22 @@
 // }
 
 use bulletproofs::PedersenGens;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
 use curve25519_dalek_ng::scalar::Scalar;
+use primitive_types::H256;
+use rand::distributions::Uniform;
+use rand::Rng;
+use serde::Serialize;
+
+use core::fmt::Debug;
+use std::time::Duration;
+
 use dapol::binary_tree::{
     BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
     MAX_THREAD_COUNT,
 };
 use dapol::node_content::FullNodeContent;
 use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
-
-use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, SamplingMode};
-use primitive_types::H256;
-use rand::distributions::Uniform;
-use rand::{thread_rng, Rng};
-use serde::Serialize;
-
-use core::fmt::Debug;
-use std::time::Duration;
 
 // CONSTANTS
 // ================================================================================================
@@ -333,27 +333,15 @@ fn generate_proof(tree: &BinaryTree<FullNodeContent>, leaf_node: Node<FullNodeCo
     let aggregation_factor = AggregationFactor::Divisor(2u8);
     let upper_bound_bit_length = 64u8;
 
-    // leaf at (2,0)
-    let liability = 27u64;
-    let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
-    let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    let mut hasher = Hasher::new();
-    hasher.update("leaf".as_bytes());
-    let hash = hasher.finalize();
-    let leaf = Node {
-        coord: Coordinate { x: 2u64, y: 0u8 },
-        content: FullNodeContent::new(liability, blinding_factor, commitment, hash),
-    };
-
     let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
-        &tree,
+        tree,
         &leaf_node,
         get_full_padding_node_content(),
     )
     .expect("Unable to generate path siblings");
 
     InclusionProof::generate(
-        leaf_node.clone(),
+        leaf_node,
         path_siblings,
         aggregation_factor,
         upper_bound_bit_length,
