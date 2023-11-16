@@ -8,6 +8,8 @@ use rand::distributions::Uniform;
 use rand::Rng;
 use serde::Serialize;
 
+use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
+
 use core::fmt::Debug;
 
 use dapol::binary_tree::{
@@ -192,6 +194,64 @@ fn bench_verify_proof(c: &mut Criterion) {
     }
 
     group.finish();
+}
+
+#[library_benchmark]
+fn bench_build_height4() -> () {
+    let tree_height = Height::from(4);
+    let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
+    build_tree(tree_height, leaf_nodes, get_padding_node_content());
+}
+
+#[library_benchmark]
+fn bench_build_height8() -> () {
+    let tree_height = Height::from(8);
+    let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
+    build_tree(tree_height, leaf_nodes, get_padding_node_content());
+}
+
+#[library_benchmark]
+fn bench_build_height16() -> () {
+    for l in NUM_USERS[0..2].into_iter() {
+        let tree_height = Height::from(TREE_HEIGHTS[0]);
+        let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    }
+}
+
+#[library_benchmark]
+fn bench_build_height32() -> () {
+    for l in NUM_USERS[0..16].into_iter() {
+        let tree_height = Height::from(TREE_HEIGHTS[1]);
+        let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    }
+}
+
+#[library_benchmark]
+fn bench_build_height64() -> () {
+    for l in NUM_USERS[0..16].into_iter() {
+        let tree_height = Height::from(TREE_HEIGHTS[2]);
+        let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    }
+}
+
+#[library_benchmark]
+fn bench_generate() -> InclusionProof {
+    let tree_height = Height::from(4);
+    let leaf_nodes = get_full_node_contents();
+    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
+    generate_proof(&tree, &leaf_nodes.0)
+}
+
+#[library_benchmark]
+fn bench_verify() -> () {
+    let tree_height = Height::from(4);
+    let leaf_nodes = get_full_node_contents();
+    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
+    let proof = generate_proof(&tree, &leaf_nodes.0);
+    proof.verify(leaf_nodes.3).expect("Unable to verify proof")
 }
 
 // HELPER FUNCTIONS
@@ -420,10 +480,17 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
     }
 }
 
-criterion_group!(
-    benches,
-    bench_build_tree,
-    bench_generate_proof,
-    bench_verify_proof
+// criterion_group!(
+//     benches,
+//     bench_build_tree,
+//     bench_generate_proof,
+//     bench_verify_proof
+// );
+// criterion_main!(benches);
+
+library_benchmark_group!(
+    name = bench_dapol;
+    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64, bench_generate, bench_verify
 );
-criterion_main!(benches);
+
+main!(library_benchmark_groups = bench_dapol);
