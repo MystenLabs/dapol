@@ -47,7 +47,7 @@ mod utils;
 pub use utils::max_bottom_layer_nodes;
 
 mod height;
-pub use height::{Height, MAX_HEIGHT, MIN_HEIGHT};
+pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
 
 use crate::utils::ErrOnSome;
 
@@ -395,7 +395,10 @@ impl<C> MatchedPair<C> {
     /// check and should never actually happen unless code is changed.
     fn from(sibling_a: Node<C>, sibling_b: Node<C>) -> Self {
         if sibling_b.is_right_sibling_of(&sibling_a) {
-            MatchedPair { left: sibling_a, right: sibling_b }
+            MatchedPair {
+                left: sibling_a,
+                right: sibling_b,
+            }
         } else if sibling_b.is_left_sibling_of(&sibling_a) {
             MatchedPair {
                 left: sibling_b,

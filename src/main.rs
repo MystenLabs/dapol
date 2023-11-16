@@ -4,10 +4,10 @@ use clap::Parser;
 use log::debug;
 
 use dapol::{
+    accumulators::NdmSmtConfigBuilder,
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
-    NdmSmtConfigBuilder,
 };
 use patharg::InputArg;
 

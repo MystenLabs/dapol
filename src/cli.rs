@@ -1,6 +1,6 @@
-//! Command Line Interface.
+//! Command Line Interface implementation using [clap].
 //!
-//! See [LONG_ABOUT] for more information.
+//! See [MAIN_LONG_ABOUT] for more information.
 
 use clap::{command, Args, Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
@@ -154,7 +154,7 @@ pub struct EntitySource {
 // -------------------------------------------------------------------------------------------------
 // Long help texts.
 
-const MAIN_LONG_ABOUT: &str = "
+pub const MAIN_LONG_ABOUT: &str = "
 DAPOL+ Proof of Liabilities protocol in Rust.
 
 **NOTE** This project is currently still a work in progress, but is ready for

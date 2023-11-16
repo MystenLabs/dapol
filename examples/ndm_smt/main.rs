@@ -7,8 +7,6 @@
 //! At the time of writing (Nov 2023) only the NDM-SMT accumulator is supported
 //! so this is the only type of tree that is used in this example.
 
-// STENT TODO need to proof generation with aggregation factor
-
 use std::str::FromStr;
 
 extern crate clap_verbosity_flag;

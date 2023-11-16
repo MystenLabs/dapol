@@ -1,3 +1,5 @@
+//! Utility functions for reading and writing to files.
+
 use std::fmt::Debug;
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
