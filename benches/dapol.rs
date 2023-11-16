@@ -237,21 +237,36 @@ fn bench_build_height64() -> () {
     }
 }
 
-#[library_benchmark]
-fn bench_generate() -> InclusionProof {
+fn setup_generate() -> (BinaryTree<FullNodeContent>, Node<FullNodeContent>, H256) {
     let tree_height = Height::from(4);
     let leaf_nodes = get_full_node_contents();
     let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
-    generate_proof(&tree, &leaf_nodes.0)
+
+    (tree, leaf_nodes.0, leaf_nodes.3)
+}
+
+fn setup_verify() -> (InclusionProof, H256) {
+    let tree_height = Height::from(4);
+    let leaf_nodes = get_full_node_contents();
+    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
+
+    (generate_proof(&tree, &leaf_nodes.0), leaf_nodes.3)
+}
+
+#[library_benchmark]
+fn bench_generate() -> InclusionProof {
+    generate_proof(
+        black_box(&setup_generate().0),
+        black_box(&setup_generate().1),
+    )
 }
 
 #[library_benchmark]
 fn bench_verify() -> () {
-    let tree_height = Height::from(4);
-    let leaf_nodes = get_full_node_contents();
-    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
-    let proof = generate_proof(&tree, &leaf_nodes.0);
-    proof.verify(leaf_nodes.3).expect("Unable to verify proof")
+    let proof = black_box(setup_verify().0);
+    let root_hash = black_box(setup_verify().1);
+
+    proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 // HELPER FUNCTIONS
@@ -490,7 +505,7 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64, bench_generate, bench_verify
+    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64,  bench_generate, /*  bench_verify */
 );
 
 main!(library_benchmark_groups = bench_dapol);
