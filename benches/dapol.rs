@@ -205,7 +205,7 @@ fn bench_generate_proof(c: &mut Criterion) {
 
     for h in TREE_HEIGHTS.into_iter() {
         let height = Height::from(h);
-        let leaf_nodes = get_full_node_content();
+        let leaf_nodes = get_full_node_contents();
 
         let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
         let leaf_node = leaf_nodes.0;
@@ -226,17 +226,17 @@ fn bench_verify_proof(c: &mut Criterion) {
 
     for h in TREE_HEIGHTS.into_iter() {
         let height = Height::from(h);
-        let leaf_nodes = get_full_node_content();
+        let leaf_nodes = get_full_node_contents();
 
         let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
         let leaf_node = leaf_nodes.0;
 
+        let root_hash = leaf_nodes.3;
+
         group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
             bench.iter_batched(
                 || generate_proof(&tree, &leaf_node),
-                |(proof)| {
-                    // verify_proof
-                },
+                |(proof)| proof.verify(root_hash),
                 BatchSize::SmallInput,
             );
         });
@@ -328,7 +328,7 @@ pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<Benc
     leaf_nodes
 }
 
-pub fn get_full_node_content(// height: &Height,
+pub fn get_full_node_contents(// height: &Height,
 ) -> (
     Node<FullNodeContent>,
     Vec<Node<FullNodeContent>>,
