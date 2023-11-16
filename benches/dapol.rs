@@ -340,12 +340,14 @@ pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<Benc
     leaf_nodes
 }
 
-pub fn get_full_node_content(height: &Height) -> (
-        Node<FullNodeContent>,
-        PathSiblings<FullNodeContent>,
-        RistrettoPoint,
-        H256,
-     {
+pub fn get_full_node_content(
+    height: &Height,
+) -> (
+    Node<FullNodeContent>,
+    PathSiblings<FullNodeContent>,
+    RistrettoPoint,
+    H256,
+) {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
     let mut rng = rand::thread_rng();
