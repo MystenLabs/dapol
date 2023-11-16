@@ -1,37 +1,3 @@
-// fn generate_proof(c: &mut Criterion) {
-//     let mut group = c.benchmark_group("prove");
-//     group.sample_size(10);
-
-//     // this benchmark depends on the tree height and not the number of leaves,
-//     // so we just pick the smallest number of leaves
-//     let num_leaves = NUM_USERS[0];
-//     for &tree_height in TREE_HEIGHTS.iter() {
-//         let items = build_item_list(num_leaves, tree_height);
-//         let mut rng = thread_rng();
-//         let item_range = Uniform::new(0usize, num_leaves);
-
-//         let dapol = build_dapol_tree::<blake3::Hasher, RangeProofSplitting>(&items, tree_height);
-//         group.bench_function(BenchmarkId::new("splitting", tree_height), |bench| {
-//             bench.iter(|| {
-//                 // time proof generation
-//                 let tree_index = &items[rng.sample(item_range)].0;
-//                 dapol.generate_proof(tree_index).unwrap()
-//             });
-//         });
-
-//         let dapol = build_dapol_tree::<blake3::Hasher, RangeProofPadding>(&items, tree_height);
-//         group.bench_function(BenchmarkId::new("padding", tree_height), |bench| {
-//             bench.iter(|| {
-//                 // time proof generation
-//                 let tree_index = &items[rng.sample(item_range)].0;
-//                 dapol.generate_proof(tree_index).unwrap()
-//             });
-//         });
-//     }
-
-//     group.finish();
-// }
-
 // fn verify_proof(c: &mut Criterion) {
 //     let mut group = c.benchmark_group("verify");
 //     group.sample_size(10);
@@ -80,40 +46,6 @@
 //     }
 
 //     group.finish();
-// }
-
-// criterion_group!(dapol_group, build_dapol, generate_proof, verify_proof);
-// criterion_main!(dapol_group);
-
-// HELPER FUNCTIONS
-// ================================================================================================
-
-// fn build_dapol_tree<D, R>(items: &[(TreeIndex, DapolNode<D>)], tree_height: usize) -> Dapol<D, R>
-// where
-//     D: Digest + Default + Clone + TypeName + Debug,
-//     R: Clone + Serializable + RangeProvable + RangeVerifiable + TypeName,
-// {
-//     let secret = get_secret();
-//     let mut dapol = Dapol::<D, R>::new_blank(tree_height, tree_height);
-//     dapol.build(&items, &secret);
-//     dapol
-// }
-
-// fn build_item_list(
-//     num_leaves: usize,
-//     tree_height: usize,
-// ) -> Vec<(TreeIndex, DapolNode<blake3::Hasher>)> {
-//     let mut result = Vec::new();
-//     let mut value = DapolNode::<blake3::Hasher>::default();
-//     let stride = 2usize.pow(tree_height as u32) / num_leaves;
-//     for i in 0..num_leaves {
-//         let idx = TreeIndex::from_u64(tree_height, (i * stride) as u64);
-//         value.randomize();
-//         result.push((idx, value.clone()));
-//     }
-
-//     result.sort_by_key(|(index, _)| *index);
-//     result
 // }
 
 use bulletproofs::PedersenGens;
@@ -206,25 +138,25 @@ pub fn bench_build_tree(c: &mut Criterion) {
     group.sampling_mode(SamplingMode::Flat);
     group.measurement_time(Duration::from_secs(120));
 
-    // // TREE_HEIGHT = 4
-    // group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
-    //     bench.iter(|| {
-    //         let tree_height = Height::from(4);
-    //         let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
-    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //         ()
-    //     })
-    // });
+    // TREE_HEIGHT = 4
+    group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
+        bench.iter(|| {
+            let tree_height = Height::from(4);
+            let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
+            ()
+        })
+    });
 
-    // // TREE_HEIGHT = 8
-    // group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
-    //     bench.iter(|| {
-    //         let tree_height = Height::from(8);
-    //         let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
-    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //         ()
-    //     })
-    // });
+    // TREE_HEIGHT = 8
+    group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
+        bench.iter(|| {
+            let tree_height = Height::from(8);
+            let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
+            ()
+        })
+    });
 
     // TREE_HEIGHT = 16
     // NUM_USERS starts at 10_000, so these are hardcoded for benchmarking
