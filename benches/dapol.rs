@@ -202,20 +202,13 @@ pub fn bench_build_tree(c: &mut Criterion) {
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
-    group.measurement_time(Duration::from_secs(120));
-
-    // changing NUM_USERS is not applicable for this benchmark
-    let num_leaves = NUM_USERS[0]; // 16 users
 
     for h in TREE_HEIGHTS.into_iter() {
         let height = Height::from(h);
-        let leaf_nodes = get_full_node_content(num_leaves, &height);
-        let mut rng = rand::thread_rng();
-        let node_range = Uniform::new(0usize, num_leaves);
+        let leaf_nodes = get_full_node_content();
 
-        let tree = build_tree(height, leaf_nodes.clone(), get_full_padding_node_content());
-
-        let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
+        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+        let leaf_node = leaf_nodes.0;
 
         group.bench_function(BenchmarkId::new("inclusion_proof", h), |bench| {
             bench.iter(|| {
@@ -231,17 +224,12 @@ fn bench_verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify");
     group.sample_size(10);
 
-    // changing NUM_USERS is not applicable for this benchmark
-    let num_leaves = NUM_USERS[0];
-
     for h in TREE_HEIGHTS.into_iter() {
         let height = Height::from(h);
-        let leaf_nodes = get_full_node_content(num_leaves, &height);
-        let mut rng = rand::thread_rng();
-        let node_range = Uniform::new(0usize, num_leaves);
+        let leaf_nodes = get_full_node_content();
 
-        let tree = build_tree(height, leaf_nodes.clone(), get_full_padding_node_content());
-        let leaf_node = leaf_nodes[rng.sample(node_range)].clone();
+        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+        let leaf_node = leaf_nodes.0;
 
         group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
             bench.iter_batched(
@@ -298,7 +286,7 @@ fn generate_proof(
 
     let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
         tree,
-        &leaf_node,
+        leaf_node,
         get_full_padding_node_content(),
     )
     .expect("Unable to generate path siblings");
@@ -340,16 +328,13 @@ pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<Benc
     leaf_nodes
 }
 
-pub fn get_full_node_content(
-    height: &Height,
+pub fn get_full_node_content(// height: &Height,
 ) -> (
     Node<FullNodeContent>,
-    PathSiblings<FullNodeContent>,
+    Vec<Node<FullNodeContent>>,
     RistrettoPoint,
     H256,
 ) {
-    let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
-
     let mut rng = rand::thread_rng();
     let liability_range = Uniform::new(1, u64::MAX);
 
@@ -365,12 +350,6 @@ pub fn get_full_node_content(
         Scalar::from_bytes_mod_order(*b"34334644060024221618334357559098"),
         Scalar::from_bytes_mod_order(*b"16183433909906002422161834335755"),
         Scalar::from_bytes_mod_order(*b"46442422181134335755929806001618"),
-        //     "90980600242216183433575590980600",
-        //     "18113433575590998600161834339299",
-        //     "57551618343357559099860018113433",
-        //     "57559099860016183433909986002422",
-        //     "34335755909986001618343390990400",
-        //     "06001618343390998000242216183433",
     ];
 
     let commitments = [
@@ -380,8 +359,6 @@ pub fn get_full_node_content(
         PedersenGens::default().commit(Scalar::from(liabilities[3]), blinding_factors[3]),
     ];
 
-    let mut hashers: Vec<Hasher> = Vec::with_capacity(4);
-
     let bytes = [
         b"leafleafleafleafleafleafleafleaf",
         b"sibling1sibling1sibling1sibling1",
@@ -389,29 +366,22 @@ pub fn get_full_node_content(
         b"sibling3sibling3sibling3sibling3",
     ];
 
-    for (i, mut hasher) in hashers.into_iter().enumerate() {
-        hasher.update(bytes[i]);
-        hashers.push(hasher);
-    }
+    let mut hasher = Hasher::new();
+    hasher.update(bytes[0]);
+    let hash = hasher.finalize();
 
     let leaf = Node {
         coord: Coordinate { x: 2u64, y: 0u8 },
-        content: FullNodeContent::new(
-            liabilities[0],
-            blinding_factors[0],
-            commitments[0],
-            hashers[0].finalize(),
-        ),
+        content: FullNodeContent::new(liabilities[0], blinding_factors[0], commitments[0], hash),
     };
+
+    let mut hasher = Hasher::new();
+    hasher.update(bytes[1]);
+    let has = hasher.finalize();
 
     let sibling1 = Node {
         coord: Coordinate { x: 3u64, y: 0u8 },
-        content: FullNodeContent::new(
-            liabilities[1],
-            blinding_factors[1],
-            commitments[1],
-            hashers[1].finalize(),
-        ),
+        content: FullNodeContent::new(liabilities[1], blinding_factors[1], commitments[1], hash),
     };
 
     let (parent_commitment, parent_hash) = get_parent_node(
@@ -421,14 +391,13 @@ pub fn get_full_node_content(
         sibling1.content.hash,
     );
 
+    let mut hasher = Hasher::new();
+    hasher.update(bytes[2]);
+    let hash = hasher.finalize();
+
     let sibling2 = Node {
         coord: Coordinate { x: 0u64, y: 1u8 },
-        content: FullNodeContent::new(
-            liabilities[2],
-            blinding_factors[2],
-            commitments[2],
-            hashers[2].finalize(),
-        ),
+        content: FullNodeContent::new(liabilities[2], blinding_factors[2], commitments[2], hash),
     };
 
     let (parent_commitment, parent_hash) = get_parent_node(
@@ -438,14 +407,13 @@ pub fn get_full_node_content(
         parent_hash,
     );
 
+    let mut hasher = Hasher::new();
+    hasher.update(bytes[3]);
+    let hash = hasher.finalize();
+
     let sibling3 = Node {
         coord: Coordinate { x: 1u64, y: 2u8 },
-        content: FullNodeContent::new(
-            liabilities[3],
-            blinding_factors[3],
-            commitments[3],
-            hashers[3].finalize(),
-        ),
+        content: FullNodeContent::new(liabilities[3], blinding_factors[3], commitments[3], hash),
     };
 
     let (root_commitment, root_hash) = get_parent_node(
@@ -455,32 +423,9 @@ pub fn get_full_node_content(
         parent_hash,
     );
 
-    (
-        leaf,
-        PathSiblings(vec![sibling1, sibling2, sibling3]),
-        root_commitment,
-        root_hash,
-    )
+    let nodes = vec![leaf.clone(), sibling1, sibling2, sibling3];
 
-    // let mut leaf_nodes: Vec<Node<FullNodeContent>> = Vec::new();
-
-    // for i in 0..num_leaves {
-    //     let liability = rng.sample(liability_range) as u64;
-    //     let blinding_factor =
-    //         Scalar::from_bytes_mod_order(*blinding_factors[i % blinding_factors.len()]);
-    //     let commitment = PedersenGens::default().commit(Scalar::from(liability), blinding_factor);
-    //     let leaf = Node {
-    //         coord: Coordinate {
-    //             x: i as u64,
-    //             y: rng.sample(node_range),
-    //         },
-    //         content: FullNodeContent::new(liability, blinding_factor, commitment, H256::random()),
-    //     };
-
-    //     leaf_nodes.push(leaf)
-    // }
-
-    // leaf_nodes
+    (leaf, nodes, root_commitment, root_hash)
 }
 
 fn get_parent_node(
