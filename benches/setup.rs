@@ -1,18 +1,21 @@
 use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
+
+use log::info;
 use primitive_types::H256;
 use rand::distributions::Uniform;
 use rand::Rng;
 use serde::Serialize;
 
 use core::fmt::Debug;
+use std::path::PathBuf;
 
 use dapol::binary_tree::{
     BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
 };
 use dapol::node_content::FullNodeContent;
-use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
+use dapol::{read_write_utils, AggregationFactor, Hasher, Height, InclusionProof};
 
 // STRUCTS
 // ================================================================================================
@@ -300,4 +303,18 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
 
         FullNodeContent::new(liability, blinding_factor, commitment, hash)
     }
+}
+
+pub fn serialize_proof(proof: InclusionProof, entity_id: &str, dir: PathBuf) -> PathBuf {
+    let mut file_name = entity_id.to_string();
+    file_name.push('.');
+    file_name.push_str("dapolproof");
+
+    let path = dir.join(file_name);
+    info!("Serializing inclusion proof to path {:?}", path);
+
+    read_write_utils::serialize_to_bin_file(&proof, path.clone())
+        .expect("Unable to serialize proof");
+
+    path
 }

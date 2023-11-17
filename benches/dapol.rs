@@ -1,9 +1,12 @@
 mod setup;
 
 use criterion::{criterion_group, criterion_main};
-use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode};
+use criterion::{BenchmarkId, Criterion, SamplingMode};
 use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 use primitive_types::H256;
+
+use std::fs;
+use std::path::PathBuf;
 
 use dapol::binary_tree::{BinaryTree, Node};
 use dapol::node_content::FullNodeContent;
@@ -92,9 +95,7 @@ fn bench_generate_proof(c: &mut Criterion) {
         let leaf_node = leaf_nodes.0;
 
         group.bench_function(BenchmarkId::new("generate_proof", h), |bench| {
-            bench.iter(|| {
-                setup::generate_proof(&tree, &leaf_node);
-            });
+            bench.iter(|| setup::generate_proof(&tree, &leaf_node));
         });
     }
 
@@ -114,13 +115,21 @@ fn bench_verify_proof(c: &mut Criterion) {
 
         let root_hash = leaf_nodes.3;
 
+        let proof = setup::generate_proof(&tree, &leaf_node);
+
         group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
-            bench.iter_batched(
-                || setup::generate_proof(&tree, &leaf_node),
-                |proof| proof.verify(root_hash),
-                BatchSize::SmallInput,
-            );
+            bench.iter(|| proof.verify(root_hash));
         });
+
+        let entity_id = format!("height_{}", h);
+
+        let path = setup::serialize_proof(proof, &entity_id, PathBuf::from("./target"));
+
+        let file_size = fs::metadata(path)
+            .expect("Unable to get proof metadata for {entity_id}")
+            .len();
+
+        println!("{entity_id} file size: {} kB", file_size / 1024u64)
     }
 
     group.finish();
@@ -305,7 +314,7 @@ criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks =  bench_build_height4, bench_build_height8, bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64 */
+    benchmarks =   bench_build_height4, bench_build_height8, bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64, */
 );
 
 // main!(library_benchmark_groups = bench_dapol);
