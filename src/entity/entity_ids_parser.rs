@@ -67,6 +67,8 @@ impl EntityIdsParser {
             }
         };
 
+        debug!("Successfully parsed entity IDs file",);
+
         Ok(entity_ids)
     }
 }

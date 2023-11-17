@@ -17,6 +17,7 @@ use crate::inclusion_proof::{
 };
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
+use crate::MaxThreadCount;
 
 mod ndm_smt_secrets;
 pub use ndm_smt_secrets::NdmSmtSecrets;
@@ -81,19 +82,9 @@ impl NdmSmt {
     pub fn new(
         secrets: NdmSmtSecrets,
         height: Height,
+        max_thread_count: MaxThreadCount,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
-        // This is used to determine the number of threads to spawn in the
-        // multi-threaded builder.
-        crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-            *opt.borrow_mut() = std::thread::available_parallelism()
-                .map_err(|err| {
-                    error!("Problem accessing machine parallelism: {}", err);
-                    err
-                })
-                .map_or(None, |par| Some(par.get() as u8))
-        });
-
         let master_secret_bytes = secrets.master_secret.as_bytes();
         let salt_b_bytes = secrets.salt_b.as_bytes();
         let salt_s_bytes = secrets.salt_s.as_bytes();
@@ -160,6 +151,7 @@ impl NdmSmt {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
+            .with_max_thread_count(max_thread_count)
             .build_using_multi_threaded_algorithm(new_padding_node_content_closure(
                 *master_secret_bytes,
                 *salt_b_bytes,
@@ -311,30 +303,28 @@ pub enum NdmSmtError {
 // TODO test serialization & deserialization
 #[cfg(test)]
 mod tests {
-    mod ndm_smt {
-        use super::super::*;
-        use crate::binary_tree::Height;
-        use crate::secret::Secret;
-        use std::str::FromStr;
+    use super::*;
+    use crate::secret::Secret;
+    use std::str::FromStr;
 
-        #[test]
-        fn constructor_works() {
-            let master_secret: Secret = 1u64.into();
-            let salt_b: Secret = 2u64.into();
-            let salt_s: Secret = 3u64.into();
-            let secrets = NdmSmtSecrets {
-                master_secret,
-                salt_b,
-                salt_s,
-            };
+    #[test]
+    fn constructor_works() {
+        let master_secret: Secret = 1u64.into();
+        let salt_b: Secret = 2u64.into();
+        let salt_s: Secret = 3u64.into();
+        let secrets = NdmSmtSecrets {
+            master_secret,
+            salt_b,
+            salt_s,
+        };
 
-            let height = Height::from(4u8);
-            let entities = vec![Entity {
-                liability: 5u64,
-                id: EntityId::from_str("some entity").unwrap(),
-            }];
+        let height = Height::from(4u8);
+        let max_thread_count = MaxThreadCount::default();
+        let entities = vec![Entity {
+            liability: 5u64,
+            id: EntityId::from_str("some entity").unwrap(),
+        }];
 
-            NdmSmt::new(secrets, height, entities).unwrap();
-        }
+        NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
     }
 }

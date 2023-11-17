@@ -171,6 +171,9 @@ pub mod utils;
 mod hasher;
 pub use hasher::Hasher;
 
+mod max_thread_count;
+pub use max_thread_count::{initialize_machine_parallelism, MaxThreadCount, MACHINE_PARALLELISM};
+
 pub mod accumulators;
 pub use accumulators::{Accumulator, AccumulatorConfig, AccumulatorConfigError, AccumulatorError};
 

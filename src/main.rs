@@ -6,6 +6,7 @@ use log::debug;
 use dapol::{
     accumulators::NdmSmtConfigBuilder,
     cli::{AccumulatorType, BuildKindCommand, Cli, Command},
+    initialize_machine_parallelism,
     utils::{activate_logging, Consume, IfNoneThen, LogOnErr, LogOnErrUnwrap},
     Accumulator, AccumulatorConfig, AggregationFactor, EntityIdsParser, InclusionProof,
 };
@@ -22,6 +23,8 @@ fn main() {
             gen_proofs,
             serialize,
         } => {
+            initialize_machine_parallelism();
+
             let serialization_path =
                 // Do not try serialize if the command is Deserialize because
                 // this means there already is a serialized file.
@@ -43,12 +46,14 @@ fn main() {
                 BuildKindCommand::New {
                     accumulator,
                     height,
+                    max_thread_count,
                     secrets_file,
                     entity_source,
                 } => match accumulator {
                     AccumulatorType::NdmSmt => {
                         let ndm_smt = NdmSmtConfigBuilder::default()
                             .height(height)
+                            .max_thread_count(max_thread_count)
                             .secrets_file_path_opt(secrets_file.and_then(|arg| arg.into_path()))
                             .entities_path_opt(
                                 entity_source.entities_file.and_then(|arg| arg.into_path()),

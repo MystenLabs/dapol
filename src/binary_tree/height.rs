@@ -1,8 +1,5 @@
-use clap::builder::{OsStr, Str};
 use log::error;
-use serde::{Serialize, Deserialize};
-use std::convert::From;
-use std::{num::ParseIntError, str::FromStr};
+use serde::{Deserialize, Serialize};
 
 const UNDERLYING_INT_TYPE_STR: &str = "u8";
 type UnderlyingInt = u8;
@@ -31,10 +28,12 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 /// Example:
 /// ```
 /// use dapol::Height;
+/// use std::str::FromStr;
 ///
 /// let height = Height::default();
 /// let height = Height::from_with_err(8u8).unwrap();
 /// let height = Height::from(8u8);
+/// let height = Height::from_str("8");
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Height(UnderlyingInt);
@@ -99,6 +98,11 @@ impl Height {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// From for str.
+
+use std::str::FromStr;
+
 impl FromStr for Height {
     type Err = HeightError;
 
@@ -109,17 +113,28 @@ impl FromStr for Height {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// From for OsStr.
+
+use clap::builder::{OsStr, Str};
+
 impl From<Height> for OsStr {
     fn from(height: Height) -> OsStr {
         OsStr::from(Str::from(height.as_raw_int().to_string()))
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Default.
+
 impl Default for Height {
     fn default() -> Self {
         Height(DEFAULT_HEIGHT)
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Errors.
 
 #[derive(thiserror::Error, Debug)]
 pub enum HeightError {
@@ -128,5 +143,5 @@ pub enum HeightError {
     #[error("Input is smaller than the lower bound {MIN_HEIGHT:?}")]
     InputTooSmall,
     #[error("Malformed string input for {UNDERLYING_INT_TYPE_STR:?} type")]
-    MalformedString(#[from] ParseIntError),
+    MalformedString(#[from] std::num::ParseIntError),
 }

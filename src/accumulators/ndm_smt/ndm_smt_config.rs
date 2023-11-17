@@ -1,12 +1,13 @@
 use std::path::PathBuf;
 
 use derive_builder::Builder;
-use log::debug;
+use log::{debug, info};
 use serde::Deserialize;
 
-use crate::binary_tree::Height;
 use crate::entity::{self, EntitiesParser};
 use crate::utils::LogOnErr;
+use crate::Height;
+use crate::MaxThreadCount;
 
 use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 
@@ -25,6 +26,10 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// # Height of the tree.
 /// # If the height is not set the default height will be used.
 /// height = 32
+///
+/// # Max number of threads to be spawned for multi-threading algorithms.
+/// # If the height is not set a default value will be used.
+/// max_thread_count = 4
 ///
 /// # Path to the secrets file.
 /// # If not present the secrets will be generated randomly.
@@ -47,10 +52,11 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// Example how to use the builder:
 /// ```
 /// use std::path::PathBuf;
-/// use dapol::Height;
+/// use dapol::{Height, MaxThreadCount};
 /// use dapol::accumulators::NdmSmtConfigBuilder;
 ///
 /// let height = Height::from(8);
+/// let max_thread_count = MaxThreadCount::default();
 ///
 /// let config = NdmSmtConfigBuilder::default()
 ///     .height(height)
@@ -63,6 +69,8 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 pub struct NdmSmtConfig {
     #[builder(setter(name = "height_opt"), default)]
     height: Option<Height>,
+    #[builder(setter(name = "max_thread_count_opt"), default)]
+    max_thread_count: Option<MaxThreadCount>,
     #[builder(setter(name = "secrets_file_path_opt"))]
     secrets_file_path: Option<PathBuf>,
     #[builder(private)]
@@ -84,15 +92,16 @@ impl NdmSmtConfig {
             .parse_or_generate_random()?;
 
         let height = self.height.unwrap_or_default();
+        let max_thread_count = self.max_thread_count.unwrap_or_default();
 
         let entities = EntitiesParser::new()
             .with_path_opt(self.entities.file_path)
             .with_num_entities_opt(self.entities.generate_random)
             .parse_file_or_generate_random()?;
 
-        let ndm_smt = NdmSmt::new(secrets, height, entities).log_on_err()?;
+        let ndm_smt = NdmSmt::new(secrets, height, max_thread_count, entities).log_on_err()?;
 
-        debug!(
+        info!(
             "Successfully built NDM-SMT with root hash {:?}",
             ndm_smt.root_hash()
         );
@@ -108,6 +117,10 @@ impl NdmSmtConfigBuilder {
 
     pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
         self.secrets_file_path_opt(Some(path))
+    }
+
+    pub fn max_thread_count(&mut self, max_thread_count: MaxThreadCount) -> &mut Self {
+        self.max_thread_count_opt(Some(max_thread_count))
     }
 
     pub fn entities_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {

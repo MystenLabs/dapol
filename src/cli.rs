@@ -12,7 +12,7 @@ use std::str::FromStr;
 use crate::{
     binary_tree::Height,
     inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+    percentage::{Percentage, ONE_HUNDRED_PERCENT}, MaxThreadCount,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -116,6 +116,10 @@ pub enum BuildKindCommand {
         /// Height to use for the binary tree.
         #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
         height: Height,
+
+        /// Max thread count allowed for parallel tree builder.
+        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT")]
+        max_thread_count: MaxThreadCount,
 
         #[arg(short, long, value_name = "FILE_PATH", long_help = NDM_SMT_SECRETS_HELP)]
         secrets_file: Option<InputArg>,
