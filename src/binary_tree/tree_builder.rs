@@ -11,6 +11,8 @@
 use serde::Serialize;
 use std::fmt::Debug;
 
+use crate::MaxThreadCount;
+
 use super::{BinaryTree, Coordinate, Height, Mergeable, Node};
 
 pub mod multi_threaded;
@@ -18,7 +20,7 @@ pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO`
-const DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
+pub const DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
@@ -49,6 +51,7 @@ pub struct TreeBuilder<C> {
     height: Option<Height>,
     leaf_nodes: Option<Vec<InputLeafNode<C>>>,
     store_depth: Option<u8>,
+    max_thread_count: Option<MaxThreadCount>,
 }
 
 /// A simpler version of the [super][Node] struct that is used as input to
@@ -74,6 +77,7 @@ where
             height: None,
             leaf_nodes: None,
             store_depth: None,
+            max_thread_count: None,
         }
     }
 
@@ -115,6 +119,14 @@ where
         self
     }
 
+    /// Set the max number of threads that will be spawned.
+    ///
+    /// This value is not required, and will be given a default if not provided.
+    pub fn with_max_thread_count(mut self, max_thread_count: MaxThreadCount) -> Self {
+        self.max_thread_count = Some(max_thread_count);
+        self
+    }
+
     /// High performance build algorithm utilizing parallelization.
     ///
     /// Will return an error if:
@@ -129,6 +141,7 @@ where
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         let height = self.height()?;
+        let max_thread_count = self.max_thread_count.clone().unwrap_or_default();
         let store_depth = self.store_depth(&height);
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
@@ -137,6 +150,7 @@ where
             store_depth,
             input_leaf_nodes,
             new_padding_node_content,
+            max_thread_count,
         )
     }
 
@@ -253,7 +267,6 @@ fn verify_no_duplicate_leaves<C>(leaf_nodes: &[InputLeafNode<C>]) -> Result<(), 
 
 // -------------------------------------------------------------------------------------------------
 // Errors.
-
 
 #[derive(thiserror::Error, Debug)]
 pub enum TreeBuildError {

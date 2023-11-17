@@ -6,6 +6,10 @@ accumulator_type = "ndm-smt"
 # If the height is not set the default height will be used.
 height = 16
 
+# Max number of threads to be spawned for multi-threading algorithms.
+# If the height is not set a default value will be used.
+max_thread_count = 4
+
 # Path to the secrets file.
 # If not present the secrets will be generated randomly.
 secrets_file_path = "./examples/ndm_smt_secrets_example.toml"
