@@ -216,14 +216,22 @@ fn setup_verify(tree_height: Height) -> (InclusionProof, H256) {
 fn bench_build_height4() -> () {
     let tree_height = Height::from(4);
     let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
-    build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    black_box(build_tree(
+        tree_height,
+        leaf_nodes,
+        get_padding_node_content(),
+    ));
 }
 
 #[library_benchmark]
 fn bench_build_height8() -> () {
     let tree_height = Height::from(8);
     let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
-    build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    black_box(build_tree(
+        tree_height,
+        leaf_nodes,
+        get_padding_node_content(),
+    ));
 }
 
 #[library_benchmark]
@@ -231,7 +239,11 @@ fn bench_build_height16() -> () {
     for l in NUM_USERS[0..2].into_iter() {
         let tree_height = Height::from(TREE_HEIGHTS[0]);
         let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
-        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+        black_box(build_tree(
+            tree_height,
+            leaf_nodes,
+            get_padding_node_content(),
+        ));
     }
 }
 
@@ -240,7 +252,11 @@ fn bench_build_height32() -> () {
     for l in NUM_USERS[0..16].into_iter() {
         let tree_height = Height::from(TREE_HEIGHTS[1]);
         let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
-        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+        black_box(build_tree(
+            tree_height,
+            leaf_nodes,
+            get_padding_node_content(),
+        ));
     }
 }
 
@@ -249,96 +265,100 @@ fn bench_build_height64() -> () {
     for l in NUM_USERS[0..16].into_iter() {
         let tree_height = Height::from(TREE_HEIGHTS[2]);
         let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
-        build_tree(tree_height, leaf_nodes, get_padding_node_content());
+        black_box(build_tree(
+            tree_height,
+            leaf_nodes,
+            get_padding_node_content(),
+        ));
     }
 }
 
 #[library_benchmark]
 fn bench_generate_height4() -> InclusionProof {
-    generate_proof(
-        black_box(&setup_generate(Height::from(4)).0),
-        black_box(&setup_generate(Height::from(4)).1),
-    )
+    black_box(generate_proof(
+        &setup_generate(Height::from(4)).0,
+        &setup_generate(Height::from(4)).1,
+    ))
 }
 
 #[library_benchmark]
 fn bench_generate_height8() -> InclusionProof {
-    generate_proof(
-        black_box(&setup_generate(Height::from(8)).0),
-        black_box(&setup_generate(Height::from(8)).1),
-    )
+    black_box(generate_proof(
+        &setup_generate(Height::from(8)).0,
+        &setup_generate(Height::from(8)).1,
+    ))
 }
 
 #[library_benchmark]
 fn bench_generate_height16() -> InclusionProof {
-    generate_proof(
-        black_box(&setup_generate(Height::from(16)).0),
-        black_box(&setup_generate(Height::from(16)).1),
-    )
+    black_box(generate_proof(
+        &setup_generate(Height::from(16)).0,
+        &setup_generate(Height::from(16)).1,
+    ))
 }
 
 #[library_benchmark]
 fn bench_generate_height32() -> InclusionProof {
-    generate_proof(
-        black_box(&setup_generate(Height::from(32)).0),
-        black_box(&setup_generate(Height::from(32)).1),
-    )
+    black_box(generate_proof(
+        &setup_generate(Height::from(32)).0,
+        &setup_generate(Height::from(32)).1,
+    ))
 }
 
 #[library_benchmark]
 fn bench_generate_height64() -> InclusionProof {
-    generate_proof(
-        black_box(&setup_generate(Height::from(64)).0),
-        black_box(&setup_generate(Height::from(64)).1),
-    )
+    black_box(generate_proof(
+        &setup_generate(Height::from(64)).0,
+        &setup_generate(Height::from(64)).1,
+    ))
 }
 
 #[library_benchmark]
 fn bench_verify_height4() -> () {
-    let proof = black_box(setup_verify(Height::from(4)).0);
-    let root_hash = black_box(setup_verify(Height::from(4)).1);
+    let proof = setup_verify(Height::from(4)).0;
+    let root_hash = setup_verify(Height::from(4)).1;
 
-    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 
     // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
 fn bench_verify_height8() -> () {
-    let proof = black_box(setup_verify(Height::from(8)).0);
-    let root_hash = black_box(setup_verify(Height::from(8)).1);
+    let proof = setup_verify(Height::from(8)).0;
+    let root_hash = setup_verify(Height::from(8)).1;
 
-    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 
     // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
 fn bench_verify_height16() -> () {
-    let proof = black_box(setup_verify(Height::from(16)).0);
-    let root_hash = black_box(setup_verify(Height::from(16)).1);
+    let proof = setup_verify(Height::from(16)).0;
+    let root_hash = setup_verify(Height::from(16)).1;
 
-    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 
     // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
 fn bench_verify_height32() -> () {
-    let proof = black_box(setup_verify(Height::from(32)).0);
-    let root_hash = black_box(setup_verify(Height::from(32)).1);
+    let proof = setup_verify(Height::from(32)).0;
+    let root_hash = setup_verify(Height::from(32)).1;
 
-    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 
     // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
 fn bench_verify_height64() -> () {
-    let proof = black_box(setup_verify(Height::from(64)).0);
-    let root_hash = black_box(setup_verify(Height::from(64)).1);
+    let proof = setup_verify(Height::from(64)).0;
+    let root_hash = setup_verify(Height::from(64)).1;
 
-    dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof")
+    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 
     // proof.verify(root_hash).expect("Unable to verify proof")
 }
@@ -569,18 +589,18 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
     }
 }
 
-criterion_group!(
-    benches,
-    bench_build_tree,
-    bench_generate_proof,
-    bench_verify_proof
-);
+// criterion_group!(
+//     benches,
+//     bench_build_tree,
+//     bench_generate_proof,
+//     bench_verify_proof
+// );
 
 // criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks = bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64
+    benchmarks =  bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64 */
 );
 
 main!(library_benchmark_groups = bench_dapol);
