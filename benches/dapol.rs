@@ -196,6 +196,22 @@ fn bench_verify_proof(c: &mut Criterion) {
     group.finish();
 }
 
+fn setup_generate(
+    tree_height: Height,
+) -> (BinaryTree<FullNodeContent>, Node<FullNodeContent>, H256) {
+    let leaf_nodes = get_full_node_contents();
+    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
+
+    (tree, leaf_nodes.0, leaf_nodes.3)
+}
+
+fn setup_verify(tree_height: Height) -> (InclusionProof, H256) {
+    let leaf_nodes = get_full_node_contents();
+    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
+
+    (generate_proof(&tree, &leaf_nodes.0), leaf_nodes.3)
+}
+
 #[library_benchmark]
 fn bench_build_height4() -> () {
     let tree_height = Height::from(4);
@@ -235,22 +251,6 @@ fn bench_build_height64() -> () {
         let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
         build_tree(tree_height, leaf_nodes, get_padding_node_content());
     }
-}
-
-fn setup_generate(
-    tree_height: Height,
-) -> (BinaryTree<FullNodeContent>, Node<FullNodeContent>, H256) {
-    let leaf_nodes = get_full_node_contents();
-    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
-
-    (tree, leaf_nodes.0, leaf_nodes.3)
-}
-
-fn setup_verify(tree_height: Height) -> (InclusionProof, H256) {
-    let leaf_nodes = get_full_node_contents();
-    let tree = build_tree(tree_height, leaf_nodes.1, get_full_padding_node_content());
-
-    (generate_proof(&tree, &leaf_nodes.0), leaf_nodes.3)
 }
 
 #[library_benchmark]
