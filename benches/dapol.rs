@@ -22,8 +22,8 @@ use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
 // ================================================================================================
 
 // TREE_HEIGHT = 4 and 8 are hard coded in benchmarks
-pub const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
-pub const NUM_USERS: [usize; 23] = [
+const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
+const NUM_USERS: [usize; 23] = [
     10_000,
     20_000,
     40_000,
@@ -53,7 +53,7 @@ pub const NUM_USERS: [usize; 23] = [
 // ================================================================================================
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
-pub struct BenchTestContent {
+struct BenchTestContent {
     pub value: u32,
     pub hash: H256,
 }
@@ -83,32 +83,32 @@ impl Mergeable for BenchTestContent {
 // BENCHMARKS
 // ================================================================================================
 
-pub fn bench_build_tree(c: &mut Criterion) {
+fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
 
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
     // group.measurement_time(Duration::from_secs(120));
 
-    // TREE_HEIGHT = 4
-    group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(4);
-            let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
-            build_tree(tree_height, leaf_nodes, get_padding_node_content());
-            ()
-        })
-    });
+    // // TREE_HEIGHT = 4
+    // group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
+    //     bench.iter(|| {
+    //         let tree_height = Height::from(4);
+    //         let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
+    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //         ()
+    //     })
+    // });
 
-    // TREE_HEIGHT = 8
-    group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(8);
-            let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
-            build_tree(tree_height, leaf_nodes, get_padding_node_content());
-            ()
-        })
-    });
+    // // TREE_HEIGHT = 8
+    // group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
+    //     bench.iter(|| {
+    //         let tree_height = Height::from(8);
+    //         let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
+    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //         ()
+    //     })
+    // });
 
     // TREE_HEIGHT = 16 (max. NUM_USERS is 32_768)
     for l in NUM_USERS[0..2].into_iter() {
@@ -122,51 +122,51 @@ pub fn bench_build_tree(c: &mut Criterion) {
         });
     }
 
-    // TREE_HEIGHT = 32
-    for l in NUM_USERS[0..16].into_iter() {
-        group.bench_function(BenchmarkId::new("height_32", l), |bench| {
-            bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[1]);
-                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
-                build_tree(tree_height, leaf_nodes, get_padding_node_content());
-                ()
-            })
-        });
-    }
+    // // TREE_HEIGHT = 32
+    // for l in NUM_USERS[0..16].into_iter() {
+    //     group.bench_function(BenchmarkId::new("height_32", l), |bench| {
+    //         bench.iter(|| {
+    //             let tree_height = Height::from(TREE_HEIGHTS[1]);
+    //             let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+    //             build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //             ()
+    //         })
+    //     });
+    // }
 
-    // TREE_HEIGHT = 64
-    for l in NUM_USERS[0..16].into_iter() {
-        group.bench_function(BenchmarkId::new("height_64", l), |bench| {
-            bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[2]);
-                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+    // // TREE_HEIGHT = 64
+    // for l in NUM_USERS[0..16].into_iter() {
+    //     group.bench_function(BenchmarkId::new("height_64", l), |bench| {
+    //         bench.iter(|| {
+    //             let tree_height = Height::from(TREE_HEIGHTS[2]);
+    //             let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
 
-                build_tree(tree_height, leaf_nodes, get_padding_node_content());
-                ()
-            })
-        });
-    }
+    //             build_tree(tree_height, leaf_nodes, get_padding_node_content());
+    //             ()
+    //         })
+    //     });
+    // }
 
-    group.finish();
+    // group.finish();
 }
 
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
 
-    for h in TREE_HEIGHTS.into_iter() {
-        let height = Height::from(h);
-        let leaf_nodes = get_full_node_contents();
+    // for h in TREE_HEIGHTS.into_iter() {
+    let height = Height::from(16);
+    let leaf_nodes = get_full_node_contents();
 
-        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
-        let leaf_node = leaf_nodes.0;
+    let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+    let leaf_node = leaf_nodes.0;
 
-        group.bench_function(BenchmarkId::new("inclusion_proof", h), |bench| {
-            bench.iter(|| {
-                generate_proof(&tree, &leaf_node);
-            });
+    group.bench_function(BenchmarkId::new("generate_proof", 16), |bench| {
+        bench.iter(|| {
+            generate_proof(&tree, &leaf_node);
         });
-    }
+    });
+    // }
 
     group.finish();
 }
@@ -175,23 +175,23 @@ fn bench_verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify");
     group.sample_size(10);
 
-    for h in TREE_HEIGHTS.into_iter() {
-        let height = Height::from(h);
-        let leaf_nodes = get_full_node_contents();
+    // for h in TREE_HEIGHTS.into_iter() {
+    let height = Height::from(16);
+    let leaf_nodes = get_full_node_contents();
 
-        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
-        let leaf_node = leaf_nodes.0;
+    let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+    let leaf_node = leaf_nodes.0;
 
-        let root_hash = leaf_nodes.3;
+    let root_hash = leaf_nodes.3;
 
-        group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
-            bench.iter_batched(
-                || generate_proof(&tree, &leaf_node),
-                |proof| proof.verify(root_hash),
-                BatchSize::SmallInput,
-            );
-        });
-    }
+    group.bench_function(BenchmarkId::new("verify_proof", 16), |bench| {
+        bench.iter_batched(
+            || generate_proof(&tree, &leaf_node),
+            |proof| proof.verify(root_hash),
+            BatchSize::SmallInput,
+        );
+    });
+    // }
 
     group.finish();
 }
@@ -366,7 +366,7 @@ fn bench_verify_height64() -> () {
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_tree<C, F>(
+fn build_tree<C, F>(
     height: Height,
     leaf_nodes: Vec<Node<C>>,
     new_padding_node_content: F,
@@ -420,7 +420,7 @@ fn generate_proof(
     proof
 }
 
-pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
+fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<BenchTestContent>> {
     let max_bottom_layer_nodes = 2usize.pow(height.as_u32() - 1);
 
     assert!(
@@ -446,7 +446,7 @@ pub fn get_input_leaf_nodes(num_leaves: usize, height: &Height) -> Vec<Node<Benc
     leaf_nodes
 }
 
-pub fn get_full_node_contents(// height: &Height,
+fn get_full_node_contents(// height: &Height,
 ) -> (
     Node<FullNodeContent>,
     Vec<Node<FullNodeContent>>,
@@ -567,7 +567,7 @@ fn get_parent_node(
     (parent_commitment, parent_hash)
 }
 
-pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
+fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
     |_coord: &Coordinate| -> BenchTestContent {
         BenchTestContent {
             value: 0,
@@ -576,7 +576,7 @@ pub fn get_padding_node_content() -> impl Fn(&Coordinate) -> BenchTestContent {
     }
 }
 
-pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeContent {
+fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeContent {
     |_coord: &Coordinate| -> FullNodeContent {
         let liability = 27u64;
         let blinding_factor = Scalar::from_bytes_mod_order(*b"11112222333344445555666677778888");
@@ -589,18 +589,18 @@ pub fn get_full_padding_node_content() -> impl Fn(&Coordinate) -> FullNodeConten
     }
 }
 
-// criterion_group!(
-//     benches,
-//     bench_build_tree,
-//     bench_generate_proof,
-//     bench_verify_proof
-// );
+criterion_group!(
+    benches,
+    bench_build_tree,
+    bench_generate_proof,
+    bench_verify_proof
+);
 
 // criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks =  bench_build_height4, bench_build_height8, bench_build_height16, bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64 */
+    benchmarks =  bench_build_height4, bench_build_height8, bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64 */
 );
 
 main!(library_benchmark_groups = bench_dapol);
