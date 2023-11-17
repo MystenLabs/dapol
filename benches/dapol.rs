@@ -2,43 +2,15 @@ mod setup;
 
 use criterion::{criterion_group, criterion_main};
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode};
-use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
-use primitive_types::H256;
+
+use dapol::{Height, InclusionProof};
 
 use dapol::binary_tree::{BinaryTree, Node};
 use dapol::node_content::FullNodeContent;
-use dapol::{Height, InclusionProof};
-
-// CONSTANTS
-// ================================================================================================
-
-// TREE_HEIGHT = 4 and 8 are hard coded in benchmarks
-const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
-const NUM_USERS: [usize; 23] = [
-    10_000,
-    20_000,
-    40_000,
-    60_000,
-    80_000,
-    100_000,
-    200_000,
-    400_000,
-    600_000,
-    800_000,
-    1_000_000,
-    2_000_000,
-    4_000_000,
-    6_000_000,
-    8_000_000,
-    10_000_000,
-    20_000_000,
-    40_000_000,
-    60_000_000,
-    80_000_000,
-    100_000_000,
-    125_000_000,
-    250_000_000,
-];
+use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
+use primitive_types::H256;
+use setup::NUM_USERS;
+use setup::TREE_HEIGHTS;
 
 // BENCHMARKS: CRITERION
 // ================================================================================================
@@ -330,11 +302,11 @@ criterion_group!(
     bench_verify_proof
 );
 
-// criterion_main!(benches);
+criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
     benchmarks =  bench_build_height4, bench_build_height8, bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64 */
 );
 
-main!(library_benchmark_groups = bench_dapol);
+// main!(library_benchmark_groups = bench_dapol);

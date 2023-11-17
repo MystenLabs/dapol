@@ -15,7 +15,7 @@ use dapol::binary_tree::{
 use dapol::node_content::FullNodeContent;
 use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
 
-// STRUCTS AND IMPLEMENTATIONS
+// STRUCTS
 // ================================================================================================
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -45,6 +45,37 @@ impl Mergeable for BenchTestContent {
         }
     }
 }
+
+// CONSTANTS
+// ================================================================================================
+
+// TREE_HEIGHT = 4 and 8 are hard coded in benchmarks
+pub const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
+pub const NUM_USERS: [usize; 23] = [
+    10_000,
+    20_000,
+    40_000,
+    60_000,
+    80_000,
+    100_000,
+    200_000,
+    400_000,
+    600_000,
+    800_000,
+    1_000_000,
+    2_000_000,
+    4_000_000,
+    6_000_000,
+    8_000_000,
+    10_000_000,
+    20_000_000,
+    40_000_000,
+    60_000_000,
+    80_000_000,
+    100_000_000,
+    125_000_000,
+    250_000_000,
+];
 
 // HELPER FUNCTIONS
 // ================================================================================================
