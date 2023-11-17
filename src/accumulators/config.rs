@@ -45,7 +45,7 @@ impl AccumulatorConfig {
     /// 3. The file type is not supported.
     pub fn deserialize(config_file_path: PathBuf) -> Result<Self, AccumulatorConfigError> {
         debug!(
-            "Successfully deserialized accumulator config from file {:?}",
+            "Attempting to parse {:?} as a file containing accumulator config",
             config_file_path.clone().into_os_string()
         );
 
@@ -64,6 +64,8 @@ impl AccumulatorConfig {
                 config
             }
         };
+
+        debug!("Successfully parsed accumulator config file");
 
         Ok(config)
     }

@@ -20,7 +20,7 @@ use rand::{
     thread_rng, Rng,
 };
 
-use log::info;
+use log::{debug, warn};
 use logging_timer::time;
 
 use super::{Entity, EntityId, ENTITY_ID_MAX_BYTES};
@@ -68,9 +68,9 @@ impl EntitiesParser {
     /// a) the file cannot be opened
     /// b) the file type is not supported
     /// c) deserialization of any of the records in the file fails
-    #[time("debug")]
+    #[time("debug", "EntitiesParser::{}")]
     pub fn parse_file(self) -> Result<Vec<Entity>, EntitiesParserError> {
-        info!(
+        debug!(
             "Attempting to parse {:?} as a file containing a list of entity IDs and liabilities",
             &self.path
         );
@@ -93,6 +93,8 @@ impl EntitiesParser {
                 }
             }
         };
+
+        debug!("Successfully parsed entities file",);
 
         Ok(entities)
     }
@@ -136,7 +138,7 @@ impl EntitiesParser {
         if self.path.is_some() {
             self.parse_file()
         } else {
-            info!("No entity file provided, defaulting to generating random entities");
+            warn!("No entity file provided, defaulting to generating random entities");
             self.generate_random()
         }
     }

@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{debug, warn};
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::ndm_smt_secrets::{NdmSmtSecrets, NdmSmtSecretsInput};
@@ -52,7 +52,7 @@ impl NdmSmtSecretsParser {
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
     pub fn parse(self) -> Result<NdmSmtSecrets, NdmSmtSecretsParserError> {
-        info!(
+        debug!(
             "Attempting to parse {:?} as a file containing NDM-SMT secrets",
             &self.path
         );
@@ -71,6 +71,8 @@ impl NdmSmtSecretsParser {
                 NdmSmtSecrets::try_from(secrets)?
             }
         };
+
+        debug!("Successfully parsed NDM-SMT secrets file",);
 
         Ok(secrets)
     }
