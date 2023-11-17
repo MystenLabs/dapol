@@ -99,7 +99,6 @@ impl NdmSmtConfig {
             .with_num_entities_opt(self.entities.generate_random)
             .parse_file_or_generate_random()?;
 
-        // - add to cli
         let ndm_smt = NdmSmt::new(secrets, height, max_thread_count, entities).log_on_err()?;
 
         info!(
