@@ -87,27 +87,26 @@ fn bench_build_tree(c: &mut Criterion) {
 
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
-    // group.measurement_time(Duration::from_secs(120));
 
-    // // TREE_HEIGHT = 4
-    // group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
-    //     bench.iter(|| {
-    //         let tree_height = Height::from(4);
-    //         let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
-    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //         ()
-    //     })
-    // });
+    // TREE_HEIGHT = 4
+    group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
+        bench.iter(|| {
+            let tree_height = Height::from(4);
+            let leaf_nodes = get_input_leaf_nodes(8, &tree_height);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
+            ()
+        })
+    });
 
-    // // TREE_HEIGHT = 8
-    // group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
-    //     bench.iter(|| {
-    //         let tree_height = Height::from(8);
-    //         let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
-    //         build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //         ()
-    //     })
-    // });
+    // TREE_HEIGHT = 8
+    group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
+        bench.iter(|| {
+            let tree_height = Height::from(8);
+            let leaf_nodes = get_input_leaf_nodes(128, &tree_height);
+            build_tree(tree_height, leaf_nodes, get_padding_node_content());
+            ()
+        })
+    });
 
     // TREE_HEIGHT = 16 (max. NUM_USERS is 32_768)
     for l in NUM_USERS[0..2].into_iter() {
@@ -121,51 +120,51 @@ fn bench_build_tree(c: &mut Criterion) {
         });
     }
 
-    // // TREE_HEIGHT = 32
-    // for l in NUM_USERS[0..16].into_iter() {
-    //     group.bench_function(BenchmarkId::new("height_32", l), |bench| {
-    //         bench.iter(|| {
-    //             let tree_height = Height::from(TREE_HEIGHTS[1]);
-    //             let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
-    //             build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //             ()
-    //         })
-    //     });
-    // }
+    // TREE_HEIGHT = 32
+    for l in NUM_USERS[0..16].into_iter() {
+        group.bench_function(BenchmarkId::new("height_32", l), |bench| {
+            bench.iter(|| {
+                let tree_height = Height::from(TREE_HEIGHTS[1]);
+                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+                build_tree(tree_height, leaf_nodes, get_padding_node_content());
+                ()
+            })
+        });
+    }
 
-    // // TREE_HEIGHT = 64
-    // for l in NUM_USERS[0..16].into_iter() {
-    //     group.bench_function(BenchmarkId::new("height_64", l), |bench| {
-    //         bench.iter(|| {
-    //             let tree_height = Height::from(TREE_HEIGHTS[2]);
-    //             let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
+    // TREE_HEIGHT = 64
+    for l in NUM_USERS[0..16].into_iter() {
+        group.bench_function(BenchmarkId::new("height_64", l), |bench| {
+            bench.iter(|| {
+                let tree_height = Height::from(TREE_HEIGHTS[2]);
+                let leaf_nodes = get_input_leaf_nodes(*l, &tree_height);
 
-    //             build_tree(tree_height, leaf_nodes, get_padding_node_content());
-    //             ()
-    //         })
-    //     });
-    // }
+                build_tree(tree_height, leaf_nodes, get_padding_node_content());
+                ()
+            })
+        });
+    }
 
-    // group.finish();
+    group.finish();
 }
 
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
 
-    // for h in TREE_HEIGHTS.into_iter() {
-    let height = Height::from(16);
-    let leaf_nodes = get_full_node_contents();
+    for h in TREE_HEIGHTS.into_iter() {
+        let height = Height::from(h);
+        let leaf_nodes = get_full_node_contents();
 
-    let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
-    let leaf_node = leaf_nodes.0;
+        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+        let leaf_node = leaf_nodes.0;
 
-    group.bench_function(BenchmarkId::new("generate_proof", 16), |bench| {
-        bench.iter(|| {
-            generate_proof(&tree, &leaf_node);
+        group.bench_function(BenchmarkId::new("generate_proof", h), |bench| {
+            bench.iter(|| {
+                generate_proof(&tree, &leaf_node);
+            });
         });
-    });
-    // }
+    }
 
     group.finish();
 }
@@ -174,23 +173,23 @@ fn bench_verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("verify");
     group.sample_size(10);
 
-    // for h in TREE_HEIGHTS.into_iter() {
-    let height = Height::from(16);
-    let leaf_nodes = get_full_node_contents();
+    for h in TREE_HEIGHTS.into_iter() {
+        let height = Height::from(h);
+        let leaf_nodes = get_full_node_contents();
 
-    let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
-    let leaf_node = leaf_nodes.0;
+        let tree = build_tree(height, leaf_nodes.1, get_full_padding_node_content());
+        let leaf_node = leaf_nodes.0;
 
-    let root_hash = leaf_nodes.3;
+        let root_hash = leaf_nodes.3;
 
-    group.bench_function(BenchmarkId::new("verify_proof", 16), |bench| {
-        bench.iter_batched(
-            || generate_proof(&tree, &leaf_node),
-            |proof| proof.verify(root_hash),
-            BatchSize::SmallInput,
-        );
-    });
-    // }
+        group.bench_function(BenchmarkId::new("verify_proof", h), |bench| {
+            bench.iter_batched(
+                || generate_proof(&tree, &leaf_node),
+                |proof| proof.verify(root_hash),
+                BatchSize::SmallInput,
+            );
+        });
+    }
 
     group.finish();
 }
@@ -318,8 +317,6 @@ fn bench_verify_height4() -> () {
     let root_hash = setup_verify(Height::from(4)).1;
 
     black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-
-    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
@@ -328,8 +325,6 @@ fn bench_verify_height8() -> () {
     let root_hash = setup_verify(Height::from(8)).1;
 
     black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-
-    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
@@ -338,8 +333,6 @@ fn bench_verify_height16() -> () {
     let root_hash = setup_verify(Height::from(16)).1;
 
     black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-
-    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
@@ -348,8 +341,6 @@ fn bench_verify_height32() -> () {
     let root_hash = setup_verify(Height::from(32)).1;
 
     black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-
-    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 #[library_benchmark]
@@ -358,8 +349,6 @@ fn bench_verify_height64() -> () {
     let root_hash = setup_verify(Height::from(64)).1;
 
     black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-
-    // proof.verify(root_hash).expect("Unable to verify proof")
 }
 
 // HELPER FUNCTIONS
