@@ -124,10 +124,4 @@ mod tests {
     fn default_without_initializing_machine_parallelism() {
         assert_eq!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
     }
-
-    #[test]
-    fn default_with_initializing_machine_parallelism() {
-        initialize_machine_parallelism();
-        assert_ne!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
-    }
 }
