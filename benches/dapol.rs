@@ -3,12 +3,11 @@ use criterion::{criterion_group, criterion_main};
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode};
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
+use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 use primitive_types::H256;
 use rand::distributions::Uniform;
 use rand::Rng;
 use serde::Serialize;
-
-use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 
 use core::fmt::Debug;
 
