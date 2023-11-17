@@ -303,30 +303,28 @@ pub enum NdmSmtError {
 // TODO test serialization & deserialization
 #[cfg(test)]
 mod tests {
-    mod ndm_smt {
-        use super::super::*;
-        use crate::secret::Secret;
-        use std::str::FromStr;
+    use super::*;
+    use crate::secret::Secret;
+    use std::str::FromStr;
 
-        #[test]
-        fn constructor_works() {
-            let master_secret: Secret = 1u64.into();
-            let salt_b: Secret = 2u64.into();
-            let salt_s: Secret = 3u64.into();
-            let secrets = NdmSmtSecrets {
-                master_secret,
-                salt_b,
-                salt_s,
-            };
+    #[test]
+    fn constructor_works() {
+        let master_secret: Secret = 1u64.into();
+        let salt_b: Secret = 2u64.into();
+        let salt_s: Secret = 3u64.into();
+        let secrets = NdmSmtSecrets {
+            master_secret,
+            salt_b,
+            salt_s,
+        };
 
-            let height = Height::from(4u8);
-            let max_thread_count = MaxThreadCount::default();
-            let entities = vec![Entity {
-                liability: 5u64,
-                id: EntityId::from_str("some entity").unwrap(),
-            }];
+        let height = Height::from(4u8);
+        let max_thread_count = MaxThreadCount::default();
+        let entities = vec![Entity {
+            liability: 5u64,
+            id: EntityId::from_str("some entity").unwrap(),
+        }];
 
-            NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
-        }
+        NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
     }
 }

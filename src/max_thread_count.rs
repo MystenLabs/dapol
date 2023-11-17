@@ -21,7 +21,7 @@ pub const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 /// let max_thread_count = MaxThreadCount::from(8u8);
 /// let max_thread_count = MaxThreadCount::from_str("8");
 /// ```
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct MaxThreadCount(u8);
 
 impl MaxThreadCount {
@@ -111,4 +111,23 @@ pub fn initialize_machine_parallelism() {
             })
             .map_or(None, |par| Some(par.get() as u8))
     });
+}
+
+// -------------------------------------------------------------------------------------------------
+// Unit tests.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_without_initializing_machine_parallelism() {
+        assert_eq!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
+    }
+
+    #[test]
+    fn default_with_initializing_machine_parallelism() {
+        initialize_machine_parallelism();
+        assert_ne!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
+    }
 }
