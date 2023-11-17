@@ -2,15 +2,14 @@ mod setup;
 
 use criterion::{criterion_group, criterion_main};
 use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode};
-
-use dapol::{Height, InclusionProof};
+use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
+use primitive_types::H256;
 
 use dapol::binary_tree::{BinaryTree, Node};
 use dapol::node_content::FullNodeContent;
-use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
-use primitive_types::H256;
-use setup::NUM_USERS;
-use setup::TREE_HEIGHTS;
+use dapol::{Height, InclusionProof};
+
+use setup::{NUM_USERS, TREE_HEIGHTS};
 
 // BENCHMARKS: CRITERION
 // ================================================================================================
