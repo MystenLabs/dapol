@@ -2,7 +2,6 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
 
-use dapol::accumulators::{NdmSmtConfig, NdmSmtConfigBuilder};
 use log::info;
 use primitive_types::H256;
 use rand::distributions::Uniform;
@@ -10,12 +9,13 @@ use rand::Rng;
 use serde::Serialize;
 
 use core::fmt::Debug;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::node_content::FullNodeContent;
 use dapol::{read_write_utils, MaxThreadCount};
 use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
-use dapol::{BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder};
+use dapol::{BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings};
 
 // STRUCTS
 // ================================================================================================
@@ -100,16 +100,21 @@ pub const NUM_USERS: [usize; 39] = [
 pub fn build_ndm_smt(
     height: Height,
     max_thread_count: MaxThreadCount,
-    secrets_file_path: PathBuf,
-    entities_path: PathBuf,
-) -> NdmSmtConfig {
+    num_entities: u64,
+) -> NdmSmt {
+    let src_dir = env!("CARGO_MANIFEST_DIR");
+    let resources_dir = Path::new(&src_dir).join("examples");
+    let secrets_file_path = resources_dir.join("ndm_smt_secrets_example.toml");
+
     NdmSmtConfigBuilder::default()
         .height(height)
         .max_thread_count(max_thread_count)
         .secrets_file_path(secrets_file_path)
-        .entities_path(entities_path)
+        .num_entities(num_entities)
         .build()
         .expect("Unable to build NdmSmtConfig")
+        .parse()
+        .expect("Unable to parse NdmSmt")
 }
 
 pub fn generate_proof(
