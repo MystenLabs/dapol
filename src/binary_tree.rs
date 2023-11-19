@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 mod tree_builder;
-pub use tree_builder::multi_threaded::{self, MAX_THREAD_COUNT};
+pub use tree_builder::multi_threaded::{self, MaxThreadCount};
 pub use tree_builder::{
     single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
 };
