@@ -7,54 +7,26 @@ use primitive_types::H256;
 
 use std::fs;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use dapol::node_content::FullNodeContent;
-use dapol::{BinaryTree, Height, InclusionProof, Node};
+use dapol::{BinaryTree, EntityId, Height, InclusionProof, MaxThreadCount, Node};
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
 // BENCHMARKS: CRITERION
 // ================================================================================================
 
-fn bench_build_tree(c: &mut Criterion) {
+fn bench_build_tree_height(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
-
     group.sample_size(10);
-    group.sampling_mode(SamplingMode::Flat);
 
-    // TREE_HEIGHT = 16
-    for l in NUM_USERS.into_iter() {
-        group.bench_function(BenchmarkId::new("height_16", l), |bench| {
+    let num_entities = NUM_USERS[2]; // 30_000: max. value for tree height 16
+
+    for h in TREE_HEIGHTS {
+        group.bench_function(BenchmarkId::new("tree_height", h), |bench| {
             bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[0]);
-                let leaf_nodes = setup::get_input_leaf_nodes(l, &tree_height);
-                setup::build_tree(tree_height, leaf_nodes, setup::get_padding_node_content());
-                ()
-            })
-        });
-    }
-
-    // TREE_HEIGHT = 32
-    for l in NUM_USERS.into_iter() {
-        group.bench_function(BenchmarkId::new("height_32", l), |bench| {
-            bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[1]);
-                let leaf_nodes = setup::get_input_leaf_nodes(l, &tree_height);
-                setup::build_tree(tree_height, leaf_nodes, setup::get_padding_node_content());
-                ()
-            })
-        });
-    }
-
-    // TREE_HEIGHT = 64
-    for l in NUM_USERS.into_iter() {
-        group.bench_function(BenchmarkId::new("height_64", l), |bench| {
-            bench.iter(|| {
-                let tree_height = Height::from(TREE_HEIGHTS[2]);
-                let leaf_nodes = setup::get_input_leaf_nodes(l, &tree_height);
-
-                setup::build_tree(tree_height, leaf_nodes, setup::get_padding_node_content());
-                ()
+                setup::build_ndm_smt(Height::from(h), MaxThreadCount::default(), num_entities);
             })
         });
     }
@@ -62,19 +34,101 @@ fn bench_build_tree(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_generate_proof(c: &mut Criterion) {
+fn bench_build_tree_max_thread_count(c: &mut Criterion) {
+    let mut group = c.benchmark_group("build");
+    group.sample_size(10);
+
+    let tree_height = Height::from(16);
+    let num_entities = NUM_USERS[2]; // 30_000: max. value for tree height 16
+    let thread_counts: [u8; 7] = [4, 8, 16, 32, 64, 128, 256];
+
+    for t in thread_counts {
+        group.bench_function(BenchmarkId::new("max_thread_count", t), |bench| {
+            bench.iter(|| {
+                setup::build_ndm_smt(tree_height, MaxThreadCount::from(t), num_entities);
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_build_tree_num_users(c: &mut Criterion) {
+    let mut group = c.benchmark_group("build");
+    group.sample_size(10);
+    group.sampling_mode(SamplingMode::Flat);
+
+    let tree_height = Height::from(16);
+
+    for u in NUM_USERS {
+        group.bench_function(BenchmarkId::new("num_users", u), |bench| {
+            bench.iter(|| {
+                setup::build_ndm_smt(tree_height, MaxThreadCount::default(), u);
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_generate_proof_tree_height(c: &mut Criterion) {
     let mut group = c.benchmark_group("prove");
     group.sample_size(10);
 
-    for h in TREE_HEIGHTS.into_iter() {
-        let height = Height::from(h);
-        let leaf_nodes = setup::get_full_node_contents();
+    let num_entities = NUM_USERS[2]; // 30_000: max. value for tree height 16
 
-        let tree = setup::build_tree(height, leaf_nodes.1, setup::get_full_padding_node_content());
-        let leaf_node = leaf_nodes.0;
+    for h in TREE_HEIGHTS {
+        let ndm_smt =
+            setup::build_ndm_smt(Height::from(h), MaxThreadCount::default(), num_entities);
+        let entity_id = EntityId::from_str("foo").unwrap();
 
-        group.bench_function(BenchmarkId::new("generate_proof", h), |bench| {
-            bench.iter(|| setup::generate_proof(&tree, &leaf_node));
+        group.bench_function(BenchmarkId::new("tree_height", h), |bench| {
+            bench.iter(|| {
+                setup::generate_proof(&ndm_smt, &entity_id);
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_generate_proof_max_thread_count(c: &mut Criterion) {
+    let mut group = c.benchmark_group("prove");
+    group.sample_size(10);
+
+    let tree_height = Height::from(16);
+    let num_entities = NUM_USERS[2]; // 30_000: max. value for tree height 16
+    let thread_counts: [u8; 7] = [4, 8, 16, 32, 64, 128, 256];
+
+    for t in thread_counts {
+        let ndm_smt = setup::build_ndm_smt(tree_height, MaxThreadCount::from(t), num_entities);
+        let entity_id = EntityId::from_str("foo").unwrap();
+
+        group.bench_function(BenchmarkId::new("max_thread_count", t), |bench| {
+            bench.iter(|| {
+                setup::generate_proof(&ndm_smt, &entity_id);
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_generate_proof_num_users(c: &mut Criterion) {
+    let mut group = c.benchmark_group("prove");
+    group.sample_size(10);
+    group.sampling_mode(SamplingMode::Flat);
+
+    let tree_height = Height::from(16);
+
+    for u in NUM_USERS {
+        let ndm_smt = setup::build_ndm_smt(tree_height, MaxThreadCount::default(), u);
+        let entity_id = EntityId::from_str("foo").unwrap();
+
+        group.bench_function(BenchmarkId::new("num_users", u), |bench| {
+            bench.iter(|| {
+                setup::generate_proof(&ndm_smt, &entity_id);
+            })
         });
     }
 
@@ -82,7 +136,7 @@ fn bench_generate_proof(c: &mut Criterion) {
 }
 
 fn bench_verify_proof(c: &mut Criterion) {
-    let mut group = c.benchmark_group("verify");
+    let mut group = c.benchmark_group("verify_proof");
     group.sample_size(10);
 
     for h in TREE_HEIGHTS.into_iter() {
