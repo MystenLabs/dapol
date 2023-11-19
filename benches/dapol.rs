@@ -238,7 +238,7 @@ fn bench_build_max_threads128() {
 }
 
 #[library_benchmark]
-fn bench_build_max_threads256() {
+fn bench_build_max_threads255() {
     black_box(setup::build_ndm_smt(
         Height::from(16),
         MaxThreadCount::from(255),
@@ -322,7 +322,7 @@ fn bench_generate_max_threads128() -> InclusionProof {
 }
 
 #[library_benchmark]
-fn bench_generate_max_threads256() -> InclusionProof {
+fn bench_generate_max_threads255() -> InclusionProof {
     let tree_height = Height::from(16);
     let num_entities = NUM_USERS[2];
     let ndm_smt = setup::build_ndm_smt(tree_height, MaxThreadCount::from(255), num_entities);
@@ -330,7 +330,7 @@ fn bench_generate_max_threads256() -> InclusionProof {
     black_box(setup::generate_proof(&ndm_smt, &entity_id))
 }
 
-// TODO: add verify_proof benches
+// TODO: add bench_verify_proof benches
 
 criterion_group!(
     benches,
@@ -343,7 +343,8 @@ criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks = bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height16, bench_verify_height32, bench_verify_height64, */
+    benchmarks = bench_build_height16, bench_build_height32, bench_build_height64, bench_build_max_threads4, bench_build_max_threads8, bench_build_max_threads16, bench_build_height32, bench_build_height64, bench_build_max_threads128, bench_build_max_threads255,
+    bench_generate_height16, bench_generate_height32, bench_generate_height64, bench_generate_max_threads4, bench_generate_max_threads8, bench_generate_max_threads16, bench_generate_height32, bench_generate_height64, bench_generate_max_threads128, bench_generate_max_threads255,
 );
 
 // main!(library_benchmark_groups = bench_dapol);
