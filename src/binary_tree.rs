@@ -48,7 +48,7 @@ mod utils;
 pub use utils::max_bottom_layer_nodes;
 
 mod height;
-pub use height::{Height, MAX_HEIGHT, MIN_HEIGHT};
+pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
 
 use crate::utils::ErrOnSome;
 

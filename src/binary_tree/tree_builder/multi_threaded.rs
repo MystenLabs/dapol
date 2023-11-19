@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{error, info, warn};
+use log::warn;
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -46,6 +46,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use serde::{Deserialize, Serialize};
+
+use crate::MaxThreadCount;
 
 use super::super::{
     max_bottom_layer_nodes, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node,
@@ -70,6 +72,7 @@ pub fn build_tree<C, F>(
     store_depth: u8,
     mut input_leaf_nodes: Vec<InputLeafNode<C>>,
     new_padding_node_content: F,
+    max_thread_count: MaxThreadCount,
 ) -> Result<BinaryTree<C>, TreeBuildError>
 where
     C: Debug + Clone + Mergeable + Send + Sync + 'static,
@@ -91,7 +94,9 @@ where
     };
 
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
-    let params = RecursionParams::from_tree_height(height.clone()).with_store_depth(store_depth);
+    let params = RecursionParams::from_tree_height(height.clone())
+        .with_store_depth(store_depth)
+        .with_max_thread_count(max_thread_count.get_value());
 
     if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
     {
@@ -237,33 +242,6 @@ pub struct RecursionParams {
     height: Height,
 }
 
-/// The default max number of threads.
-/// This value is used in the case where the number of threads cannot be
-/// determined from the underlying hardware. 4 was chosen as the default because
-/// most modern (circa 2023) architectures will have at least 4 cores.
-const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
-
-// This is used to determine the number of threads to spawn in the
-// multi-threaded builder.
-pub fn MAX_THREAD_COUNT() -> u8 {
-    crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-        *opt.borrow_mut() = std::thread::available_parallelism()
-            .map_err(|err| {
-                error!("Problem accessing machine parallelism: {}", err);
-                err
-            })
-            .map_or(None, |par| Some(par.get() as u8));
-
-        if let Some(t) = opt.clone().into_inner() {
-            info!("Available parallelism detected: {}. This will be the max number of threads spawned.", t);
-            t
-        } else {
-            warn!("No default parallelism found, defaulting to {}", DEFAULT_MAX_THREAD_COUNT);
-            DEFAULT_MAX_THREAD_COUNT
-        }
-    })
-}
-
 /// Private functions for use within this file only.
 impl RecursionParams {
     /// Construct the parameters given only the height of the tree.
@@ -287,22 +265,6 @@ impl RecursionParams {
         // y-coords also start from 0, hence the `- 1`.
         let y_coord = height.as_y_coord();
 
-        // let mut max_thread_count = DEFAULT_MAX_THREAD_COUNT;
-        // crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-        //     match *opt.borrow() {
-        //         None =>
-        //             warn!("No default parallelism found, defaulting to {}", max_thread_count)
-        //         ,
-        //         Some(par) => {
-        //             max_thread_count = par;
-        //             info!(
-        //                 "Available parallelism detected: {}. This will be the max number of threads spawned.",
-        //                 max_thread_count
-        //             );
-        //         }
-        //     }
-        // });
-
         RecursionParams {
             x_coord_min,
             x_coord_mid,
@@ -310,7 +272,7 @@ impl RecursionParams {
             y_coord,
             // TODO need to unit test that this number matches actual thread count
             thread_count: Arc::new(Mutex::new(1)),
-            max_thread_count: MAX_THREAD_COUNT(),
+            max_thread_count: 1,
             store_depth: MIN_STORE_DEPTH,
             height,
         }
@@ -366,6 +328,11 @@ impl RecursionParams {
 
     pub fn with_tree_height(mut self, height: Height) -> Self {
         self.height = height;
+        self
+    }
+
+    pub fn with_max_thread_count(mut self, max_thread_count: u8) -> Self {
+        self.max_thread_count = max_thread_count;
         self
     }
 }

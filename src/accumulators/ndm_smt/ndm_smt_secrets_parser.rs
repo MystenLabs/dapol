@@ -1,32 +1,31 @@
-//! Parser for files containing NDM-SMT-related secrets.
-//!
-//! Supported file types: toml
-//! Note that the file type is inferred from its path extension.
-//!
-//! TOML format:
-//! ```toml,ignore
-//! # None of these values should be shared. They should be kept with the tree
-//! # creator.
-//!
-//! # Used for generating secrets for each entity.
-//! master_secret = "master_secret"
-//!
-//! # Used for generating blinding factors for Pedersen commitments.
-//! salt_b = "salt_b"
-//!
-//! # Used as an input to the hash function when merging nodes.
-//! salt_s = "salt_s"
-//! ```
-//!
-//! See [super][secrets] for more details about the secret values.
-
-use log::{info, warn};
+use log::{debug, warn};
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::ndm_smt_secrets::{NdmSmtSecrets, NdmSmtSecretsInput};
-use crate::secret::SecretParseError;
+use crate::secret::SecretParserError;
 
-/// Parser requires a valid path to a file.
+/// Parser for files containing NDM-SMT-related secrets.
+///
+/// Supported file types: toml
+/// Note that the file type is inferred from its path extension.
+///
+/// TOML format:
+/// ```toml,ignore
+/// # None of these values should be shared. They should be kept with the tree
+/// # creator.
+///
+/// # Used for generating secrets for each entity.
+/// master_secret = "master_secret"
+///
+/// # Used for generating blinding factors for Pedersen commitments.
+/// salt_b = "salt_b"
+///
+/// # Used as an input to the hash function when merging nodes.
+/// salt_s = "salt_s"
+/// ```
+///
+/// See [crate][accumulators][NdmSmtSecrets] for more details about the
+/// secret values.
 pub struct NdmSmtSecretsParser {
     path: Option<PathBuf>,
 }
@@ -35,7 +34,7 @@ impl NdmSmtSecretsParser {
     /// Constructor.
     ///
     /// `Option` is used to wrap the parameter to make the code work more
-    /// seamlessly with the config builders in [super][super][accumulators].
+    /// seamlessly with the config builders in [crate][accumulators].
     pub fn from_path_opt(path: Option<PathBuf>) -> Self {
         NdmSmtSecretsParser { path }
     }
@@ -53,7 +52,7 @@ impl NdmSmtSecretsParser {
     /// 4. The file type is not supported.
     /// 5. Deserialization of any of the records in the file fails.
     pub fn parse(self) -> Result<NdmSmtSecrets, NdmSmtSecretsParserError> {
-        info!(
+        debug!(
             "Attempting to parse {:?} as a file containing NDM-SMT secrets",
             &self.path
         );
@@ -72,6 +71,8 @@ impl NdmSmtSecretsParser {
                 NdmSmtSecrets::try_from(secrets)?
             }
         };
+
+        debug!("Successfully parsed NDM-SMT secrets file",);
 
         Ok(secrets)
     }
@@ -114,7 +115,7 @@ pub enum NdmSmtSecretsParserError {
     #[error("The file type with extension {ext:?} is not supported")]
     UnsupportedFileType { ext: String },
     #[error("Error converting string found in file to Secret")]
-    StringConversionError(#[from] SecretParseError),
+    StringConversionError(#[from] SecretParserError),
     #[error("Error reading the file")]
     FileReadError(#[from] std::io::Error),
     #[error("Deserialization process failed")]

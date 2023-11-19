@@ -1,6 +1,6 @@
-//! Command Line Interface.
+//! Command Line Interface implementation using [clap].
 //!
-//! See [LONG_ABOUT] for more information.
+//! See [MAIN_LONG_ABOUT] for more information.
 
 use clap::{command, Args, Parser, Subcommand, ValueEnum};
 use clap_verbosity_flag::{Verbosity, WarnLevel};
@@ -12,7 +12,7 @@ use std::str::FromStr;
 use crate::{
     binary_tree::Height,
     inclusion_proof::DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
-    percentage::{Percentage, ONE_HUNDRED_PERCENT},
+    percentage::{Percentage, ONE_HUNDRED_PERCENT}, MaxThreadCount,
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -117,6 +117,10 @@ pub enum BuildKindCommand {
         #[arg(long, value_parser = Height::from_str, default_value = Height::default(), value_name = "U8_INT")]
         height: Height,
 
+        /// Max thread count allowed for parallel tree builder.
+        #[arg(long, value_parser = MaxThreadCount::from_str, default_value = MaxThreadCount::default(), value_name = "U8_INT")]
+        max_thread_count: MaxThreadCount,
+
         #[arg(short, long, value_name = "FILE_PATH", long_help = NDM_SMT_SECRETS_HELP)]
         secrets_file: Option<InputArg>,
 
@@ -154,7 +158,7 @@ pub struct EntitySource {
 // -------------------------------------------------------------------------------------------------
 // Long help texts.
 
-const MAIN_LONG_ABOUT: &str = "
+pub const MAIN_LONG_ABOUT: &str = "
 DAPOL+ Proof of Liabilities protocol in Rust.
 
 **NOTE** This project is currently still a work in progress, but is ready for

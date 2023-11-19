@@ -1,19 +1,21 @@
-//! Accumulators.
+//! Various accumulator variants of the DAPOL+ protocol.
 //!
-//! This is the top-most file in the hierarchy of the dapol crate. An
-//! accumulator defines how the binary tree is built. The are different types of
-//! accumulators, which can all be found under this module. Each accumulator has
-//! different configuration requirements, which are detailed in each of the
+//! This is the top-most module in the hierarchy of the [dapol] crate. An
+//! accumulator defines how the binary tree is built. There are different types
+//! of accumulators, which can all be found under this module. Each accumulator
+//! has different configuration requirements, which are detailed in each of the
 //! sub-modules. The currently supported accumulator types are:
 //! - [Non-Deterministic Mapping Sparse Merkle Tree]
 //!
-//! Each accumulator can be constructed via the configuration structs:
-//! - [config][AccumulatorConfig] is used to deserialize config from a file. The
-//! specific type of accumulator is determined from the config file.
-//! - [ndm_smt][ndm_smt_config][NdmSmtConfigBuilder] is used to construct the
-//! NDM-SMT accumulator type using the builder pattern.
+//! Accumulators can be constructed via the configuration parsers:
+//! - [AccumulatorConfig] is used to deserialize config from a file (the
+//! specific type of accumulator is determined from the config file). After
+//! parsing the config the accumulator can be constructed.
+//! - [NdmSmtConfigBuilder] is used to construct the
+//! config for the NDM-SMT accumulator type using a builder pattern. The config
+//! can then be parsed to construct an NDM-SMT.
 //!
-//! [Non-Deterministic Mapping Sparse Merkle Tree]: ndm_smt
+//! [Non-Deterministic Mapping Sparse Merkle Tree]: crate::accumulators::NdmSmt
 
 use log::{debug, info};
 use serde::{Deserialize, Serialize};
@@ -22,16 +24,30 @@ use std::path::PathBuf;
 use crate::{
     read_write_utils::{self, ReadWriteError},
     utils::LogOnErr,
-    AggregationFactor, EntityId, InclusionProof, NdmSmtError,
+    AggregationFactor, EntityId, InclusionProof,
 };
 
-pub mod config;
-pub mod ndm_smt;
+mod config;
+pub use config::{AccumulatorConfig, AccumulatorConfigError, AccumulatorParserError};
+
+mod ndm_smt;
+pub use ndm_smt::{
+    NdmSmt, NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtError, NdmSmtConfigParserError, NdmSmtSecrets,
+    NdmSmtSecretsParser, RandomXCoordGenerator
+};
 
 const SERIALIZED_ACCUMULATOR_EXTENSION: &str = "dapoltree";
 const SERIALIZED_ACCUMULATOR_FILE_PREFIX: &str = "accumulator_";
 
-/// Various accumulator types.
+/// Various supported accumulator types.
+///
+/// Accumulators can be constructed via the configuration parsers:
+/// - [AccumulatorConfig] is used to deserialize config from a file (the
+/// specific type of accumulator is determined from the config file). After
+/// parsing the config the accumulator can be constructed.
+/// - [NdmSmtConfigBuilder] is used to construct the
+/// config for the NDM-SMT accumulator type using a builder pattern. The config
+/// can then be parsed to construct an NDM-SMT.
 #[derive(Serialize, Deserialize)]
 pub enum Accumulator {
     NdmSmt(ndm_smt::NdmSmt),
@@ -166,6 +182,7 @@ impl Accumulator {
     }
 }
 
+/// Errors encountered when handling an [Accumulator].
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorError {
     #[error("Error serializing/deserializing file")]

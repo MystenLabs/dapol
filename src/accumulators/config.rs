@@ -1,31 +1,30 @@
-//! Configuration for the various accumulator types.
-//!
-//! Currently only TOML files are supported for config files. The only
-//! config requirement at this level (not including the specific accumulator
-//! config) is the accumulator type:
-//!
-//! ```toml,ignore
-//! accumulator_type = "ndm-smt"
-//! ```
-//!
-//! The rest of the config details can be found in the submodules:
-//! - [ndm_smt][ndm_smt_config]
-//!
-//! Config deserialization example:
-//! ```
-//! use std::path::PathBuf;
-//! use dapol::AccumulatorConfig;
-//!
-//! let file_path = PathBuf::from("./examples/tree_config_example.toml");
-//! let config = AccumulatorConfig::deserialize(file_path).unwrap();
-//! ```
-
 use log::debug;
 use serde::Deserialize;
 use std::{ffi::OsString, fs::File, io::Read, path::PathBuf, str::FromStr};
 
 use super::{ndm_smt, Accumulator};
 
+/// Configuration required for building various accumulator types.
+///
+/// Currently only TOML files are supported for config files. The only
+/// config requirement at this level (not including the specific accumulator
+/// config) is the accumulator type:
+///
+/// ```toml,ignore
+/// accumulator_type = "ndm-smt"
+/// ```
+///
+/// The rest of the config details can be found in the submodules:
+/// - [crate][accumulators][NdmSmtConfig]
+///
+/// Config deserialization example:
+/// ```
+/// use std::path::PathBuf;
+/// use dapol::AccumulatorConfig;
+///
+/// let file_path = PathBuf::from("./examples/tree_config_example.toml");
+/// let config = AccumulatorConfig::deserialize(file_path).unwrap();
+/// ```
 #[derive(Deserialize, Debug)]
 #[serde(tag = "accumulator_type", rename_all = "kebab-case")]
 pub enum AccumulatorConfig {
@@ -46,7 +45,7 @@ impl AccumulatorConfig {
     /// 3. The file type is not supported.
     pub fn deserialize(config_file_path: PathBuf) -> Result<Self, AccumulatorConfigError> {
         debug!(
-            "Successfully deserialized accumulator config from file {:?}",
+            "Attempting to parse {:?} as a file containing accumulator config",
             config_file_path.clone().into_os_string()
         );
 
@@ -65,6 +64,8 @@ impl AccumulatorConfig {
                 config
             }
         };
+
+        debug!("Successfully parsed accumulator config file");
 
         Ok(config)
     }
@@ -99,6 +100,7 @@ impl FromStr for FileType {
     }
 }
 
+/// Errors encountered when handling [AccumulatorConfig].
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorConfigError {
     #[error("Unable to find file extension for path {0:?}")]
@@ -114,5 +116,5 @@ pub enum AccumulatorConfigError {
 #[derive(thiserror::Error, Debug)]
 pub enum AccumulatorParserError {
     #[error("Error parsing NDM-SMT config")]
-    NdmSmtError(#[from] ndm_smt::NdmSmtParserError),
+    NdmSmtError(#[from] ndm_smt::NdmSmtConfigParserError),
 }

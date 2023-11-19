@@ -1,14 +1,3 @@
-//! Non-Deterministic Mapping Sparse Merkle Tree (NDM-SMT).
-//!
-//! This accumulator variant is the simplest. Each entity is randomly mapped to
-//! a bottom-layer node in the tree. The algorithm used to determine the mapping
-//! uses a variation of Durstenfeld’s shuffle algorithm (see
-//! [RandomXCoordGenerator]) and will not produce the same mapping for the same
-//! inputs, hence the "non-deterministic" term in the title.
-//!
-//! Construction of this tree can be done via
-//! [ndm_smt_config][NdmSmtConfigBuilder].
-
 use std::collections::HashMap;
 
 use primitive_types::H256;
@@ -19,36 +8,51 @@ use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
 
-use crate::binary_tree::{BinaryTree, Coordinate, Height, InputLeafNode, TreeBuilder, PathSiblings};
+use crate::binary_tree::{
+    BinaryTree, Coordinate, Height, InputLeafNode, PathSiblings, TreeBuilder,
+};
 use crate::entity::{Entity, EntityId};
 use crate::inclusion_proof::{
     AggregationFactor, InclusionProof, DEFAULT_RANGE_PROOF_UPPER_BOUND_BIT_LENGTH,
 };
 use crate::kdf::generate_key;
 use crate::node_content::FullNodeContent;
+use crate::MaxThreadCount;
 
 mod ndm_smt_secrets;
-use ndm_smt_secrets::NdmSmtSecrets;
+pub use ndm_smt_secrets::NdmSmtSecrets;
 
 mod ndm_smt_secrets_parser;
 pub use ndm_smt_secrets_parser::NdmSmtSecretsParser;
 
 mod x_coord_generator;
-use x_coord_generator::RandomXCoordGenerator;
+pub use x_coord_generator::RandomXCoordGenerator;
 
 mod ndm_smt_config;
-pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtParserError};
+pub use ndm_smt_config::{NdmSmtConfig, NdmSmtConfigBuilder, NdmSmtConfigParserError};
 
 // -------------------------------------------------------------------------------------------------
 // Main struct and implementation.
 
 type Content = FullNodeContent;
 
-/// Main struct containing tree object, master secret and the salts.
+/// Non-Deterministic Mapping Sparse Merkle Tree (NDM-SMT) accumulator type.
+///
+/// This accumulator variant is the simplest. Each entity is randomly mapped to
+/// a bottom-layer node in the tree. The algorithm used to determine the mapping
+/// uses a variation of Durstenfeld’s shuffle algorithm (see
+/// [RandomXCoordGenerator]) and will not produce the same mapping for the same
+/// inputs, hence the "non-deterministic" term in the title.
+///
+/// Construction of this tree can be done via [NdmSmtConfigBuilder].
+///
+/// The struct contains a tree object, secrets used for construction, and an
+/// entity mapping.
 ///
 /// The entity mapping structure is required because each entity is randomly
 /// mapped to a leaf node, and this assignment is non-deterministic. The map
 /// keeps track of which entity is assigned to which leaf node.
+
 #[derive(Serialize, Deserialize)]
 pub struct NdmSmt {
     secrets: NdmSmtSecrets,
@@ -78,19 +82,9 @@ impl NdmSmt {
     pub fn new(
         secrets: NdmSmtSecrets,
         height: Height,
+        max_thread_count: MaxThreadCount,
         entities: Vec<Entity>,
     ) -> Result<Self, NdmSmtError> {
-        // This is used to determine the number of threads to spawn in the
-        // multi-threaded builder.
-        crate::utils::DEFAULT_PARALLELISM_APPROX.with(|opt| {
-            *opt.borrow_mut() = std::thread::available_parallelism()
-                .map_err(|err| {
-                    error!("Problem accessing machine parallelism: {}", err);
-                    err
-                })
-                .map_or(None, |par| Some(par.get() as u8))
-        });
-
         let master_secret_bytes = secrets.master_secret.as_bytes();
         let salt_b_bytes = secrets.salt_b.as_bytes();
         let salt_s_bytes = secrets.salt_s.as_bytes();
@@ -157,6 +151,7 @@ impl NdmSmt {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
+            .with_max_thread_count(max_thread_count)
             .build_using_multi_threaded_algorithm(new_padding_node_content_closure(
                 *master_secret_bytes,
                 *salt_b_bytes,
@@ -207,8 +202,11 @@ impl NdmSmt {
             .and_then(|leaf_x_coord| self.tree.get_leaf_node(*leaf_x_coord))
             .ok_or(NdmSmtError::EntityIdNotFound)?;
 
-        let path_siblings = PathSiblings::
-            build_using_multi_threaded_algorithm(&self.tree, &leaf_node, new_padding_node_content)?;
+        let path_siblings = PathSiblings::build_using_multi_threaded_algorithm(
+            &self.tree,
+            &leaf_node,
+            new_padding_node_content,
+        )?;
 
         Ok(InclusionProof::generate(
             leaf_node,
@@ -278,6 +276,7 @@ fn new_padding_node_content_closure(
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+/// Errors encountered when handling [NdmSmt].
 #[derive(thiserror::Error, Debug)]
 pub enum NdmSmtError {
     #[error("Problem constructing the tree")]
@@ -304,30 +303,28 @@ pub enum NdmSmtError {
 // TODO test serialization & deserialization
 #[cfg(test)]
 mod tests {
-    mod ndm_smt {
-        use super::super::*;
-        use crate::binary_tree::Height;
-        use crate::secret::Secret;
-        use std::str::FromStr;
+    use super::*;
+    use crate::secret::Secret;
+    use std::str::FromStr;
 
-        #[test]
-        fn constructor_works() {
-            let master_secret: Secret = 1u64.into();
-            let salt_b: Secret = 2u64.into();
-            let salt_s: Secret = 3u64.into();
-            let secrets = NdmSmtSecrets {
-                master_secret,
-                salt_b,
-                salt_s,
-            };
+    #[test]
+    fn constructor_works() {
+        let master_secret: Secret = 1u64.into();
+        let salt_b: Secret = 2u64.into();
+        let salt_s: Secret = 3u64.into();
+        let secrets = NdmSmtSecrets {
+            master_secret,
+            salt_b,
+            salt_s,
+        };
 
-            let height = Height::from(4u8);
-            let entities = vec![Entity {
-                liability: 5u64,
-                id: EntityId::from_str("some entity").unwrap(),
-            }];
+        let height = Height::from(4u8);
+        let max_thread_count = MaxThreadCount::default();
+        let entities = vec![Entity {
+            liability: 5u64,
+            id: EntityId::from_str("some entity").unwrap(),
+        }];
 
-            NdmSmt::new(secrets, height, entities).unwrap();
-        }
+        NdmSmt::new(secrets, height, max_thread_count, entities).unwrap();
     }
 }

@@ -1,20 +1,3 @@
-//! Parser for files containing a list of entity IDs.
-//!
-//! The entity IDs file is expected to be a list of entity IDs, each on a new
-//! line.    All file formats are accepted. It is also possible to use the same
-//! entity IDs &    liabilities file that is accepted by
-//! [super][EntitiesParser].
-//!
-//! Example:
-//! ```
-//! use dapol::EntityIdsParser;
-//! use std::path::PathBuf;
-//!
-//! let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-//! path.push("./examples/entities_example.csv");
-//! let entities = EntityIdsParser::from_path(path).parse().unwrap();
-//! ```
-
 use std::str::FromStr;
 use std::{ffi::OsString, path::PathBuf};
 
@@ -22,6 +5,22 @@ use log::debug;
 
 use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 
+/// Parser for files containing a list of entity IDs.
+///
+/// The entity IDs file is expected to be a list of entity IDs, each on a new
+/// line.    All file formats are accepted. It is also possible to use the same
+/// entity IDs &    liabilities file that is accepted by
+/// [crate][EntitiesParser].
+///
+/// Example:
+/// ```
+/// use dapol::EntityIdsParser;
+/// use std::path::PathBuf;
+///
+/// let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+/// path.push("./examples/entities_example.csv");
+/// let entities = EntityIdsParser::from_path(path).parse().unwrap();
+/// ```
 pub struct EntityIdsParser {
     path: Option<PathBuf>,
 }
@@ -68,6 +67,8 @@ impl EntityIdsParser {
             }
         };
 
+        debug!("Successfully parsed entity IDs file",);
+
         Ok(entity_ids)
     }
 }
@@ -86,6 +87,7 @@ impl FromStr for FileType {
 // -------------------------------------------------------------------------------------------------
 // Errors.
 
+/// Errors encountered when handling [EntityIdsParser].
 #[derive(thiserror::Error, Debug)]
 pub enum EntityIdsParserError {
     #[error("Expected path to be set but found none")]

@@ -96,7 +96,7 @@ impl<T> IfNoneThen<T> for Option<T> {
     {
         match &self {
             None => f(),
-            Some(_) => {},
+            Some(_) => {}
         }
         self
     }
@@ -128,17 +128,6 @@ impl ErrUnlessTrue for Option<bool> {
         }
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Global variables.
-
-use std::cell::RefCell;
-
-// Guessing the number of cores.
-// This variable must NOT be shared between more than 1 thread, it is not
-// thread-safe.
-// https://www.sitepoint.com/rust-global-variables/#singlethreadedglobalswithruntimeinitialization
-thread_local!(pub static DEFAULT_PARALLELISM_APPROX: RefCell<Option<u8>> = RefCell::new(None));
 
 // -------------------------------------------------------------------------------------------------
 // Testing utils.

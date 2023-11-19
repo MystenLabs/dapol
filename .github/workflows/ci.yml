@@ -1,0 +1,55 @@
+# Build platform and run tests
+
+# Took inspiration from the following:
+# https://infinyon.com/blog/2021/04/github-actions-best-practices/
+# https://github.com/infinyon/fluvio/blob/master/.github/workflows/ci.yml
+# https://github.com/clap-rs/clap/blob/master/.github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**"
+      - "!/*.md"
+      - "!/**.md"
+  pull_request:
+    branches: [main]
+    paths:
+      - "**"
+      - "!/*.md"
+      - "!/**.md"
+
+jobs:
+  build:
+
+    name: Build on (${{ matrix.os }})
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    env:
+      RUST_BACKTRACE: full
+      RELEASE: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build
+        run: cargo test --examples --tests --no-run
+        # TODO rather use the below as apposed to the above, when benches are done
+        # run: cargo test --all-targets --no-run
+
+      - name: Test
+        run: cargo test
+
+      # TODO maybe we should have a light version of the benches that we can run for pushes to main (not PRs)
+      # - name: Test
+      #   run: cargo test --workspace --benches

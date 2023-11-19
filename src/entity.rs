@@ -1,16 +1,3 @@
-//! Entity structure and methods.
-//!
-//! The proof of liabilities protocol operates on a list of objects. Each object
-//! must be of the same type, and the structure of this type is defined by the
-//! entity struct. There is a 1-1 mapping from entity to bottom layer leaf node
-//! in the binary tree.
-//!
-//! More often than not the data fed to the protocol is expected to be related
-//! to people, or users. So an entity can be thought of as a user. 'Entity' was
-//! chosen above 'user' because it has a more general connotation.
-//!
-//! The entity struct has only 2 fields: ID and liability.
-
 use serde::{Deserialize, Serialize};
 
 use std::{convert::From};
@@ -25,6 +12,18 @@ pub use entity_ids_parser::{EntityIdsParser, EntityIdsParserError};
 // -------------------------------------------------------------------------------------------------
 // Main structs & implementations.
 
+/// Container for single liability & ID entry into the tree.
+///
+/// The proof of liabilities protocol operates on a list of objects. Each object
+/// must be of the same type, and the structure of this type is defined by the
+/// entity struct. There is a 1-1 mapping from entity to bottom layer leaf node
+/// in the binary tree.
+///
+/// More often than not the data fed to the protocol is expected to be related
+/// to people, or users. So an entity can be thought of as a user. 'Entity' was
+/// chosen above 'user' because it has a more general connotation.
+///
+/// The entity struct has only 2 fields: ID and liability.
 #[derive(Deserialize, PartialEq)]
 pub struct Entity {
     pub liability: u64,

@@ -1,22 +1,21 @@
-//! Hash function.
-//!
-//! The main purpose of the hash function is usage in the binary tree merge
-//! function. The reason it has it's own file is so that we can create a
-//! wrapper around the underlying hash function, allowing it to be easily
-//! changed.
-//!
-//! The current hash function used is blake3.
-//!
-//! Example:
-//! ```
-//! use dapol::Hasher;
-//! let mut hasher = Hasher::new();
-//! hasher.update("leaf".as_bytes());
-//! let hash = hasher.finalize();
-//! ```
-
 use primitive_types::H256;
 
+/// Abstraction of a hash function, allows easy switching of hash function.
+///
+/// The main purpose of the hash function is usage in the binary tree merge
+/// function. The reason it has it's own file is so that we can create a
+/// wrapper around the underlying hash function, allowing it to be easily
+/// changed.
+///
+/// The current hash function used is blake3.
+///
+/// Example:
+/// ```
+/// use dapol::Hasher;
+/// let mut hasher = Hasher::new();
+/// hasher.update("leaf".as_bytes());
+/// let hash = hasher.finalize();
+/// ```
 pub struct Hasher(blake3::Hasher);
 
 impl Hasher {
@@ -32,6 +31,12 @@ impl Hasher {
     pub fn finalize(&self) -> H256 {
         let bytes: [u8; 32] = self.0.finalize().into();
         H256(bytes)
+    }
+}
+
+impl Default for Hasher {
+    fn default() -> Self {
+        Hasher(blake3::Hasher::default())
     }
 }
 
