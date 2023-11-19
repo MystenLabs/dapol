@@ -11,11 +11,10 @@ use serde::Serialize;
 use core::fmt::Debug;
 use std::path::PathBuf;
 
-use dapol::binary_tree::{
-    BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder,
-};
 use dapol::node_content::FullNodeContent;
-use dapol::{read_write_utils, AggregationFactor, Hasher, Height, InclusionProof};
+use dapol::read_write_utils;
+use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
+use dapol::{BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder};
 
 // STRUCTS
 // ================================================================================================

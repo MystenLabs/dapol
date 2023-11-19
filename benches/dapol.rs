@@ -8,9 +8,8 @@ use primitive_types::H256;
 use std::fs;
 use std::path::PathBuf;
 
-use dapol::binary_tree::{BinaryTree, Node};
 use dapol::node_content::FullNodeContent;
-use dapol::{Height, InclusionProof};
+use dapol::{BinaryTree, Height, InclusionProof, Node};
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -22,26 +21,6 @@ fn bench_build_tree(c: &mut Criterion) {
 
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
-
-    // TREE_HEIGHT = 4
-    group.bench_function(BenchmarkId::new("height_4", 8), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(4);
-            let leaf_nodes = setup::get_input_leaf_nodes(8, &tree_height);
-            setup::build_tree(tree_height, leaf_nodes, setup::get_padding_node_content());
-            ()
-        })
-    });
-
-    // TREE_HEIGHT = 8
-    group.bench_function(BenchmarkId::new("height_8", 128), |bench| {
-        bench.iter(|| {
-            let tree_height = Height::from(8);
-            let leaf_nodes = setup::get_input_leaf_nodes(128, &tree_height);
-            setup::build_tree(tree_height, leaf_nodes, setup::get_padding_node_content());
-            ()
-        })
-    });
 
     // TREE_HEIGHT = 16 (max. NUM_USERS is 32_768)
     for l in NUM_USERS[0..2].into_iter() {
@@ -163,28 +142,6 @@ fn setup_verify(tree_height: Height) -> (InclusionProof, H256) {
 }
 
 #[library_benchmark]
-fn bench_build_height4() -> () {
-    let tree_height = Height::from(4);
-    let leaf_nodes = setup::get_input_leaf_nodes(8, &tree_height);
-    black_box(setup::build_tree(
-        tree_height,
-        leaf_nodes,
-        setup::get_padding_node_content(),
-    ));
-}
-
-#[library_benchmark]
-fn bench_build_height8() -> () {
-    let tree_height = Height::from(8);
-    let leaf_nodes = setup::get_input_leaf_nodes(128, &tree_height);
-    black_box(setup::build_tree(
-        tree_height,
-        leaf_nodes,
-        setup::get_padding_node_content(),
-    ));
-}
-
-#[library_benchmark]
 fn bench_build_height16() -> () {
     for l in NUM_USERS[0..2].into_iter() {
         let tree_height = Height::from(TREE_HEIGHTS[0]);
@@ -224,22 +181,6 @@ fn bench_build_height64() -> () {
 }
 
 #[library_benchmark]
-fn bench_generate_height4() -> InclusionProof {
-    black_box(setup::generate_proof(
-        &setup_generate(Height::from(4)).0,
-        &setup_generate(Height::from(4)).1,
-    ))
-}
-
-#[library_benchmark]
-fn bench_generate_height8() -> InclusionProof {
-    black_box(setup::generate_proof(
-        &setup_generate(Height::from(8)).0,
-        &setup_generate(Height::from(8)).1,
-    ))
-}
-
-#[library_benchmark]
 fn bench_generate_height16() -> InclusionProof {
     black_box(setup::generate_proof(
         &setup_generate(Height::from(16)).0,
@@ -261,22 +202,6 @@ fn bench_generate_height64() -> InclusionProof {
         &setup_generate(Height::from(64)).0,
         &setup_generate(Height::from(64)).1,
     ))
-}
-
-#[library_benchmark]
-fn bench_verify_height4() -> () {
-    let proof = setup_verify(Height::from(4)).0;
-    let root_hash = setup_verify(Height::from(4)).1;
-
-    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
-}
-
-#[library_benchmark]
-fn bench_verify_height8() -> () {
-    let proof = setup_verify(Height::from(8)).0;
-    let root_hash = setup_verify(Height::from(8)).1;
-
-    black_box(dapol::InclusionProof::verify(&proof, root_hash).expect("Unable to verify proof"))
 }
 
 #[library_benchmark]
@@ -314,7 +239,7 @@ criterion_main!(benches);
 
 library_benchmark_group!(
     name = bench_dapol;
-    benchmarks =   bench_build_height4, bench_build_height8, bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height4, bench_generate_height8, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height4, bench_verify_height8, bench_verify_height16, bench_verify_height32, bench_verify_height64, */
+    benchmarks = bench_build_height16,  bench_build_height32, bench_build_height64, bench_generate_height16, bench_generate_height32, bench_generate_height64, /* bench_verify_height16, bench_verify_height32, bench_verify_height64, */
 );
 
 // main!(library_benchmark_groups = bench_dapol);

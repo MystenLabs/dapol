@@ -178,7 +178,10 @@ pub mod accumulators;
 pub use accumulators::{Accumulator, AccumulatorConfig, AccumulatorConfigError, AccumulatorError};
 
 mod binary_tree;
-pub use binary_tree::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
+pub use binary_tree::{
+    BinaryTree, Coordinate, Height, HeightError, InputLeafNode, Mergeable, Node, PathSiblings,
+    TreeBuilder, MAX_HEIGHT, MIN_HEIGHT,
+};
 
 mod secret;
 pub use secret::{Secret, SecretParserError};
