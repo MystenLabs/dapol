@@ -2,6 +2,7 @@ use bulletproofs::PedersenGens;
 use curve25519_dalek_ng::ristretto::RistrettoPoint;
 use curve25519_dalek_ng::scalar::Scalar;
 
+use dapol::accumulators::{NdmSmtConfig, NdmSmtConfigBuilder};
 use log::info;
 use primitive_types::H256;
 use rand::distributions::Uniform;
@@ -12,7 +13,7 @@ use core::fmt::Debug;
 use std::path::PathBuf;
 
 use dapol::node_content::FullNodeContent;
-use dapol::read_write_utils;
+use dapol::{read_write_utils, MaxThreadCount};
 use dapol::{AggregationFactor, Hasher, Height, InclusionProof};
 use dapol::{BinaryTree, Coordinate, InputLeafNode, Mergeable, Node, PathSiblings, TreeBuilder};
 
@@ -96,33 +97,19 @@ pub const NUM_USERS: [usize; 39] = [
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_tree<C, F>(
+pub fn build_ndm_smt(
     height: Height,
-    leaf_nodes: Vec<Node<C>>,
-    new_padding_node_content: F,
-) -> BinaryTree<C>
-where
-    C: Clone + Debug + Mergeable + Serialize + Send + Sync + 'static,
-    F: Fn(&Coordinate) -> C + Send + Sync + 'static,
-{
-    let mut input_leaf_nodes: Vec<InputLeafNode<C>> = Vec::new();
-
-    leaf_nodes.into_iter().for_each(|n| {
-        input_leaf_nodes.push(InputLeafNode {
-            content: n.content.clone(),
-            x_coord: n.coord.x,
-        })
-    });
-
-    let builder = TreeBuilder::<C>::new()
-        .with_height(height)
-        .with_leaf_nodes(input_leaf_nodes);
-
-    let tree = builder
-        .build_using_multi_threaded_algorithm(new_padding_node_content)
-        .expect("Unable to build tree");
-
-    tree
+    max_thread_count: MaxThreadCount,
+    secrets_file_path: PathBuf,
+    entities_path: PathBuf,
+) -> NdmSmtConfig {
+    NdmSmtConfigBuilder::default()
+        .height(height)
+        .max_thread_count(max_thread_count)
+        .secrets_file_path(secrets_file_path)
+        .entities_path(entities_path)
+        .build()
+        .expect("Unable to build NdmSmtConfig")
 }
 
 pub fn generate_proof(
