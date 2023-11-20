@@ -4,7 +4,6 @@ use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion};
 use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 
-// use std::path::PathBuf;
 use std::str::FromStr;
 
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
