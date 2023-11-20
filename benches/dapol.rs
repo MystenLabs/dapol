@@ -2,13 +2,15 @@ mod setup;
 
 use criterion::{criterion_group, criterion_main, SamplingMode};
 use criterion::{BenchmarkId, Criterion};
+use dapol::accumulators::{NdmSmt, NdmSmtSecrets};
 use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 
+use std::path::PathBuf;
 use std::str::FromStr;
 
-use std::thread::LocalKey;
-
-use dapol::{EntityId, Height, InclusionProof, MaxThreadCount, MACHINE_PARALLELISM};
+use dapol::{
+    Entity, EntityId, Height, InclusionProof, MaxThreadCount, Secret, MACHINE_PARALLELISM,
+};
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -23,6 +25,7 @@ fn bench_build_tree(c: &mut Criterion) {
     dapol::initialize_machine_parallelism();
 
     let max_thread_count = MaxThreadCount::default().get_value();
+
     let mut thread_counts: Vec<u8> = Vec::new();
 
     if max_thread_count <= 8 {
@@ -59,6 +62,31 @@ fn bench_build_tree(c: &mut Criterion) {
         thread_counts.push(max_thread_count);
     }
 
+    let dummy_secrets = NdmSmtSecrets {
+        master_secret: Secret::from_str("master_secret").unwrap(),
+        salt_b: dapol::Secret::from_str("salt_b").unwrap(),
+        salt_s: Secret::from_str("salt_s").unwrap(),
+    };
+
+    let mut dummy_entities: Vec<Entity> = Vec::new();
+
+    dummy_entities.push(Entity {
+        liability: 893267,
+        id: EntityId::from_str("john.doe@example.com").unwrap(),
+    });
+
+    dummy_entities.push(Entity {
+        liability: 724851,
+        id: EntityId::from_str("jane.smith@example.com").unwrap(),
+    });
+
+    let mut ndm_smt = NdmSmt::new(
+        dummy_secrets,
+        Height::from(16),
+        MaxThreadCount::default(),
+        dummy_entities,
+    )
+    .unwrap();
     // TREE_HEIGHT = 16
     // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
     for t in thread_counts {
@@ -73,10 +101,11 @@ fn bench_build_tree(c: &mut Criterion) {
                 ),
                 |bench| {
                     bench.iter(|| {
-                        setup::build_ndm_smt(tup.clone());
+                        ndm_smt = setup::build_ndm_smt(tup.clone());
                     })
                 },
             );
+            setup::serialize_tree(&ndm_smt, PathBuf::from("./target"));
         }
     }
 
@@ -196,7 +225,7 @@ fn bench_build_tree(c: &mut Criterion) {
 //         });
 //     }
 
-//     group.finish();
+// group.finish();
 // }
 
 // BENCHMARKS: IAI

@@ -1,7 +1,9 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
+use dapol::{read_write_utils, EntityId, Height, InclusionProof, MaxThreadCount};
+use log::info;
 
 // CONSTANTS
 // ================================================================================================
@@ -48,11 +50,7 @@ pub const NUM_USERS: [u64; 35] = [
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_ndm_smt(
-    tup: (Height,
-    MaxThreadCount,
-    u64),
-) -> NdmSmt {
+pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
     let src_dir = env!("CARGO_MANIFEST_DIR");
     let resources_dir = Path::new(&src_dir).join("examples");
     let secrets_file_path = resources_dir.join("ndm_smt_secrets_example.toml");
@@ -70,6 +68,24 @@ pub fn build_ndm_smt(
 
 pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof {
     NdmSmt::generate_inclusion_proof(ndm_smt, entity_id).expect("Unable to generate proof")
+}
+
+pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
+    let mut file_name = tree.root_hash().to_string();
+    file_name.push('.');
+    file_name.push_str("ndmsmt");
+
+    let path = dir.join(file_name);
+    info!("Serializing tree build to path {:?}", path);
+
+    read_write_utils::serialize_to_bin_file(&tree, path.clone())
+        .expect("Unable to serialize proof");
+
+    let file_size = fs::metadata(path)
+        .expect("Unable to get tree metadata for {tree.root_hash()}")
+        .len();
+
+    println!("Tree file size: {} kB", file_size / 1024u64);
 }
 
 // pub fn serialize_proof(proof: InclusionProof, entity_id: EntityId, dir: PathBuf) -> PathBuf {
