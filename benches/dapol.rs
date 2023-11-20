@@ -1,6 +1,6 @@
 mod setup;
 
-use criterion::{criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, SamplingMode};
 use criterion::{BenchmarkId, Criterion};
 use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 
@@ -16,6 +16,7 @@ use setup::{NUM_USERS, TREE_HEIGHTS};
 fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
+    group.sampling_mode(SamplingMode::Flat);
 
     let thread_counts: [u8; 7] = [4, 8, 16, 32, 64, 128, 255];
 
