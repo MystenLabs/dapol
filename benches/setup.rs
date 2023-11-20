@@ -1,17 +1,7 @@
-use bulletproofs::PedersenGens;
-use curve25519_dalek_ng::scalar::Scalar;
-use log::info;
-use primitive_types::H256;
-use serde::Serialize;
-
-use core::fmt::Debug;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::node_content::FullNodeContent;
-use dapol::{read_write_utils, EntityId, MaxThreadCount};
-use dapol::{Coordinate, Mergeable};
-use dapol::{Hasher, Height, InclusionProof};
+use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 // CONSTANTS
 // ================================================================================================
