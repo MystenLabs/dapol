@@ -6,7 +6,9 @@ use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main}
 
 use std::str::FromStr;
 
-use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
+use std::thread::LocalKey;
+
+use dapol::{EntityId, Height, InclusionProof, MaxThreadCount, MACHINE_PARALLELISM};
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -18,12 +20,49 @@ fn bench_build_tree(c: &mut Criterion) {
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
 
-    let thread_counts: [u8; 7] = [4, 8, 16, 32, 64, 128, 255];
+    dapol::initialize_machine_parallelism();
+
+    let max_thread_count = MaxThreadCount::default().get_value();
+    let mut thread_counts: Vec<u8> = Vec::new();
+
+    if max_thread_count <= 8 {
+        for i in 1..max_thread_count {
+            thread_counts.push(i)
+        }
+        thread_counts.push(max_thread_count);
+    } else if max_thread_count > 8 && max_thread_count <= 32 {
+        for i in 1..max_thread_count / 2 {
+            thread_counts.push(i * 2)
+        }
+        thread_counts.push(max_thread_count);
+    } else if max_thread_count > 32 && max_thread_count <= 64 {
+        for i in 1..max_thread_count / 4 {
+            thread_counts.push(i * 4)
+        }
+
+        thread_counts.push(max_thread_count);
+    } else if max_thread_count > 64 && max_thread_count <= 128 {
+        for i in 1..max_thread_count / 8 {
+            thread_counts.push(i * 8);
+        }
+
+        thread_counts.push(max_thread_count);
+    } else if max_thread_count > 128 && max_thread_count <= 192 {
+        for i in 1..max_thread_count / 16 {
+            thread_counts.push(i * 16);
+        }
+        thread_counts.push(max_thread_count);
+    } else {
+        for i in 1..max_thread_count / 32 {
+            thread_counts.push(i * 32);
+        }
+        thread_counts.push(max_thread_count);
+    }
 
     // TREE_HEIGHT = 16
     // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
     for t in thread_counts {
-        for u in NUM_USERS[0..3].into_iter() {
+        for u in NUM_USERS[0..=2].into_iter() {
             let tup: (Height, MaxThreadCount, u64) =
                 (Height::from(16), MaxThreadCount::from(t), *u);
 
