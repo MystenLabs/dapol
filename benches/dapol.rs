@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use dapol::{
-    Entity, EntityId, Height, InclusionProof, MaxThreadCount, Secret, MACHINE_PARALLELISM,
+    Entity, EntityId, Height, MaxThreadCount, Secret,
 };
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
