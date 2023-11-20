@@ -17,31 +17,31 @@ fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
 
-    let num_entities = NUM_USERS[2]; // 30_000: max. value for tree height 16
     let thread_counts: [u8; 7] = [4, 8, 16, 32, 64, 128, 255];
 
-    for h in TREE_HEIGHTS {
-        group.bench_function(BenchmarkId::new("tree_height", h), |bench| {
-            bench.iter(|| {
-                setup::build_ndm_smt(Height::from(h), MaxThreadCount::default(), num_entities);
-            })
-        });
-    }
-
+    // TREE_HEIGHT = 16
+    // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
     for t in thread_counts {
-        group.bench_function(BenchmarkId::new("max_thread_count", t), |bench| {
-            bench.iter(|| {
-                setup::build_ndm_smt(Height::from(16), MaxThreadCount::from(t), num_entities);
-            })
-        });
+        for u in NUM_USERS[0..3].into_iter() {
+            group.bench_function(BenchmarkId::new("tree_height", 16), |bench| {
+                bench.iter(|| {
+                    setup::build_ndm_smt(Height::from(16), MaxThreadCount::from(t), *u);
+                })
+            });
+        }
     }
 
-    for u in NUM_USERS {
-        group.bench_function(BenchmarkId::new("num_users", u), |bench| {
-            bench.iter(|| {
-                setup::build_ndm_smt(Height::from(16), MaxThreadCount::default(), u);
-            })
-        });
+    // TREE_HEIGHT = 32 and 64
+    for h in [32u8, 64u8].into_iter() {
+        for t in thread_counts {
+            for u in NUM_USERS {
+                group.bench_function(BenchmarkId::new("tree_height", h), |bench| {
+                    bench.iter(|| {
+                        setup::build_ndm_smt(Height::from(h), MaxThreadCount::from(t), u);
+                    })
+                });
+            }
+        }
     }
 
     group.finish();
