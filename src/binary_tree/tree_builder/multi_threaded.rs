@@ -47,7 +47,7 @@ use std::thread;
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::MaxThreadCount;
+use crate::MaxThreadCount;
 
 use super::super::{
     max_bottom_layer_nodes, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node,
