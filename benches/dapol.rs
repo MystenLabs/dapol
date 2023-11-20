@@ -87,16 +87,17 @@ fn bench_build_tree(c: &mut Criterion) {
         dummy_entities,
     )
     .unwrap();
+
     // TREE_HEIGHT = 16
     // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
-    for t in thread_counts {
+    for t in thread_counts.iter() {
         for u in NUM_USERS[0..=2].into_iter() {
             let tup: (Height, MaxThreadCount, u64) =
-                (Height::from(16), MaxThreadCount::from(t), *u);
+                (Height::from(16), MaxThreadCount::from(*t), *u);
 
             group.bench_function(
                 BenchmarkId::new(
-                    "tree_height",
+                    "build_tree",
                     format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
                 ),
                 |bench| {
@@ -109,26 +110,28 @@ fn bench_build_tree(c: &mut Criterion) {
         }
     }
 
-    // // TREE_HEIGHT = 32 and 64
-    // for h in [32u8, 64u8].into_iter() {
-    //     for t in thread_counts {
-    //         for u in NUM_USERS {
-    //             let tup: (Height, MaxThreadCount, u64) =
-    //                 (Height::from(h), MaxThreadCount::from(t), u);
-    //             group.bench_function(
-    //                 BenchmarkId::new(
-    //                     "tree_height",
-    //                     format!("{:?}/{:?}/{:?}", &tup.0, &tup.1, &tup.2),
-    //                 ),
-    //                 |bench| {
-    //                     bench.iter(|| {
-    //                         setup::build_ndm_smt(tup.clone());
-    //                     })
-    //                 },
-    //             );
-    //         }
-    //     }
-    // }
+    // TREE_HEIGHT = 32 and 64
+    for h in [32u8, 64u8].into_iter() {
+        for t in thread_counts.iter() {
+            for u in NUM_USERS {
+                let tup: (Height, MaxThreadCount, u64) =
+                    (Height::from(h), MaxThreadCount::from(*t), u);
+                group.bench_function(
+                    BenchmarkId::new(
+                        "build_tree",
+                        format!("{:?}/{:?}/{:?}", &tup.0, &tup.1, &tup.2),
+                    ),
+                    |bench| {
+                        bench.iter(|| {
+                            setup::build_ndm_smt(tup.clone());
+                        })
+                    },
+                );
+
+                setup::serialize_tree(&ndm_smt, PathBuf::from("./target"));
+            }
+        }
+    }
 
     group.finish();
 }
