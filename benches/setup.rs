@@ -53,7 +53,6 @@ pub const NUM_USERS: [u64; 35] = [
 pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
     let src_dir = env!("CARGO_MANIFEST_DIR");
     let resources_dir = Path::new(&src_dir).join("examples");
-    let secrets_file_path = resources_dir.join("ndm_smt_secrets_example.toml");
 
     NdmSmtConfigBuilder::default()
         .height(tup.0)
