@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread::LocalKey;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::{read_write_utils, EntityId, Height, InclusionProof, MaxThreadCount};
@@ -51,8 +52,16 @@ pub const NUM_USERS: [u64; 35] = [
 // ================================================================================================
 
 pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
-    let src_dir = env!("CARGO_MANIFEST_DIR");
-    let resources_dir = Path::new(&src_dir).join("examples");
+    let height_int = tup.0.as_raw_int();
+    let max_users_for_height = 2_u64.pow((height_int - 1) as u32);
+
+    if tup.2 > max_users_for_height {
+        panic!("Number of users exceeds max for height {:?}", height_int);
+    }
+
+    if tup.1.get_value() > MaxThreadCount::default().get_value() {
+        panic!("Max thread count exceeds available machine parallelism");
+    }
 
     NdmSmtConfigBuilder::default()
         .height(tup.0)
