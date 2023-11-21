@@ -58,7 +58,6 @@ pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
     NdmSmtConfigBuilder::default()
         .height(tup.0)
         .max_thread_count(tup.1)
-        .secrets_file_path(secrets_file_path)
         .num_entities(tup.2)
         .build()
         .expect("Unable to build NdmSmtConfig")
