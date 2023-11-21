@@ -80,7 +80,7 @@ pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof 
 pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
     let mut file_name = tree.root_hash().to_string();
     file_name.push('.');
-    file_name.push_str("ndmsmt");
+    file_name.push_str("dapoltree");
 
     let path = dir.join(file_name);
     info!("Serializing tree build to path {:?}", path);
