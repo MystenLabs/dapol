@@ -8,9 +8,7 @@ use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main}
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use dapol::{
-    Entity, EntityId, Height, MaxThreadCount, Secret,
-};
+use dapol::{Entity, EntityId, Height, MaxThreadCount, Secret};
 
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -28,34 +26,14 @@ fn bench_build_tree(c: &mut Criterion) {
 
     let mut thread_counts: Vec<u8> = Vec::new();
 
-    if max_thread_count <= 8 {
-        for i in 1..max_thread_count {
-            thread_counts.push(i)
-        }
-    } else if max_thread_count > 8 && max_thread_count <= 32 {
-        for i in 1..max_thread_count / 2 {
-            thread_counts.push(i * 2)
-        }
-    } else if max_thread_count > 32 && max_thread_count <= 64 {
-        for i in 1..max_thread_count / 4 {
-            thread_counts.push(i * 4)
-        }
-
-    } else if max_thread_count > 64 && max_thread_count <= 128 {
-        for i in 1..max_thread_count / 8 {
-            thread_counts.push(i * 8);
-        }
-
-    } else if max_thread_count > 128 && max_thread_count <= 192 {
-        for i in 1..max_thread_count / 16 {
-            thread_counts.push(i * 16);
-        }
-    } else {
-        for i in 1..max_thread_count / 32 {
-            thread_counts.push(i * 32);
-        }
+    let k = u8::BITS - max_thread_count.leading_zeros() - 1; // floor(log_2(max_thread_count))
+    let lower_bound = 1u8 << k - 1; // 2^k
+    let upper_bound = 1u8 << k; // 2^(k+1)
+    let step = 1usize << k - 3; // 2^(k-2)
+    for i in (lower_bound..upper_bound).step_by(step) {
+        thread_counts.push(i);
     }
-    
+
     thread_counts.push(max_thread_count);
 
     let dummy_secrets = NdmSmtSecrets {
