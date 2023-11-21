@@ -32,35 +32,31 @@ fn bench_build_tree(c: &mut Criterion) {
         for i in 1..max_thread_count {
             thread_counts.push(i)
         }
-        thread_counts.push(max_thread_count);
     } else if max_thread_count > 8 && max_thread_count <= 32 {
         for i in 1..max_thread_count / 2 {
             thread_counts.push(i * 2)
         }
-        thread_counts.push(max_thread_count);
     } else if max_thread_count > 32 && max_thread_count <= 64 {
         for i in 1..max_thread_count / 4 {
             thread_counts.push(i * 4)
         }
 
-        thread_counts.push(max_thread_count);
     } else if max_thread_count > 64 && max_thread_count <= 128 {
         for i in 1..max_thread_count / 8 {
             thread_counts.push(i * 8);
         }
 
-        thread_counts.push(max_thread_count);
     } else if max_thread_count > 128 && max_thread_count <= 192 {
         for i in 1..max_thread_count / 16 {
             thread_counts.push(i * 16);
         }
-        thread_counts.push(max_thread_count);
     } else {
         for i in 1..max_thread_count / 32 {
             thread_counts.push(i * 32);
         }
-        thread_counts.push(max_thread_count);
     }
+    
+    thread_counts.push(max_thread_count);
 
     let dummy_secrets = NdmSmtSecrets {
         master_secret: Secret::from_str("master_secret").unwrap(),
