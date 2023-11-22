@@ -76,9 +76,7 @@ fn bench_build_tree(c: &mut Criterion) {
                     format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
                 ),
                 |bench| {
-                    bench.iter(|| {
-                        ndm_smt = setup::build_ndm_smt(tup.clone());
-                    })
+                    bench.iter(|| ndm_smt = setup::build_ndm_smt(tup.clone()).unwrap());
                 },
             );
             setup::serialize_tree(&ndm_smt, PathBuf::from("./target"));
@@ -97,9 +95,7 @@ fn bench_build_tree(c: &mut Criterion) {
                         format!("{:?}/{:?}/{:?}", &tup.0, &tup.1, &tup.2),
                     ),
                     |bench| {
-                        bench.iter(|| {
-                            setup::build_ndm_smt(tup.clone());
-                        })
+                        bench.iter(|| ndm_smt = setup::build_ndm_smt(tup.clone()).unwrap());
                     },
                 );
 

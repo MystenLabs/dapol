@@ -51,26 +51,27 @@ pub const NUM_USERS: [u64; 35] = [
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
+pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> Result<NdmSmt, ()> {
     let height_int = tup.0.as_raw_int();
     let max_users_for_height = 2_u64.pow((height_int - 1) as u32);
 
+
     if tup.2 > max_users_for_height {
-        panic!("Number of users exceeds max for height {:?}", height_int);
+        return Err(())
     }
 
     if tup.1.get_value() > MaxThreadCount::default().get_value() {
-        panic!("Max thread count exceeds available machine parallelism");
+        return Err(())
     }
 
-    NdmSmtConfigBuilder::default()
+    Ok(NdmSmtConfigBuilder::default()
         .height(tup.0)
         .max_thread_count(tup.1)
         .num_entities(tup.2)
         .build()
-        .expect("Unable to build NdmSmtConfig")
+        .map_err(|_| ())?
         .parse()
-        .expect("Unable to parse NdmSmt")
+        .map_err(|_| ())?)
 }
 
 pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof {
