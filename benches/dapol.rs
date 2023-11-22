@@ -22,7 +22,7 @@ fn bench_build_tree(c: &mut Criterion) {
 
     dapol::initialize_machine_parallelism();
 
-    let max_thread_count = MaxThreadCount::default().get_value();
+    let max_thread_count: u8 = MaxThreadCount::default().get_value();
 
     let mut thread_counts: Vec<u8> = Vec::new();
 
