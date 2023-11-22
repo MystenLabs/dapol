@@ -1,21 +1,20 @@
-mod setup;
+use std::path::PathBuf;
 
 use criterion::{criterion_group, criterion_main, SamplingMode};
 use criterion::{BenchmarkId, Criterion};
-use dapol::accumulators::{NdmSmt, NdmSmtSecrets};
 use iai_callgrind::{black_box, library_benchmark, library_benchmark_group, main};
 
-use std::path::PathBuf;
-use std::str::FromStr;
+use dapol::accumulators::NdmSmt;
+use dapol::{Height, MaxThreadCount};
 
-use dapol::{Entity, EntityId, Height, MaxThreadCount, Secret};
+mod setup;
 
-use setup::NUM_USERS;
+use setup::{NUM_USERS, TREE_HEIGHTS};
 
 // BENCHMARKS: CRITERION
 // ================================================================================================
 
-fn bench_build_tree(c: &mut Criterion) {
+fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
@@ -39,37 +38,23 @@ fn bench_build_tree(c: &mut Criterion) {
 
     let mut ndm_smt = Option::<NdmSmt>::None;
 
-    // TREE_HEIGHT = 16
-    // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
-    for t in thread_counts.iter() {
-        for u in NUM_USERS[0..=2].into_iter() {
-            let tup: (Height, MaxThreadCount, u64) =
-                (Height::from(16), MaxThreadCount::from(*t), *u);
-
-            group.bench_function(
-                BenchmarkId::new(
-                    "build_tree",
-                    format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
-                ),
-                |bench| {
-                    bench.iter(|| ndm_smt = Some(setup::build_ndm_smt(tup.clone()).unwrap()));
-                },
-            );
-            if let Some(inner) = &ndm_smt {
-                setup::serialize_tree(inner, PathBuf::from("./target"));
-            } else {
-                panic!("Tree not found");
-            }
-        }
-    }
-
-    // TREE_HEIGHT = 32 and 64
-    // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
-    for h in [32u8, 64u8].into_iter() {
+    for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
-            for u in NUM_USERS[0..=2].into_iter() {
+            if *t > MaxThreadCount::default().get_value() {
+                // return Err("Number of threads exceeds maximum parallelism");
+                continue;
+            }
+
+            for u in NUM_USERS.into_iter() {
+                let max_users_for_height = 2_u64.pow((h - 1) as u32);
+
+                if u > max_users_for_height {
+                    // return Err("Number of users exceeds maximum");
+                    break;
+                }
+
                 let tup: (Height, MaxThreadCount, u64) =
-                    (Height::from(h), MaxThreadCount::from(*t), *u);
+                    (Height::from(h), MaxThreadCount::from(*t), u);
 
                 group.bench_function(
                     BenchmarkId::new(
@@ -77,19 +62,27 @@ fn bench_build_tree(c: &mut Criterion) {
                         format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
                     ),
                     |bench| {
-                        bench.iter(|| ndm_smt = Some(setup::build_ndm_smt(tup.clone()).unwrap()));
+                        bench.iter(|| {
+                            ndm_smt = setup::build_ndm_smt(tup.clone()).ok();
+                        });
                     },
                 );
+
                 if let Some(inner) = &ndm_smt {
-                    setup::serialize_tree(inner, PathBuf::from("./target"));
+                    setup::serialize_tree(inner, PathBuf::from("./target"))
                 } else {
-                    panic!("Tree not found");
+                    return Err("Tree not found");
                 }
+            }
+
+            // prevent duplicate max thread counts
+            if *t == max_thread_count {
+                break;
             }
         }
     }
 
-    group.finish();
+    Ok(group.finish())
 }
 
 // fn bench_generate_proof(c: &mut Criterion) {

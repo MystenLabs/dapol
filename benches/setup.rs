@@ -1,13 +1,16 @@
 use std::fs;
 use std::path::PathBuf;
 
-use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{read_write_utils, EntityId, Height, InclusionProof, MaxThreadCount};
 use log::info;
+
+use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
+use dapol::read_write_utils;
+use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 // CONSTANTS
 // ================================================================================================
 
+pub const TREE_HEIGHTS: [u8; 3] = [16, 32, 64];
 pub const NUM_USERS: [u64; 35] = [
     10_000,
     20_000,
@@ -49,26 +52,23 @@ pub const NUM_USERS: [u64; 35] = [
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> Result<NdmSmt, ()> {
+pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> Result<NdmSmt, &'static str> {
     let height_int = tup.0.as_raw_int();
     let max_users_for_height = 2_u64.pow((height_int - 1) as u32);
 
-    if tup.2 > max_users_for_height {
-        return Err(());
+    if tup.2 as u64 > max_users_for_height {
+        return Err("Number of users exceeds maximum");
     }
 
-    if tup.1.get_value() > MaxThreadCount::default().get_value() {
-        return Err(());
-    }
-
-    Ok(NdmSmtConfigBuilder::default()
+    NdmSmtConfigBuilder::default()
         .height(tup.0)
         .max_thread_count(tup.1)
         .num_entities(tup.2)
+        .secrets_file_path(PathBuf::from("examples/ndm_smt_secrets_example.toml"))
         .build()
-        .map_err(|_| ())?
+        .map_err(|_| "Unable to build NdmSmtConfig")?
         .parse()
-        .map_err(|_| ())?)
+        .map_err(|_| "Unable to build NdmSmt")
 }
 
 pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof {
