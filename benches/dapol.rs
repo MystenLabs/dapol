@@ -10,7 +10,7 @@ use std::str::FromStr;
 
 use dapol::{Entity, EntityId, Height, MaxThreadCount, Secret};
 
-use setup::{NUM_USERS, TREE_HEIGHTS};
+use setup::NUM_USERS;
 
 // BENCHMARKS: CRITERION
 // ================================================================================================
