@@ -1,6 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::thread::LocalKey;
+use std::path::PathBuf;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::{read_write_utils, EntityId, Height, InclusionProof, MaxThreadCount};
@@ -55,13 +54,12 @@ pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> Result<NdmSmt, ()> {
     let height_int = tup.0.as_raw_int();
     let max_users_for_height = 2_u64.pow((height_int - 1) as u32);
 
-
     if tup.2 > max_users_for_height {
-        return Err(())
+        return Err(());
     }
 
     if tup.1.get_value() > MaxThreadCount::default().get_value() {
-        return Err(())
+        return Err(());
     }
 
     Ok(NdmSmtConfigBuilder::default()
