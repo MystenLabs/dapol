@@ -41,7 +41,6 @@ fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             if *t > MaxThreadCount::default().get_value() {
-                // return Err("Number of threads exceeds maximum parallelism");
                 continue;
             }
 
@@ -49,7 +48,6 @@ fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
-                    // return Err("Number of users exceeds maximum");
                     break;
                 }
 
