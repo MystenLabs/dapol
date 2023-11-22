@@ -37,31 +37,7 @@ fn bench_build_tree(c: &mut Criterion) {
 
     thread_counts.push(max_thread_count);
 
-    let dummy_secrets = NdmSmtSecrets {
-        master_secret: Secret::from_str("master_secret").unwrap(),
-        salt_b: dapol::Secret::from_str("salt_b").unwrap(),
-        salt_s: Secret::from_str("salt_s").unwrap(),
-    };
-
-    let mut dummy_entities: Vec<Entity> = Vec::new();
-
-    dummy_entities.push(Entity {
-        liability: 893267,
-        id: EntityId::from_str("john.doe@example.com").unwrap(),
-    });
-
-    dummy_entities.push(Entity {
-        liability: 724851,
-        id: EntityId::from_str("jane.smith@example.com").unwrap(),
-    });
-
-    let mut ndm_smt = NdmSmt::new(
-        dummy_secrets,
-        Height::from(16),
-        MaxThreadCount::default(),
-        dummy_entities,
-    )
-    .unwrap();
+    let mut ndm_smt = Option::<NdmSmt>::None;
 
     // TREE_HEIGHT = 16
     // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
@@ -76,30 +52,39 @@ fn bench_build_tree(c: &mut Criterion) {
                     format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
                 ),
                 |bench| {
-                    bench.iter(|| ndm_smt = setup::build_ndm_smt(tup.clone()).unwrap());
+                    bench.iter(|| ndm_smt = Some(setup::build_ndm_smt(tup.clone()).unwrap()));
                 },
             );
-            setup::serialize_tree(&ndm_smt, PathBuf::from("./target"));
+            if let Some(inner) = &ndm_smt {
+                setup::serialize_tree(inner, PathBuf::from("./target"));
+            } else {
+                panic!("Tree not found");
+            }
         }
     }
 
     // TREE_HEIGHT = 32 and 64
+    // tree height = 16 maxes out at 32_768, so num users only goes up to 30_000
     for h in [32u8, 64u8].into_iter() {
         for t in thread_counts.iter() {
-            for u in NUM_USERS {
+            for u in NUM_USERS[0..=2].into_iter() {
                 let tup: (Height, MaxThreadCount, u64) =
-                    (Height::from(h), MaxThreadCount::from(*t), u);
+                    (Height::from(h), MaxThreadCount::from(*t), *u);
+
                 group.bench_function(
                     BenchmarkId::new(
                         "build_tree",
-                        format!("{:?}/{:?}/{:?}", &tup.0, &tup.1, &tup.2),
+                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
                     ),
                     |bench| {
-                        bench.iter(|| ndm_smt = setup::build_ndm_smt(tup.clone()).unwrap());
+                        bench.iter(|| ndm_smt = Some(setup::build_ndm_smt(tup.clone()).unwrap()));
                     },
                 );
-
-                setup::serialize_tree(&ndm_smt, PathBuf::from("./target"));
+                if let Some(inner) = &ndm_smt {
+                    setup::serialize_tree(inner, PathBuf::from("./target"));
+                } else {
+                    panic!("Tree not found");
+                }
             }
         }
     }
