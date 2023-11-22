@@ -27,9 +27,10 @@ fn bench_build_tree(c: &mut Criterion) {
     let mut thread_counts: Vec<u8> = Vec::new();
 
     let k = u8::BITS - max_thread_count.leading_zeros() - 1; // floor(log_2(max_thread_count))
-    let lower_bound = 1u8 << k - 1; // 2^k
-    let upper_bound = 1u8 << k; // 2^(k+1)
-    let step = 1usize << k - 3; // 2^(k-2)
+    let lower_bound = 1u8 << k; // 2^k
+    let upper_bound = if k == 7 { u8::MAX } else { 1u8 << k + 1 }; // 2^(k+1)
+    let step = 1usize << k - 2; // 2^(k-2)
+
     for i in (lower_bound..upper_bound).step_by(step) {
         thread_counts.push(i);
     }
