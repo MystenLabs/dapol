@@ -80,7 +80,24 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
         .expect("Unable to get tree metadata for {tree.root_hash()}")
         .len();
 
-    println!("Tree file size: {} kB", file_size / 1024);
+    let file_size_string = if file_size < 1024 {
+        format!("{} bytes", file_size)
+    } else if file_size < 1024u64.pow(2) {
+        format!("{} kB", file_size / 1024)
+    } else if file_size < 1024u64.pow(3) {
+        // scale to get accurate decimal values
+        format!(
+            "{:.2} MB",
+            ((file_size as f32 / 1024u64.pow(2) as f32) * 1000.0).round() / 1000.0
+        )
+    } else {
+        format!(
+            "{:.2} GB",
+            ((file_size as f32 / 1024u64.pow(3) as f32) * 1000000.0).round() / 1000000.0
+        )
+    };
+
+    println!("Tree file size: {}", file_size_string);
 }
 
 // pub fn serialize_proof(proof: InclusionProof, entity_id: EntityId, dir: PathBuf) -> PathBuf {
