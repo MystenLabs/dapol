@@ -11,12 +11,6 @@ use dapol::{Height, MaxThreadCount};
 mod setup;
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
-// ================================================================================================
-
-// *COMPUTE TIME & SERIALIZED FILE SIZE*
-
-// ================================================================================================
-
 fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
@@ -60,6 +54,7 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 e.advance().unwrap();
 
+                // compute time
                 group.bench_function(
                     BenchmarkId::new(
                         "build_tree",
@@ -72,11 +67,13 @@ fn bench_build_tree(c: &mut Criterion) {
                     },
                 );
 
+                // tree build size
                 setup::serialize_tree(
                     ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
                 );
 
+                // memory usage
                 let alloc = alloc.read().unwrap();
                 let res = res.read().unwrap();
                 println!(
