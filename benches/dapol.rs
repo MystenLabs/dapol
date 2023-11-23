@@ -14,23 +14,24 @@ use setup::{NUM_USERS, TREE_HEIGHTS};
 // BENCHMARKS: CRITERION
 // ================================================================================================
 
-fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
+fn bench_build_tree(c: &mut Criterion) {
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
 
     dapol::initialize_machine_parallelism();
 
-    let max_thread_count: u8 = MaxThreadCount::default().get_value();
-
     let mut thread_counts: Vec<u8> = Vec::new();
 
-    let k = u8::BITS - max_thread_count.leading_zeros() - 1; // floor(log_2(max_thread_count))
-    let lower_bound = 1u8 << k; // 2^k
-    let upper_bound = if k == 7 { u8::MAX } else { 1u8 << k + 1 }; // 2^(k+1)
-    let step = 1usize << k - 2; // 2^(k-2)
+    let max_thread_count: u8 = MaxThreadCount::default().get_value();
 
-    for i in (lower_bound..upper_bound).step_by(step) {
+    let step = if max_thread_count < 8 {
+        1
+    } else {
+        max_thread_count >> 2
+    };
+
+    for i in (step..max_thread_count).step_by(step as usize) {
         thread_counts.push(i);
     }
 
@@ -40,10 +41,6 @@ fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
 
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
-            if *t > MaxThreadCount::default().get_value() {
-                continue;
-            }
-
             for u in NUM_USERS.into_iter() {
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
@@ -61,26 +58,17 @@ fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
                     ),
                     |bench| {
                         bench.iter(|| {
-                            ndm_smt = setup::build_ndm_smt(tup.clone()).ok();
+                            ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
                         });
                     },
                 );
 
-                if let Some(inner) = &ndm_smt {
-                    setup::serialize_tree(inner, PathBuf::from("./target"))
-                } else {
-                    return Err("Tree not found");
-                }
-            }
-
-            // prevent duplicate max thread counts
-            if *t == max_thread_count {
-                break;
+                setup::serialize_tree(ndm_smt.as_ref().expect("Tree not found"), PathBuf::from("./target"))
             }
         }
     }
 
-    Ok(group.finish())
+    group.finish()
 }
 
 // fn bench_generate_proof(c: &mut Criterion) {
@@ -191,22 +179,177 @@ fn bench_build_tree(c: &mut Criterion) -> Result<(), &str> {
 //     setup::generate_proof(&ndm_smt, &entity_id)
 // }
 
+#[library_benchmark]
+fn bench_build_height16_threads_default_users10k() {
+    dapol::initialize_machine_parallelism();
+
+    let _ = black_box(setup::build_ndm_smt((
+        Height::from(16),
+        MaxThreadCount::default(),
+        NUM_USERS[0],
+    )));
+}
+
+#[library_benchmark]
+fn bench_build_height16_threads_default_users20k() {
+    dapol::initialize_machine_parallelism();
+
+    let _ = black_box(setup::build_ndm_smt((
+        Height::from(16),
+        MaxThreadCount::default(),
+        NUM_USERS[1],
+    )));
+}
+
+#[library_benchmark]
+fn bench_build_height16_threads_default_users30k() {
+    dapol::initialize_machine_parallelism();
+
+    let _ = black_box(setup::build_ndm_smt((
+        Height::from(16),
+        MaxThreadCount::default(),
+        NUM_USERS[2],
+    )));
+}
+
 // #[library_benchmark]
-// fn bench_build_height16() {
-//     black_box(setup::build_ndm_smt(
-//         Height::from(16),
-//         MaxThreadCount::default(),
-//         NUM_USERS[2],
-//     ));
+// fn bench_build_height32_threads_default_users10k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[0])).unwrap(),
+//     );
 // }
 
 // #[library_benchmark]
-// fn bench_build_height32() {
-//     black_box(setup::build_ndm_smt(
-//         Height::from(32),
-//         MaxThreadCount::default(),
-//         NUM_USERS[2],
-//     ));
+// fn bench_build_height32_threads_default_users50k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[4])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users100k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[9])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users500k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[13])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users1M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[18])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users5M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[22])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users10M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[27])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users50M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[29])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users100M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[32])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height32_threads_default_users250M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(32), MaxThreadCount::default(), NUM_USERS[34])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users10k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[0])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users50k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[4])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users100k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[9])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users500k() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[13])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users1M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[18])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users5M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[22])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users10M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[27])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users50M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[29])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users100M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[32])).unwrap(),
+//     );
+// }
+
+// #[library_benchmark]
+// fn bench_build_height64_threads_default_users250M() {
+//     black_box(
+//         setup::build_ndm_smt((Height::from(64), MaxThreadCount::default(), NUM_USERS[34])).unwrap(),
+//     );
 // }
 
 // #[library_benchmark]
@@ -376,10 +519,36 @@ criterion_group!(
 
 criterion_main!(benches);
 
-// library_benchmark_group!(
-//     name = bench_dapol;
-//     benchmarks = bench_build_height16, bench_build_height32, bench_build_height64, bench_build_max_threads4, bench_build_max_threads8, bench_build_max_threads16, bench_build_height32, bench_build_height64, bench_build_max_threads128, bench_build_max_threads255,
-//     bench_generate_height16, bench_generate_height32, bench_generate_height64, bench_generate_max_threads4, bench_generate_max_threads8, bench_generate_max_threads16, bench_generate_height32, bench_generate_height64, bench_generate_max_threads128, bench_generate_max_threads255,
-// );
+library_benchmark_group!(
+    name = bench_dapol;
+    benchmarks =
+    bench_build_height16_threads_default_users10k,
+    bench_build_height16_threads_default_users20k,
+    bench_build_height16_threads_default_users30k,
+
+    // bench_build_height32_threads_default_users10k,
+    // bench_build_height32_threads_default_users50k,
+    // bench_build_height32_threads_default_users100k,
+    // bench_build_height32_threads_default_users500k,
+    // bench_build_height32_threads_default_users1M,
+    // bench_build_height32_threads_default_users5M,
+    // bench_build_height32_threads_default_users10M,
+    // bench_build_height32_threads_default_users50M,
+    // bench_build_height32_threads_default_users100M,
+    // bench_build_height32_threads_default_users250M,
+
+    // bench_build_height64_threads_default_users10k,
+    // bench_build_height64_threads_default_users50k,
+    // bench_build_height64_threads_default_users100k,
+    // bench_build_height64_threads_default_users500k,
+    // bench_build_height64_threads_default_users1M,
+    // bench_build_height64_threads_default_users5M,
+    // bench_build_height64_threads_default_users10M,
+    // bench_build_height64_threads_default_users50M,
+    // bench_build_height64_threads_default_users100M,
+    // bench_build_height64_threads_default_users250M,
+
+
+);
 
 // main!(library_benchmark_groups = bench_dapol);

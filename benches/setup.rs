@@ -52,23 +52,16 @@ pub const NUM_USERS: [u64; 35] = [
 // HELPER FUNCTIONS
 // ================================================================================================
 
-pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> Result<NdmSmt, &'static str> {
-    let height_int = tup.0.as_raw_int();
-    let max_users_for_height = 2_u64.pow((height_int - 1) as u32);
-
-    if tup.2 as u64 > max_users_for_height {
-        return Err("Number of users exceeds maximum");
-    }
-
+pub fn build_ndm_smt(tup: (Height, MaxThreadCount, u64)) -> NdmSmt {
     NdmSmtConfigBuilder::default()
         .height(tup.0)
         .max_thread_count(tup.1)
         .num_entities(tup.2)
         .secrets_file_path(PathBuf::from("examples/ndm_smt_secrets_example.toml"))
         .build()
-        .map_err(|_| "Unable to build NdmSmtConfig")?
+        .expect("Unable to build NdmSmtConfig")
         .parse()
-        .map_err(|_| "Unable to build NdmSmt")
+        .expect("Unable to build NdmSmt")
 }
 
 pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof {
@@ -81,7 +74,6 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
     file_name.push_str("dapoltree");
 
     let path = dir.join(file_name);
-    info!("Serializing tree build to path {:?}", path);
 
     read_write_utils::serialize_to_bin_file(&tree, path.clone())
         .expect("Unable to serialize proof");
@@ -90,7 +82,7 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
         .expect("Unable to get tree metadata for {tree.root_hash()}")
         .len();
 
-    println!("Tree file size: {} kB", file_size / 1024u64);
+    println!("Tree file size: {} kB", file_size / 1024);
 }
 
 // pub fn serialize_proof(proof: InclusionProof, entity_id: EntityId, dir: PathBuf) -> PathBuf {
