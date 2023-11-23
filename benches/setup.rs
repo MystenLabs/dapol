@@ -1,8 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
 
-use log::info;
-
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::read_write_utils;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
