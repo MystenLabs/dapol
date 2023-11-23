@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 
-use criterion::{criterion_group, criterion_main, SamplingMode};
-use criterion::{BenchmarkId, Criterion};
+use criterion::measurement::{Measurement, ValueFormatter};
+use criterion::{criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, SamplingMode};
+use jemalloc_ctl::{epoch, stats};
 
 use dapol::accumulators::NdmSmt;
 use dapol::{Height, MaxThreadCount};
@@ -180,10 +182,6 @@ fn bench_build_tree(c: &mut Criterion) {
 // ================================================================================================
 
 // TODO
-
-
-
-
 
 // ================================================================================================
 
