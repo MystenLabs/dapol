@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
-use criterion::measurement::{Measurement, ValueFormatter};
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
+
 use jemalloc_ctl::{epoch, stats};
 
 use dapol::accumulators::NdmSmt;
 use dapol::{Height, MaxThreadCount};
 
 mod setup;
-
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
 // ================================================================================================
@@ -43,6 +42,10 @@ fn bench_build_tree(c: &mut Criterion) {
 
     let mut ndm_smt = Option::<NdmSmt>::None;
 
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
+    let res = stats::resident::mib().unwrap();
+
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
@@ -54,6 +57,8 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 let tup: (Height, MaxThreadCount, u64) =
                     (Height::from(h), MaxThreadCount::from(*t), u);
+
+                e.advance().unwrap();
 
                 group.bench_function(
                     BenchmarkId::new(
@@ -70,7 +75,15 @@ fn bench_build_tree(c: &mut Criterion) {
                 setup::serialize_tree(
                     ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
-                )
+                );
+
+                let alloc = alloc.read().unwrap();
+                let res = res.read().unwrap();
+                println!(
+                    "Memory usage: {} allocated / {} resident",
+                    setup::bytes_as_string(alloc),
+                    setup::bytes_as_string(res)
+                );
             }
         }
     }
@@ -174,16 +187,6 @@ fn bench_build_tree(c: &mut Criterion) {
 // }
 
 // TODO: add bench_verify_proof benches
-
-// ================================================================================================
-
-// *MEMORY USAGE
-
-// ================================================================================================
-
-// TODO
-
-// ================================================================================================
 
 // ================================================================================================
 
