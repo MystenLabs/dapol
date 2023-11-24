@@ -66,7 +66,8 @@ derive_builder = "0.12.0"
 
 [dev-dependencies]
 criterion = "0.5.0"
-iai-callgrind = "0.8.0"
+jemalloc-ctl = "0.5.4"
+jemallocator = "0.5.4"
 
 [[bench]]
 name = "dapol"

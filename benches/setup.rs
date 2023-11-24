@@ -1,8 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
 
-use log::info;
-
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::read_write_utils;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
@@ -75,26 +73,51 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
 
     let path = dir.join(file_name);
 
-    read_write_utils::serialize_to_bin_file(&tree, path.clone())
-        .expect("Unable to serialize proof");
+    read_write_utils::serialize_to_bin_file(&tree, path.clone()).expect("Unable to serialize tree");
 
     let file_size = fs::metadata(path)
         .expect("Unable to get tree metadata for {tree.root_hash()}")
         .len();
 
-    println!("Tree file size: {} kB", file_size / 1024);
+    let bytes_scaled = bytes_as_string(file_size as usize);
+
+    println!("Tree file size: {:<6}", bytes_scaled);
 }
 
-// pub fn serialize_proof(proof: InclusionProof, entity_id: EntityId, dir: PathBuf) -> PathBuf {
-//     let mut file_name = entity_id.to_string();
-//     file_name.push('.');
-//     file_name.push_str("dapolproof");
+pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBuf) {
+    let mut file_name = entity_id.to_string();
+    file_name.push('.');
+    file_name.push_str("dapolproof");
 
-//     let path = dir.join(file_name);
-//     info!("Serializing inclusion proof to path {:?}", path);
+    let path = dir.join(file_name);
 
-//     read_write_utils::serialize_to_bin_file(&proof, path.clone())
-//         .expect("Unable to serialize proof");
+    read_write_utils::serialize_to_bin_file(&proof, path.clone())
+        .expect("Unable to serialize proof");
 
-//     path
-// }
+    let file_size = fs::metadata(path)
+        .expect("Unable to get proof metadata for {entity_id}")
+        .len();
+
+    let bytes_scaled = bytes_as_string(file_size as usize);
+
+    println!("Proof file size: {:<6}", bytes_scaled);
+}
+
+pub fn bytes_as_string(num_bytes: usize) -> String {
+    if num_bytes < 1024 {
+        format!("{} bytes", num_bytes)
+    } else if num_bytes < 1024usize.pow(2) {
+        format!("{} kB", num_bytes / 1024)
+    } else if num_bytes < 1024usize.pow(3) {
+        // scale to get accurate decimal values
+        format!(
+            "{:.2} MB",
+            ((num_bytes as f32 / 1024u64.pow(2) as f32) * 1000.0).round() / 1000.0
+        )
+    } else {
+        format!(
+            "{:.2} GB",
+            ((num_bytes as f32 / 1024u64.pow(3) as f32) * 1000000.0).round() / 1000000.0
+        )
+    }
+}
