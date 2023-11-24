@@ -80,12 +80,6 @@ fn bench_build_tree(c: &mut Criterion) {
                     },
                 );
 
-                // tree build size
-                setup::serialize_tree(
-                    ndm_smt.as_ref().expect("Tree not found"),
-                    PathBuf::from("./target"),
-                );
-
                 // memory usage
                 let alloc = alloc.read().unwrap();
                 let act = act.read().unwrap();
@@ -95,6 +89,12 @@ fn bench_build_tree(c: &mut Criterion) {
                     setup::bytes_as_string(alloc),
                     setup::bytes_as_string(act),
                     setup::bytes_as_string(res)
+                );
+
+                // tree build size
+                setup::serialize_tree(
+                    ndm_smt.as_ref().expect("Tree not found"),
+                    PathBuf::from("./target"),
                 );
             }
         }
@@ -239,4 +239,4 @@ criterion_group!(
     // bench_verify_proof
 );
 
-criterion_main!(benches, /* bench_test_jemalloc_readings */);
+criterion_main!(benches /* bench_test_jemalloc_readings */,);
