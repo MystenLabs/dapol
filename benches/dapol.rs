@@ -8,9 +8,7 @@ use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod setup;
-use setup::{Metric, Variable, NUM_USERS, TREE_HEIGHTS};
-
-use crate::setup::{MemoryUsage, VarType};
+use crate::setup::{MemoryUsage, Metrics, Variable, NUM_USERS, TREE_HEIGHTS};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -99,10 +97,13 @@ fn bench_dapol(c: &mut Criterion) {
                     PathBuf::from("./target"),
                 );
 
-                let tree_build =
-                    Variable::from(Metric(VarType::TreeBuild, mem_usage, tree_build_file_size));
+                let tree_build = Metrics {
+                    variable: Variable::TreeBuild,
+                    mem_usage,
+                    file_size: tree_build_file_size,
+                };
 
-                println!("\nTree build metrics: {:?} \n", tree_build);
+                println!("\n{:?}\n", tree_build);
 
                 let alloc = stats::allocated::mib().unwrap();
                 let act = stats::active::mib().unwrap();
@@ -156,13 +157,13 @@ fn bench_dapol(c: &mut Criterion) {
                     PathBuf::from("./target"),
                 );
 
-                let proof_generation = Variable::from(Metric(
-                    VarType::ProofGeneration,
+                let proof_generation = Metrics {
+                    variable: Variable::ProofGeneration,
                     mem_usage,
-                    proof_file_size.clone(),
-                ));
+                    file_size: proof_file_size.clone(),
+                };
 
-                println!("\n Proof generation metrics: {:?} \n", proof_generation);
+                println!("\n{:?}\n", proof_generation);
 
                 let alloc = stats::allocated::mib().unwrap();
                 let act = stats::active::mib().unwrap();
@@ -198,13 +199,13 @@ fn bench_dapol(c: &mut Criterion) {
                     resident: setup::bytes_as_string(res),
                 };
 
-                let proof_verification = Variable::from(Metric(
-                    VarType::ProofVerification,
+                let proof_verification = Metrics {
+                    variable: Variable::ProofVerification,
                     mem_usage,
-                    proof_file_size.clone(),
-                ));
+                    file_size: proof_file_size.clone(),
+                };
 
-                println!("\n Proof verification metrics: {:?} \n", proof_verification);
+                println!("\n{:?}\n", proof_verification);
             }
         }
     }

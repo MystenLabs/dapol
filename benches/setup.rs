@@ -51,14 +51,11 @@ pub const NUM_USERS: [u64; 35] = [
 // ================================================================================================
 
 #[derive(Debug)]
-pub enum VarType {
+pub enum Variable {
     TreeBuild,
     ProofGeneration,
     ProofVerification,
 }
-
-#[derive(Debug)]
-pub struct Metric(pub VarType, pub MemoryUsage, pub String);
 
 #[derive(Debug)]
 pub struct MemoryUsage {
@@ -68,20 +65,10 @@ pub struct MemoryUsage {
 }
 
 #[derive(Debug)]
-pub struct Variable {
-    _var_type: VarType,
-    _mem_usage: MemoryUsage,
-    _file_size: String,
-}
-
-impl From<Metric> for Variable {
-    fn from(metric: Metric) -> Self {
-        Self {
-            _var_type: metric.0,
-            _mem_usage: metric.1,
-            _file_size: metric.2,
-        }
-    }
+pub struct Metrics {
+    pub variable: Variable,
+    pub mem_usage: MemoryUsage,
+    pub file_size: String,
 }
 
 // HELPER FUNCTIONS
@@ -119,8 +106,6 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) -> String {
     let bytes_scaled = bytes_as_string(file_size as usize);
 
     bytes_scaled
-
-    // println!("Tree file size: {:<6}", bytes_scaled);
 }
 
 pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBuf) -> String {
@@ -140,8 +125,6 @@ pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBu
     let bytes_scaled = bytes_as_string(file_size as usize);
 
     bytes_scaled
-
-    // println!("Proof file size: {:<6}", bytes_scaled);
 }
 
 pub fn bytes_as_string(num_bytes: usize) -> String {
