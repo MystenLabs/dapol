@@ -195,18 +195,15 @@ fn bench_test_jemalloc_readings() {
     let act = stats::active::mib().unwrap();
     let res = stats::resident::mib().unwrap();
 
-    // 3 kB
-    let path = PathBuf::from("examples/entities_example.csv");
+    // 1 MB
+    let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
 
     e.advance().unwrap();
 
-    let file_size = std::fs::metadata(&path)
-        .expect("Unable to get metadata for {path}")
-        .len();
-
-    let bytes_scaled = setup::bytes_as_string(file_size as usize);
-
-    println!("{} file size: {:<6}", path.display(), bytes_scaled);
+    println!(
+        "buf capacity: {:<6}",
+        setup::bytes_as_string(buf.capacity())
+    );
 
     let alloc = alloc.read().unwrap();
     let act = act.read().unwrap();
