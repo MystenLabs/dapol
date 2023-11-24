@@ -73,8 +73,7 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
 
     let path = dir.join(file_name);
 
-    read_write_utils::serialize_to_bin_file(&tree, path.clone())
-        .expect("Unable to serialize proof");
+    read_write_utils::serialize_to_bin_file(&tree, path.clone()).expect("Unable to serialize tree");
 
     let file_size = fs::metadata(path)
         .expect("Unable to get tree metadata for {tree.root_hash()}")
@@ -83,6 +82,25 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
     let bytes_scaled = bytes_as_string(file_size as usize);
 
     println!("Tree file size: {:<6}", bytes_scaled);
+}
+
+pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBuf) {
+    let mut file_name = entity_id.to_string();
+    file_name.push('.');
+    file_name.push_str("dapolproof");
+
+    let path = dir.join(file_name);
+
+    read_write_utils::serialize_to_bin_file(&proof, path.clone())
+        .expect("Unable to serialize proof");
+
+    let file_size = fs::metadata(path)
+        .expect("Unable to get proof metadata for {entity_id}")
+        .len();
+
+    let bytes_scaled = bytes_as_string(file_size as usize);
+
+    println!("Proof file size: {:<6}", bytes_scaled);
 }
 
 pub fn bytes_as_string(num_bytes: usize) -> String {
@@ -103,17 +121,3 @@ pub fn bytes_as_string(num_bytes: usize) -> String {
         )
     }
 }
-
-// pub fn serialize_proof(proof: InclusionProof, entity_id: EntityId, dir: PathBuf) -> PathBuf {
-//     let mut file_name = entity_id.to_string();
-//     file_name.push('.');
-//     file_name.push_str("dapolproof");
-
-//     let path = dir.join(file_name);
-//     info!("Serializing inclusion proof to path {:?}", path);
-
-//     read_write_utils::serialize_to_bin_file(&proof, path.clone())
-//         .expect("Unable to serialize proof");
-
-//     path
-// }

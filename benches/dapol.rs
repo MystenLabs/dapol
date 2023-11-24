@@ -5,7 +5,7 @@ use criterion::{BenchmarkId, Criterion, SamplingMode};
 use jemalloc_ctl::{epoch, stats};
 
 use dapol::accumulators::NdmSmt;
-use dapol::{Height, MaxThreadCount};
+use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod setup;
 use setup::{NUM_USERS, TREE_HEIGHTS};
@@ -13,7 +13,7 @@ use setup::{NUM_USERS, TREE_HEIGHTS};
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-fn bench_build_tree(c: &mut Criterion) {
+fn bench_dapol(c: &mut Criterion) {
     let e = epoch::mib().unwrap();
     let alloc = stats::allocated::mib().unwrap();
     let act = stats::active::mib().unwrap();
@@ -66,7 +66,7 @@ fn bench_build_tree(c: &mut Criterion) {
                 let tup: (Height, MaxThreadCount, u64) =
                     (Height::from(h), MaxThreadCount::from(*t), u);
 
-                // compute time
+                // tree build compute time
                 group.bench_function(
                     BenchmarkId::new(
                         "build_tree",
@@ -80,20 +80,72 @@ fn bench_build_tree(c: &mut Criterion) {
                     },
                 );
 
-                // memory usage
+                // tree build memory usage
                 let alloc = alloc.read().unwrap();
                 let act = act.read().unwrap();
                 let res = res.read().unwrap();
                 println!(
-                    "Memory usage: {} allocated / {} active / {} resident",
+                    "Tree build memory usage: {} allocated / {} active / {} resident",
                     setup::bytes_as_string(alloc),
                     setup::bytes_as_string(act),
                     setup::bytes_as_string(res)
                 );
 
-                // tree build size
+                // tree build file size
                 setup::serialize_tree(
                     ndm_smt.as_ref().expect("Tree not found"),
+                    PathBuf::from("./target"),
+                );
+
+                let alloc = stats::allocated::mib().unwrap();
+                let act = stats::active::mib().unwrap();
+                let res = stats::resident::mib().unwrap();
+
+                let mut proof = Option::<InclusionProof>::None;
+
+                let entity_keys = ndm_smt.as_ref().unwrap().entity_mapping().keys();
+                let mut entity_ids: Vec<&EntityId> = Vec::new();
+
+                e.advance().unwrap();
+
+                entity_keys.for_each(|entity| {
+                    e.advance().unwrap();
+                    entity_ids.push(entity);
+                });
+
+                // proof generation compute time
+                group.bench_function(
+                    BenchmarkId::new(
+                        "generate_proof",
+                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
+                    ),
+                    |bench| {
+                        bench.iter(|| {
+                            e.advance().unwrap();
+
+                            proof = Some(setup::generate_proof(
+                                ndm_smt.as_ref().expect("Tree not found"),
+                                entity_ids[0],
+                            ));
+                        });
+                    },
+                );
+
+                // proof generation memory usage
+                let alloc = alloc.read().unwrap();
+                let act = act.read().unwrap();
+                let res = res.read().unwrap();
+                println!(
+                    "Proof generation memory usage: {} allocated / {} active / {} resident",
+                    setup::bytes_as_string(alloc),
+                    setup::bytes_as_string(act),
+                    setup::bytes_as_string(res)
+                );
+
+                // proof file size
+                setup::serialize_proof(
+                    proof.as_ref().expect("Proof not found"),
+                    &entity_ids[0],
                     PathBuf::from("./target"),
                 );
             }
@@ -234,7 +286,7 @@ fn bench_build_tree(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_build_tree,
+    bench_dapol,
     // bench_generate_proof,
     // bench_verify_proof
 );
