@@ -11,82 +11,85 @@ use dapol::{Height, MaxThreadCount};
 mod setup;
 use setup::{NUM_USERS, TREE_HEIGHTS};
 
-fn bench_build_tree(c: &mut Criterion) {
-    let mut group = c.benchmark_group("build");
-    group.sample_size(10);
-    group.sampling_mode(SamplingMode::Flat);
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-    dapol::initialize_machine_parallelism();
+// fn bench_build_tree(c: &mut Criterion) {
+//     let mut group = c.benchmark_group("build");
+//     group.sample_size(10);
+//     group.sampling_mode(SamplingMode::Flat);
 
-    let mut thread_counts: Vec<u8> = Vec::new();
+//     dapol::initialize_machine_parallelism();
 
-    let max_thread_count: u8 = MaxThreadCount::default().get_value();
+//     let mut thread_counts: Vec<u8> = Vec::new();
 
-    let step = if max_thread_count < 8 {
-        1
-    } else {
-        max_thread_count >> 2
-    };
+//     let max_thread_count: u8 = MaxThreadCount::default().get_value();
 
-    for i in (step..max_thread_count).step_by(step as usize) {
-        thread_counts.push(i);
-    }
+//     let step = if max_thread_count < 8 {
+//         1
+//     } else {
+//         max_thread_count >> 2
+//     };
 
-    thread_counts.push(max_thread_count);
+//     for i in (step..max_thread_count).step_by(step as usize) {
+//         thread_counts.push(i);
+//     }
 
-    let mut ndm_smt = Option::<NdmSmt>::None;
+//     thread_counts.push(max_thread_count);
 
-    let e = epoch::mib().unwrap();
-    let alloc = stats::allocated::mib().unwrap();
-    let res = stats::resident::mib().unwrap();
+//     let mut ndm_smt = Option::<NdmSmt>::None;
 
-    for h in TREE_HEIGHTS.into_iter() {
-        for t in thread_counts.iter() {
-            for u in NUM_USERS.into_iter() {
-                let max_users_for_height = 2_u64.pow((h - 1) as u32);
+//     let e = epoch::mib().unwrap();
+//     let alloc = stats::allocated::mib().unwrap();
+//     let res = stats::resident::mib().unwrap();
 
-                if u > max_users_for_height {
-                    break;
-                }
+//     for h in TREE_HEIGHTS.into_iter() {
+//         for t in thread_counts.iter() {
+//             for u in NUM_USERS.into_iter() {
+//                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
-                let tup: (Height, MaxThreadCount, u64) =
-                    (Height::from(h), MaxThreadCount::from(*t), u);
+//                 if u > max_users_for_height {
+//                     break;
+//                 }
 
-                e.advance().unwrap();
+//                 let tup: (Height, MaxThreadCount, u64) =
+//                     (Height::from(h), MaxThreadCount::from(*t), u);
 
-                // compute time
-                group.bench_function(
-                    BenchmarkId::new(
-                        "build_tree",
-                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
-                    ),
-                    |bench| {
-                        bench.iter(|| {
-                            ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
-                        });
-                    },
-                );
+//                 e.advance().unwrap();
 
-                // tree build size
-                setup::serialize_tree(
-                    ndm_smt.as_ref().expect("Tree not found"),
-                    PathBuf::from("./target"),
-                );
+//                 // compute time
+//                 group.bench_function(
+//                     BenchmarkId::new(
+//                         "build_tree",
+//                         format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
+//                     ),
+//                     |bench| {
+//                         bench.iter(|| {
+//                             ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
+//                         });
+//                     },
+//                 );
 
-                // memory usage
-                let alloc = alloc.read().unwrap();
-                let res = res.read().unwrap();
-                println!(
-                    "Memory usage: {} allocated / {} resident",
-                    setup::bytes_as_string(alloc),
-                    setup::bytes_as_string(res)
-                );
-            }
-        }
-    }
+//                 // tree build size
+//                 setup::serialize_tree(
+//                     ndm_smt.as_ref().expect("Tree not found"),
+//                     PathBuf::from("./target"),
+//                 );
 
-    group.finish()
-}
+//                 // memory usage
+//                 let alloc = alloc.read().unwrap();
+//                 let res = res.read().unwrap();
+//                 println!(
+//                     "Memory usage: {} allocated / {} resident",
+//                     setup::bytes_as_string(alloc),
+//                     setup::bytes_as_string(res)
+//                 );
+//             }
+//         }
+//     }
+
+//     group.finish()
+// }
 
 // fn bench_generate_proof(c: &mut Criterion) {
 //     let mut group = c.benchmark_group("generate");
@@ -187,11 +190,43 @@ fn bench_build_tree(c: &mut Criterion) {
 
 // ================================================================================================
 
-criterion_group!(
-    benches,
-    bench_build_tree,
-    // bench_generate_proof,
-    // bench_verify_proof
-);
+fn bench_test_jemalloc_readings() {
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
+    let act = stats::active::mib().unwrap();
+    let res = stats::resident::mib().unwrap();
 
-criterion_main!(benches);
+    let path = PathBuf::from("examples/entities_example.csv");
+
+    e.advance().unwrap();
+
+    let file_size = std::fs::metadata(&path)
+        .expect("Unable to get metadata for {path}")
+        .len();
+
+    let bytes_scaled = setup::bytes_as_string(file_size as usize);
+
+    println!("{} file size: {:<6}", path.display(), bytes_scaled);
+
+    let alloc = alloc.read().unwrap();
+    let act = act.read().unwrap();
+    let res = res.read().unwrap();
+
+    println!(
+        "Memory usage: {} allocated / {} active / {} resident",
+        setup::bytes_as_string(alloc),
+        setup::bytes_as_string(act),
+        setup::bytes_as_string(res)
+    );
+}
+
+// ================================================================================================
+
+// criterion_group!(
+// benches,
+// bench_build_tree,
+// bench_generate_proof,
+// bench_verify_proof
+// );
+
+criterion_main!(/* benches, */ bench_test_jemalloc_readings);
