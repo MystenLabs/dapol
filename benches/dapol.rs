@@ -14,6 +14,11 @@ use setup::{NUM_USERS, TREE_HEIGHTS};
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn bench_build_tree(c: &mut Criterion) {
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
+    let act = stats::active::mib().unwrap();
+    let res = stats::resident::mib().unwrap();
+
     let mut group = c.benchmark_group("build");
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
@@ -30,7 +35,10 @@ fn bench_build_tree(c: &mut Criterion) {
         max_thread_count >> 2
     };
 
+    e.advance().unwrap();
+
     for i in (step..max_thread_count).step_by(step as usize) {
+        e.advance().unwrap();
         thread_counts.push(i);
     }
 
@@ -38,13 +46,17 @@ fn bench_build_tree(c: &mut Criterion) {
 
     let mut ndm_smt = Option::<NdmSmt>::None;
 
-    let e = epoch::mib().unwrap();
-    let alloc = stats::allocated::mib().unwrap();
-    let res = stats::resident::mib().unwrap();
+    e.advance().unwrap();
 
     for h in TREE_HEIGHTS.into_iter() {
+        e.advance().unwrap();
+
         for t in thread_counts.iter() {
+            e.advance().unwrap();
+
             for u in NUM_USERS.into_iter() {
+                e.advance().unwrap();
+
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
@@ -54,8 +66,6 @@ fn bench_build_tree(c: &mut Criterion) {
                 let tup: (Height, MaxThreadCount, u64) =
                     (Height::from(h), MaxThreadCount::from(*t), u);
 
-                e.advance().unwrap();
-
                 // compute time
                 group.bench_function(
                     BenchmarkId::new(
@@ -64,6 +74,7 @@ fn bench_build_tree(c: &mut Criterion) {
                     ),
                     |bench| {
                         bench.iter(|| {
+                            e.advance().unwrap();
                             ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
                         });
                     },
@@ -77,10 +88,12 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 // memory usage
                 let alloc = alloc.read().unwrap();
+                let act = act.read().unwrap();
                 let res = res.read().unwrap();
                 println!(
-                    "Memory usage: {} allocated / {} resident",
+                    "Memory usage: {} allocated / {} active / {} resident",
                     setup::bytes_as_string(alloc),
+                    setup::bytes_as_string(act),
                     setup::bytes_as_string(res)
                 );
             }
@@ -189,33 +202,33 @@ fn bench_build_tree(c: &mut Criterion) {
 
 // ================================================================================================
 
-fn bench_test_jemalloc_readings() {
-    let e = epoch::mib().unwrap();
-    let alloc = stats::allocated::mib().unwrap();
-    let act = stats::active::mib().unwrap();
-    let res = stats::resident::mib().unwrap();
+// fn bench_test_jemalloc_readings() {
+//     let e = epoch::mib().unwrap();
+//     let alloc = stats::allocated::mib().unwrap();
+//     let act = stats::active::mib().unwrap();
+//     let res = stats::resident::mib().unwrap();
 
-    // 1 MB
-    let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
+//     // 1 MB
+//     let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
 
-    e.advance().unwrap();
+//     e.advance().unwrap();
 
-    println!(
-        "buf capacity: {:<6}",
-        setup::bytes_as_string(buf.capacity())
-    );
+//     println!(
+//         "buf capacity: {:<6}",
+//         setup::bytes_as_string(buf.capacity())
+//     );
 
-    let alloc = alloc.read().unwrap();
-    let act = act.read().unwrap();
-    let res = res.read().unwrap();
+//     let alloc = alloc.read().unwrap();
+//     let act = act.read().unwrap();
+//     let res = res.read().unwrap();
 
-    println!(
-        "Memory usage: {} allocated / {} active / {} resident",
-        setup::bytes_as_string(alloc),
-        setup::bytes_as_string(act),
-        setup::bytes_as_string(res)
-    );
-}
+//     println!(
+//         "Memory usage: {} allocated / {} active / {} resident",
+//         setup::bytes_as_string(alloc),
+//         setup::bytes_as_string(act),
+//         setup::bytes_as_string(res)
+//     );
+// }
 
 // ================================================================================================
 
@@ -226,4 +239,4 @@ criterion_group!(
     // bench_verify_proof
 );
 
-criterion_main!(/* benches, */ bench_test_jemalloc_readings);
+criterion_main!(benches, /* bench_test_jemalloc_readings */);
