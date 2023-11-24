@@ -8,7 +8,9 @@ use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod setup;
-use setup::{NUM_USERS, TREE_HEIGHTS};
+use setup::{Metric, Variable, NUM_USERS, TREE_HEIGHTS};
+
+use crate::setup::{MemoryUsage, VarType};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -84,18 +86,23 @@ fn bench_dapol(c: &mut Criterion) {
                 let alloc = alloc.read().unwrap();
                 let act = act.read().unwrap();
                 let res = res.read().unwrap();
-                println!(
-                    "Tree build memory usage: {} allocated / {} active / {} resident",
-                    setup::bytes_as_string(alloc),
-                    setup::bytes_as_string(act),
-                    setup::bytes_as_string(res)
-                );
+
+                let mem_usage = MemoryUsage {
+                    allocated: setup::bytes_as_string(alloc),
+                    active: setup::bytes_as_string(act),
+                    resident: setup::bytes_as_string(res),
+                };
 
                 // tree build file size
-                setup::serialize_tree(
+                let tree_build_file_size = setup::serialize_tree(
                     ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
                 );
+
+                let tree_build =
+                    Variable::from(Metric(VarType::TreeBuild, mem_usage, tree_build_file_size));
+
+                println!("\nTree build metrics: {:?} \n", tree_build);
 
                 let alloc = stats::allocated::mib().unwrap();
                 let act = stats::active::mib().unwrap();
@@ -135,19 +142,27 @@ fn bench_dapol(c: &mut Criterion) {
                 let alloc = alloc.read().unwrap();
                 let act = act.read().unwrap();
                 let res = res.read().unwrap();
-                println!(
-                    "Proof generation memory usage: {} allocated / {} active / {} resident",
-                    setup::bytes_as_string(alloc),
-                    setup::bytes_as_string(act),
-                    setup::bytes_as_string(res)
-                );
+
+                let mem_usage = MemoryUsage {
+                    allocated: setup::bytes_as_string(alloc),
+                    active: setup::bytes_as_string(act),
+                    resident: setup::bytes_as_string(res),
+                };
 
                 // proof file size
-                setup::serialize_proof(
+                let proof_file_size = setup::serialize_proof(
                     proof.as_ref().expect("Proof not found"),
                     &entity_ids[0],
                     PathBuf::from("./target"),
                 );
+
+                let proof_generation = Variable::from(Metric(
+                    VarType::ProofGeneration,
+                    mem_usage,
+                    proof_file_size.clone(),
+                ));
+
+                println!("\n Proof generation metrics: {:?} \n", proof_generation);
 
                 let alloc = stats::allocated::mib().unwrap();
                 let act = stats::active::mib().unwrap();
@@ -176,12 +191,20 @@ fn bench_dapol(c: &mut Criterion) {
                 let alloc = alloc.read().unwrap();
                 let act = act.read().unwrap();
                 let res = res.read().unwrap();
-                println!(
-                    "Proof verification memory usage: {} allocated / {} active / {} resident",
-                    setup::bytes_as_string(alloc),
-                    setup::bytes_as_string(act),
-                    setup::bytes_as_string(res)
-                );
+
+                let mem_usage = MemoryUsage {
+                    allocated: setup::bytes_as_string(alloc),
+                    active: setup::bytes_as_string(act),
+                    resident: setup::bytes_as_string(res),
+                };
+
+                let proof_verification = Variable::from(Metric(
+                    VarType::ProofVerification,
+                    mem_usage,
+                    proof_file_size.clone(),
+                ));
+
+                println!("\n Proof verification metrics: {:?} \n", proof_verification);
             }
         }
     }

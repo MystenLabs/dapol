@@ -47,6 +47,43 @@ pub const NUM_USERS: [u64; 35] = [
     250_000_000,
 ];
 
+// STRUCTS + ENUMS
+// ================================================================================================
+
+#[derive(Debug)]
+pub enum VarType {
+    TreeBuild,
+    ProofGeneration,
+    ProofVerification,
+}
+
+#[derive(Debug)]
+pub struct Metric(pub VarType, pub MemoryUsage, pub String);
+
+#[derive(Debug)]
+pub struct MemoryUsage {
+    pub allocated: String,
+    pub active: String,
+    pub resident: String,
+}
+
+#[derive(Debug)]
+pub struct Variable {
+    _var_type: VarType,
+    _mem_usage: MemoryUsage,
+    _file_size: String,
+}
+
+impl From<Metric> for Variable {
+    fn from(metric: Metric) -> Self {
+        Self {
+            _var_type: metric.0,
+            _mem_usage: metric.1,
+            _file_size: metric.2,
+        }
+    }
+}
+
 // HELPER FUNCTIONS
 // ================================================================================================
 
@@ -66,7 +103,7 @@ pub fn generate_proof(ndm_smt: &NdmSmt, entity_id: &EntityId) -> InclusionProof 
     NdmSmt::generate_inclusion_proof(ndm_smt, entity_id).expect("Unable to generate proof")
 }
 
-pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
+pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) -> String {
     let mut file_name = tree.root_hash().to_string();
     file_name.push('.');
     file_name.push_str("dapoltree");
@@ -81,10 +118,12 @@ pub fn serialize_tree(tree: &NdmSmt, dir: PathBuf) {
 
     let bytes_scaled = bytes_as_string(file_size as usize);
 
-    println!("Tree file size: {:<6}", bytes_scaled);
+    bytes_scaled
+
+    // println!("Tree file size: {:<6}", bytes_scaled);
 }
 
-pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBuf) {
+pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBuf) -> String {
     let mut file_name = entity_id.to_string();
     file_name.push('.');
     file_name.push_str("dapolproof");
@@ -100,7 +139,9 @@ pub fn serialize_proof(proof: &InclusionProof, entity_id: &EntityId, dir: PathBu
 
     let bytes_scaled = bytes_as_string(file_size as usize);
 
-    println!("Proof file size: {:<6}", bytes_scaled);
+    bytes_scaled
+
+    // println!("Proof file size: {:<6}", bytes_scaled);
 }
 
 pub fn bytes_as_string(num_bytes: usize) -> String {
