@@ -8,7 +8,7 @@ use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod setup;
-use crate::setup::{MemoryUsage, Metrics, Variable, NUM_USERS, TREE_HEIGHTS};
+use crate::setup::{Metrics, Variable, NUM_USERS, TREE_HEIGHTS};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -20,7 +20,7 @@ fn bench_dapol(c: &mut Criterion) {
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
 
-    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches 
+    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
@@ -85,10 +85,6 @@ fn bench_dapol(c: &mut Criterion) {
                 // mem used is the difference between the 2 measurements
                 let diff = after - before;
 
-                let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(diff),
-                };
-
                 // tree build file size
                 let tree_build_file_size = setup::serialize_tree(
                     ndm_smt.as_ref().expect("Tree not found"),
@@ -97,7 +93,7 @@ fn bench_dapol(c: &mut Criterion) {
 
                 let tree_build = Metrics {
                     variable: Variable::TreeBuild,
-                    mem_usage,
+                    mem_usage: setup::bytes_as_string(diff),
                     file_size: tree_build_file_size,
                 };
 
@@ -133,10 +129,6 @@ fn bench_dapol(c: &mut Criterion) {
                 // mem used is the difference between the 2 measurements
                 let diff = after - before;
 
-                let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(diff),
-                };
-
                 // proof file size
                 let proof_file_size = setup::serialize_proof(
                     proof.as_ref().expect("Proof not found"),
@@ -146,7 +138,7 @@ fn bench_dapol(c: &mut Criterion) {
 
                 let proof_generation = Metrics {
                     variable: Variable::ProofGeneration,
-                    mem_usage,
+                    mem_usage: setup::bytes_as_string(diff),
                     file_size: proof_file_size.clone(),
                 };
 
@@ -178,13 +170,9 @@ fn bench_dapol(c: &mut Criterion) {
                 // mem used is the difference between the 2 measurements
                 let diff = after - before;
 
-                let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(diff),
-                };
-
                 let proof_verification = Metrics {
                     variable: Variable::ProofVerification,
-                    mem_usage,
+                    mem_usage: setup::bytes_as_string(diff),
                     file_size: proof_file_size.clone(),
                 };
 

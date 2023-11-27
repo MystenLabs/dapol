@@ -58,14 +58,9 @@ pub enum Variable {
 }
 
 #[derive(Debug)]
-pub struct MemoryUsage {
-    pub allocated: String,
-}
-
-#[derive(Debug)]
 pub struct Metrics {
     pub variable: Variable,
-    pub mem_usage: MemoryUsage,
+    pub mem_usage: String,
     pub file_size: String,
 }
 
