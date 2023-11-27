@@ -23,22 +23,25 @@ fn bench_dapol(c: &mut Criterion) {
 
     dapol::initialize_machine_parallelism();
 
-    let mut thread_counts: Vec<u8> = Vec::new();
+    let thread_counts = {
+        let mut tc: Vec<u8> = Vec::new();
 
-    let max_thread_count: u8 = MaxThreadCount::default().get_value();
+        let max_thread_count: u8 = MaxThreadCount::default().get_value();
 
-    let step = if max_thread_count < 8 {
-        1
-    } else {
-        max_thread_count >> 2
+        let step = if max_thread_count < 8 {
+            1
+        } else {
+            max_thread_count >> 2
+        };
+
+        for i in (step..max_thread_count).step_by(step as usize) {
+            tc.push(i);
+        }
+
+        tc.push(max_thread_count);
+
+        tc
     };
-
-    for i in (step..max_thread_count).step_by(step as usize) {
-        e.advance().unwrap();
-        thread_counts.push(i);
-    }
-
-    thread_counts.push(max_thread_count);
 
     let mut ndm_smt = Option::<NdmSmt>::None;
 
