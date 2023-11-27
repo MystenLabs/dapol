@@ -67,12 +67,13 @@ fn bench_dapol(c: &mut Criterion) {
                     (Height::from(h), MaxThreadCount::from(*t), u);
 
                 // tree build compute time
-                group.bench_function(
+                group.bench_with_input(
                     BenchmarkId::new(
                         "build_tree",
-                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
+                        format!("{:?}/{:?}/NUM_USERS: {:?}", tup.0, tup.1, tup.2),
                     ),
-                    |bench| {
+                    &tup,
+                    |bench, tup| {
                         bench.iter(|| {
                             ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
                         });
