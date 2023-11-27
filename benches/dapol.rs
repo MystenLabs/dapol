@@ -99,12 +99,8 @@ fn bench_dapol(c: &mut Criterion) {
 
                 let mut proof = Option::<InclusionProof>::None;
 
-                let entity_keys = ndm_smt.as_ref().unwrap().entity_mapping().keys();
-                let mut entity_ids: Vec<&EntityId> = Vec::new();
-
-                entity_keys.for_each(|entity| {
-                    entity_ids.push(entity);
-                });
+                let entity_ids: Vec<&EntityId> =
+                    ndm_smt.as_ref().unwrap().entity_mapping().keys().collect();
 
                 e.advance().unwrap();
                 let before = alloc.read().unwrap();
