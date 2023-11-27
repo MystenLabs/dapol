@@ -53,7 +53,9 @@ fn bench_build_tree(c: &mut Criterion) {
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
-                // Many of the statistics tracked by jemalloc are cached. The epoch controls when they are refreshed. We care about measuring ndm_smt so we refresh before it's construction
+                // Many of the statistics tracked by `jemalloc` are cached.
+                // The epoch controls when they are refreshed. 
+                // We care about measuring ndm_smt so we refresh before it's construction
                 e.advance().unwrap();
                 let before = alloc.read().unwrap();
 
@@ -146,9 +148,6 @@ fn bench_generate_proof(c: &mut Criterion) {
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
-
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
@@ -159,6 +158,12 @@ fn bench_generate_proof(c: &mut Criterion) {
                     (Height::from(h), MaxThreadCount::from(*t), u);
 
                 let ndm_smt = Some(setup::build_ndm_smt(tup.clone())).expect("Tree not found");
+
+                // Many of the statistics tracked by `jemalloc` are cached. 
+                // The epoch controls when they are refreshed. 
+                // We care about measuring proof generation so we refresh before it's construction
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
 
@@ -259,6 +264,12 @@ fn bench_verify_proof(c: &mut Criterion) {
 
                 let proof =
                     Some(setup::generate_proof(&ndm_smt, entity_ids[0])).expect("Proof not found");
+
+                // Many of the statistics tracked by `jemalloc` are cached. 
+                // The epoch controls when they are refreshed. 
+                // We care about measuring proof verification so we refresh before it's construction
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 // proof file size
                 let proof_file_size =
