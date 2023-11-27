@@ -13,7 +13,7 @@ use crate::setup::{Metrics, Variable, NUM_USERS, TREE_HEIGHTS};
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-fn bench_dapol(c: &mut Criterion) {
+fn bench_build_tree(c: &mut Criterion) {
     let e = epoch::mib().unwrap();
     let alloc = stats::allocated::mib().unwrap();
 
@@ -99,27 +99,79 @@ fn bench_dapol(c: &mut Criterion) {
                 };
 
                 println!("\n{:?}\n", tree_build);
+            }
+        }
+    }
 
-                let mut proof = Option::<InclusionProof>::None;
+    group.finish()
+}
 
-                let entity_ids: Vec<&EntityId> =
-                    ndm_smt.as_ref().unwrap().entity_mapping().keys().collect();
+fn bench_generate_proof(c: &mut Criterion) {
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
 
+    let mut group = c.benchmark_group("dapol");
+    group.sample_size(10);
+
+    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
+    // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
+    group.sampling_mode(SamplingMode::Flat);
+
+    dapol::initialize_machine_parallelism();
+
+    let thread_counts = {
+        let mut tc: Vec<u8> = Vec::new();
+
+        let max_thread_count: u8 = MaxThreadCount::default().get_value();
+
+        let step = if max_thread_count < 8 {
+            1
+        } else {
+            max_thread_count >> 2
+        };
+
+        for i in (step..max_thread_count).step_by(step as usize) {
+            tc.push(i);
+        }
+
+        tc.push(max_thread_count);
+
+        tc
+    };
+
+    let mut proof = Option::<InclusionProof>::None;
+
+    e.advance().unwrap();
+
+    for h in TREE_HEIGHTS.into_iter() {
+        for t in thread_counts.iter() {
+            for u in NUM_USERS.into_iter() {
                 e.advance().unwrap();
                 let before = alloc.read().unwrap();
 
+                let max_users_for_height = 2_u64.pow((h - 1) as u32);
+
+                if u > max_users_for_height {
+                    break;
+                }
+
+                let tup: (Height, MaxThreadCount, u64) =
+                    (Height::from(h), MaxThreadCount::from(*t), u);
+
+                let ndm_smt = Some(setup::build_ndm_smt(tup.clone())).expect("Tree not found");
+
+                let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
+
                 // proof generation compute time
-                group.bench_function(
+                group.bench_with_input(
                     BenchmarkId::new(
                         "generate_proof",
-                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
+                        format!("{:?}/{:?}/NUM_USERS: {:?}", tup.0, tup.1, tup.2),
                     ),
-                    |bench| {
+                    &ndm_smt,
+                    |bench, ndm_smt| {
                         bench.iter(|| {
-                            proof = Some(setup::generate_proof(
-                                ndm_smt.as_ref().expect("Tree not found"),
-                                entity_ids[0],
-                            ));
+                            proof = Some(setup::generate_proof(ndm_smt, entity_ids[0]));
                         });
                     },
                 );
@@ -144,23 +196,85 @@ fn bench_dapol(c: &mut Criterion) {
                 };
 
                 println!("\n{:?}\n", proof_generation);
+            }
+        }
+    }
 
+    group.finish()
+}
+
+fn bench_verify_proof(c: &mut Criterion) {
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
+
+    let mut group = c.benchmark_group("dapol");
+    group.sample_size(10);
+
+    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
+    // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
+    group.sampling_mode(SamplingMode::Flat);
+
+    dapol::initialize_machine_parallelism();
+
+    let thread_counts = {
+        let mut tc: Vec<u8> = Vec::new();
+
+        let max_thread_count: u8 = MaxThreadCount::default().get_value();
+
+        let step = if max_thread_count < 8 {
+            1
+        } else {
+            max_thread_count >> 2
+        };
+
+        for i in (step..max_thread_count).step_by(step as usize) {
+            tc.push(i);
+        }
+
+        tc.push(max_thread_count);
+
+        tc
+    };
+
+    e.advance().unwrap();
+
+    for h in TREE_HEIGHTS.into_iter() {
+        for t in thread_counts.iter() {
+            for u in NUM_USERS.into_iter() {
                 e.advance().unwrap();
                 let before = alloc.read().unwrap();
 
+                let max_users_for_height = 2_u64.pow((h - 1) as u32);
+
+                if u > max_users_for_height {
+                    break;
+                }
+
+                let tup: (Height, MaxThreadCount, u64) =
+                    (Height::from(h), MaxThreadCount::from(*t), u);
+
+                let ndm_smt = Some(setup::build_ndm_smt(tup.clone())).expect("Tree not found");
+
+                let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
+
+                let proof =
+                    Some(setup::generate_proof(&ndm_smt, entity_ids[0])).expect("Proof not found");
+
+                // proof file size
+                let proof_file_size =
+                    setup::serialize_proof(&proof, &entity_ids[0], PathBuf::from("./target"));
+
                 // proof verification compute time
-                group.bench_function(
+                group.bench_with_input(
                     BenchmarkId::new(
                         "verify_proof",
-                        format!("{:?}/{:?}/NUM_USERS: {:?}", &tup.0, &tup.1, &tup.2),
+                        format!("{:?}/{:?}/NUM_USERS: {:?}", tup.0, tup.1, tup.2),
                     ),
-                    |bench| {
+                    &proof,
+                    |bench, proof| {
                         bench.iter(|| {
-                            InclusionProof::verify(
-                                proof.as_ref().expect("Proof not found"),
-                                ndm_smt.as_ref().expect("Tree not found").root_hash(),
-                            )
-                            .expect("Unable to verify proof")
+                            InclusionProof::verify(proof, ndm_smt.root_hash())
+                                .expect("Unable to verify proof")
                         });
                     },
                 );
@@ -174,7 +288,7 @@ fn bench_dapol(c: &mut Criterion) {
                 let proof_verification = Metrics {
                     variable: Variable::ProofVerification,
                     mem_usage: setup::bytes_as_string(diff),
-                    file_size: proof_file_size.clone(),
+                    file_size: proof_file_size,
                 };
 
                 println!("\n{:?}\n", proof_verification);
@@ -217,6 +331,11 @@ fn bench_test_jemalloc_readings() {
 
 // ================================================================================================
 
-criterion_group!(benches, bench_dapol);
+criterion_group!(
+    benches,
+    bench_build_tree,
+    bench_generate_proof,
+    bench_verify_proof
+);
 
 criterion_main!(benches, bench_test_jemalloc_readings);
