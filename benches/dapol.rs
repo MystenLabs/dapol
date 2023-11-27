@@ -16,7 +16,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 fn bench_dapol(c: &mut Criterion) {
     let e = epoch::mib().unwrap();
     let alloc = stats::allocated::mib().unwrap();
-    
+
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
@@ -47,14 +47,11 @@ fn bench_dapol(c: &mut Criterion) {
     e.advance().unwrap();
 
     for h in TREE_HEIGHTS.into_iter() {
-        // Many of the statistics tracked by jemalloc are cached. The epoch controls when they are refreshed. We care about measuring ndm_smt so we refresh before it's construction
-        e.advance().unwrap();
-
         for t in thread_counts.iter() {
-            e.advance().unwrap();
-
             for u in NUM_USERS.into_iter() {
+                // Many of the statistics tracked by jemalloc are cached. The epoch controls when they are refreshed. We care about measuring ndm_smt so we refresh before it's construction
                 e.advance().unwrap();
+
                 let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
@@ -80,6 +77,7 @@ fn bench_dapol(c: &mut Criterion) {
                 );
 
                 e.advance().unwrap();
+                
                 let after = alloc.read().unwrap();
 
                 // mem used is the difference between the 2 measurements
