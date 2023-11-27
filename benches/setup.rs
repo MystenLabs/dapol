@@ -60,8 +60,6 @@ pub enum Variable {
 #[derive(Debug)]
 pub struct MemoryUsage {
     pub allocated: String,
-    pub active: String,
-    pub resident: String,
 }
 
 #[derive(Debug)]

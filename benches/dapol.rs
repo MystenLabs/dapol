@@ -16,9 +16,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 fn bench_dapol(c: &mut Criterion) {
     let e = epoch::mib().unwrap();
     let alloc = stats::allocated::mib().unwrap();
-    let act = stats::active::mib().unwrap();
-    let res = stats::resident::mib().unwrap();
-
+    
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
     group.sampling_mode(SamplingMode::Flat);
@@ -49,6 +47,7 @@ fn bench_dapol(c: &mut Criterion) {
     e.advance().unwrap();
 
     for h in TREE_HEIGHTS.into_iter() {
+        // Many of the statistics tracked by jemalloc are cached. The epoch controls when they are refreshed. We care about measuring ndm_smt so we refresh before it's construction
         e.advance().unwrap();
 
         for t in thread_counts.iter() {
@@ -56,6 +55,7 @@ fn bench_dapol(c: &mut Criterion) {
 
             for u in NUM_USERS.into_iter() {
                 e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
@@ -74,21 +74,19 @@ fn bench_dapol(c: &mut Criterion) {
                     ),
                     |bench| {
                         bench.iter(|| {
-                            e.advance().unwrap();
                             ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
                         });
                     },
                 );
 
-                // tree build memory usage
-                let alloc = alloc.read().unwrap();
-                let act = act.read().unwrap();
-                let res = res.read().unwrap();
+                e.advance().unwrap();
+                let after = alloc.read().unwrap();
+
+                // mem used is the difference between the 2 measurements
+                let diff = after - before;
 
                 let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(alloc),
-                    active: setup::bytes_as_string(act),
-                    resident: setup::bytes_as_string(res),
+                    allocated: setup::bytes_as_string(diff),
                 };
 
                 // tree build file size
@@ -106,18 +104,13 @@ fn bench_dapol(c: &mut Criterion) {
                 println!("\n{:?}\n", tree_build);
 
                 let alloc = stats::allocated::mib().unwrap();
-                let act = stats::active::mib().unwrap();
-                let res = stats::resident::mib().unwrap();
 
                 let mut proof = Option::<InclusionProof>::None;
 
                 let entity_keys = ndm_smt.as_ref().unwrap().entity_mapping().keys();
                 let mut entity_ids: Vec<&EntityId> = Vec::new();
 
-                e.advance().unwrap();
-
                 entity_keys.for_each(|entity| {
-                    e.advance().unwrap();
                     entity_ids.push(entity);
                 });
 
@@ -129,8 +122,6 @@ fn bench_dapol(c: &mut Criterion) {
                     ),
                     |bench| {
                         bench.iter(|| {
-                            e.advance().unwrap();
-
                             proof = Some(setup::generate_proof(
                                 ndm_smt.as_ref().expect("Tree not found"),
                                 entity_ids[0],
@@ -141,13 +132,9 @@ fn bench_dapol(c: &mut Criterion) {
 
                 // proof generation memory usage
                 let alloc = alloc.read().unwrap();
-                let act = act.read().unwrap();
-                let res = res.read().unwrap();
 
                 let mem_usage = MemoryUsage {
                     allocated: setup::bytes_as_string(alloc),
-                    active: setup::bytes_as_string(act),
-                    resident: setup::bytes_as_string(res),
                 };
 
                 // proof file size
@@ -166,8 +153,6 @@ fn bench_dapol(c: &mut Criterion) {
                 println!("\n{:?}\n", proof_generation);
 
                 let alloc = stats::allocated::mib().unwrap();
-                let act = stats::active::mib().unwrap();
-                let res = stats::resident::mib().unwrap();
 
                 // proof verification compute time
                 group.bench_function(
@@ -177,8 +162,6 @@ fn bench_dapol(c: &mut Criterion) {
                     ),
                     |bench| {
                         bench.iter(|| {
-                            e.advance().unwrap();
-
                             InclusionProof::verify(
                                 proof.as_ref().expect("Proof not found"),
                                 ndm_smt.as_ref().expect("Tree not found").root_hash(),
@@ -190,13 +173,9 @@ fn bench_dapol(c: &mut Criterion) {
 
                 // proof verification memory usage
                 let alloc = alloc.read().unwrap();
-                let act = act.read().unwrap();
-                let res = res.read().unwrap();
 
                 let mem_usage = MemoryUsage {
                     allocated: setup::bytes_as_string(alloc),
-                    active: setup::bytes_as_string(act),
-                    resident: setup::bytes_as_string(res),
                 };
 
                 let proof_verification = Metrics {
