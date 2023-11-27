@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
 use jemalloc_ctl::{epoch, stats};
+use rand::distributions::{Distribution, Uniform};
 
 use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
@@ -56,8 +57,6 @@ fn bench_build_tree(c: &mut Criterion) {
                 // Many of the statistics tracked by `jemalloc` are cached.
                 // The epoch controls when they are refreshed.
                 // We care about measuring ndm_smt so we refresh before it's construction
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
@@ -67,6 +66,9 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 let tup: (Height, MaxThreadCount, u64) =
                     (Height::from(h), MaxThreadCount::from(*t), u);
+
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 // tree build compute time
                 group.bench_with_input(
@@ -143,6 +145,8 @@ fn bench_generate_proof(c: &mut Criterion) {
 
     let mut proof = Option::<InclusionProof>::None;
 
+    let mut rng = rand::thread_rng();
+
     e.advance().unwrap();
 
     for h in TREE_HEIGHTS.into_iter() {
@@ -167,6 +171,8 @@ fn bench_generate_proof(c: &mut Criterion) {
 
                 let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
 
+                let i = Uniform::from(0..NUM_USERS.len() - 1);
+
                 // proof generation compute time
                 group.bench_with_input(
                     BenchmarkId::new(
@@ -176,7 +182,10 @@ fn bench_generate_proof(c: &mut Criterion) {
                     &ndm_smt,
                     |bench, ndm_smt| {
                         bench.iter(|| {
-                            proof = Some(setup::generate_proof(ndm_smt, entity_ids[0]));
+                            proof = Some(setup::generate_proof(
+                                ndm_smt,
+                                entity_ids[i.sample(&mut rng)],
+                            ));
                         });
                     },
                 );
@@ -241,6 +250,8 @@ fn bench_verify_proof(c: &mut Criterion) {
         tc
     };
 
+    let mut rng = rand::thread_rng();
+
     e.advance().unwrap();
 
     for h in TREE_HEIGHTS.into_iter() {
@@ -257,10 +268,15 @@ fn bench_verify_proof(c: &mut Criterion) {
 
                 let ndm_smt = Some(setup::build_ndm_smt(tup.clone())).expect("Tree not found");
 
+                let i = Uniform::from(0..NUM_USERS.len() - 1);
+
                 let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
 
-                let proof =
-                    Some(setup::generate_proof(&ndm_smt, entity_ids[0])).expect("Proof not found");
+                let proof = Some(setup::generate_proof(
+                    &ndm_smt,
+                    entity_ids[i.sample(&mut rng)],
+                ))
+                .expect("Proof not found");
 
                 // Many of the statistics tracked by `jemalloc` are cached.
                 // The epoch controls when they are refreshed.
