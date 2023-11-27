@@ -33,8 +33,6 @@ fn bench_dapol(c: &mut Criterion) {
         max_thread_count >> 2
     };
 
-    e.advance().unwrap();
-
     for i in (step..max_thread_count).step_by(step as usize) {
         e.advance().unwrap();
         thread_counts.push(i);
@@ -51,7 +49,6 @@ fn bench_dapol(c: &mut Criterion) {
             for u in NUM_USERS.into_iter() {
                 // Many of the statistics tracked by jemalloc are cached. The epoch controls when they are refreshed. We care about measuring ndm_smt so we refresh before it's construction
                 e.advance().unwrap();
-
                 let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
@@ -77,7 +74,6 @@ fn bench_dapol(c: &mut Criterion) {
                 );
 
                 e.advance().unwrap();
-                
                 let after = alloc.read().unwrap();
 
                 // mem used is the difference between the 2 measurements
@@ -101,8 +97,6 @@ fn bench_dapol(c: &mut Criterion) {
 
                 println!("\n{:?}\n", tree_build);
 
-                let alloc = stats::allocated::mib().unwrap();
-
                 let mut proof = Option::<InclusionProof>::None;
 
                 let entity_keys = ndm_smt.as_ref().unwrap().entity_mapping().keys();
@@ -111,6 +105,9 @@ fn bench_dapol(c: &mut Criterion) {
                 entity_keys.for_each(|entity| {
                     entity_ids.push(entity);
                 });
+
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 // proof generation compute time
                 group.bench_function(
@@ -128,11 +125,14 @@ fn bench_dapol(c: &mut Criterion) {
                     },
                 );
 
-                // proof generation memory usage
-                let alloc = alloc.read().unwrap();
+                e.advance().unwrap();
+                let after = alloc.read().unwrap();
+
+                // mem used is the difference between the 2 measurements
+                let diff = after - before;
 
                 let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(alloc),
+                    allocated: setup::bytes_as_string(diff),
                 };
 
                 // proof file size
@@ -150,7 +150,8 @@ fn bench_dapol(c: &mut Criterion) {
 
                 println!("\n{:?}\n", proof_generation);
 
-                let alloc = stats::allocated::mib().unwrap();
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 // proof verification compute time
                 group.bench_function(
@@ -169,11 +170,14 @@ fn bench_dapol(c: &mut Criterion) {
                     },
                 );
 
-                // proof verification memory usage
-                let alloc = alloc.read().unwrap();
+                e.advance().unwrap();
+                let after = alloc.read().unwrap();
+
+                // mem used is the difference between the 2 measurements
+                let diff = after - before;
 
                 let mem_usage = MemoryUsage {
-                    allocated: setup::bytes_as_string(alloc),
+                    allocated: setup::bytes_as_string(diff),
                 };
 
                 let proof_verification = Metrics {
