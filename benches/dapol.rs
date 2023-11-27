@@ -19,6 +19,9 @@ fn bench_dapol(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
+
+    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches 
+    // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
     dapol::initialize_machine_parallelism();
