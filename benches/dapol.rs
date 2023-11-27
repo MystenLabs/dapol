@@ -20,7 +20,6 @@ fn bench_build_tree(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
-
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
@@ -47,16 +46,16 @@ fn bench_build_tree(c: &mut Criterion) {
         tc
     };
 
-    let mut ndm_smt = Option::<NdmSmt>::None;
-
-    e.advance().unwrap();
-
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
+                let mut ndm_smt = Option::<NdmSmt>::None;
+
                 // Many of the statistics tracked by `jemalloc` are cached.
                 // The epoch controls when they are refreshed.
                 // We care about measuring ndm_smt so we refresh before it's construction
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
@@ -66,9 +65,6 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 let tup: (Height, MaxThreadCount, u64) =
                     (Height::from(h), MaxThreadCount::from(*t), u);
-
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
 
                 // tree build compute time
                 group.bench_with_input(
@@ -92,7 +88,7 @@ fn bench_build_tree(c: &mut Criterion) {
 
                 // tree build file size
                 let tree_build_file_size = setup::serialize_tree(
-                    ndm_smt.as_ref().expect("Tree not found"),
+                    &ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
                 );
 
@@ -116,7 +112,6 @@ fn bench_generate_proof(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
-
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
@@ -143,8 +138,6 @@ fn bench_generate_proof(c: &mut Criterion) {
         tc
     };
 
-    let mut proof = Option::<InclusionProof>::None;
-
     let mut rng = rand::thread_rng();
 
     e.advance().unwrap();
@@ -152,6 +145,14 @@ fn bench_generate_proof(c: &mut Criterion) {
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
+                let mut proof = Option::<InclusionProof>::None;
+
+                // Many of the statistics tracked by `jemalloc` are cached.
+                // The epoch controls when they are refreshed.
+                // We care about measuring proof generation so we refresh before it's construction
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
+
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
@@ -162,12 +163,6 @@ fn bench_generate_proof(c: &mut Criterion) {
                     (Height::from(h), MaxThreadCount::from(*t), u);
 
                 let ndm_smt = Some(setup::build_ndm_smt(tup.clone())).expect("Tree not found");
-
-                // Many of the statistics tracked by `jemalloc` are cached.
-                // The epoch controls when they are refreshed.
-                // We care about measuring proof generation so we refresh before it's construction
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
 
                 let entity_ids: Vec<&EntityId> = ndm_smt.entity_mapping().keys().collect();
 
@@ -223,7 +218,6 @@ fn bench_verify_proof(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
-
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
@@ -252,11 +246,15 @@ fn bench_verify_proof(c: &mut Criterion) {
 
     let mut rng = rand::thread_rng();
 
-    e.advance().unwrap();
-
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
+                // Many of the statistics tracked by `jemalloc` are cached.
+                // The epoch controls when they are refreshed.
+                // We care about measuring proof verification so we refresh before it's construction
+                e.advance().unwrap();
+                let before = alloc.read().unwrap();
+
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
@@ -277,12 +275,6 @@ fn bench_verify_proof(c: &mut Criterion) {
                     entity_ids[i.sample(&mut rng)],
                 ))
                 .expect("Proof not found");
-
-                // Many of the statistics tracked by `jemalloc` are cached.
-                // The epoch controls when they are refreshed.
-                // We care about measuring proof verification so we refresh before it's construction
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
 
                 // proof file size
                 let proof_file_size =
