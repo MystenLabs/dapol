@@ -9,7 +9,7 @@ use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod setup;
-use crate::setup::{Metrics, Variable, NUM_USERS, TREE_HEIGHTS};
+use crate::setup::{NUM_USERS, TREE_HEIGHTS};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -91,14 +91,11 @@ fn bench_build_tree(c: &mut Criterion) {
                     &ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
                 );
-
-                let tree_build = Metrics {
-                    variable: Variable::TreeBuild,
-                    mem_usage: setup::bytes_as_string(diff),
-                    file_size: tree_build_file_size,
-                };
-
-                println!("\n{:?}\n", tree_build);
+                println!(
+                    "\n Metrics {{ variable: \"TreeBuild\", mem_usage: {:?}, file_size: {:?} }} \n",
+                    setup::bytes_as_string(diff),
+                    tree_build_file_size
+                );
             }
         }
     }
@@ -107,9 +104,6 @@ fn bench_build_tree(c: &mut Criterion) {
 }
 
 fn bench_generate_proof(c: &mut Criterion) {
-    let e = epoch::mib().unwrap();
-    let alloc = stats::allocated::mib().unwrap();
-
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
@@ -140,18 +134,10 @@ fn bench_generate_proof(c: &mut Criterion) {
 
     let mut rng = rand::thread_rng();
 
-    e.advance().unwrap();
-
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
                 let mut proof = Option::<InclusionProof>::None;
-
-                // Many of the statistics tracked by `jemalloc` are cached.
-                // The epoch controls when they are refreshed.
-                // We care about measuring proof generation so we refresh before it's construction
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
 
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
@@ -185,12 +171,6 @@ fn bench_generate_proof(c: &mut Criterion) {
                     },
                 );
 
-                e.advance().unwrap();
-                let after = alloc.read().unwrap();
-
-                // mem used is the difference between the 2 measurements
-                let diff = after - before;
-
                 // proof file size
                 let proof_file_size = setup::serialize_proof(
                     proof.as_ref().expect("Proof not found"),
@@ -198,13 +178,10 @@ fn bench_generate_proof(c: &mut Criterion) {
                     PathBuf::from("./target"),
                 );
 
-                let proof_generation = Metrics {
-                    variable: Variable::ProofGeneration,
-                    mem_usage: setup::bytes_as_string(diff),
-                    file_size: proof_file_size.clone(),
-                };
-
-                println!("\n{:?}\n", proof_generation);
+                println!(
+                    "\n Metrics {{ variable: \"ProofGeneration\", file_size: {:?} }} \n",
+                    proof_file_size
+                );
             }
         }
     }
@@ -213,9 +190,6 @@ fn bench_generate_proof(c: &mut Criterion) {
 }
 
 fn bench_verify_proof(c: &mut Criterion) {
-    let e = epoch::mib().unwrap();
-    let alloc = stats::allocated::mib().unwrap();
-
     let mut group = c.benchmark_group("dapol");
     group.sample_size(10);
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
@@ -249,12 +223,6 @@ fn bench_verify_proof(c: &mut Criterion) {
     for h in TREE_HEIGHTS.into_iter() {
         for t in thread_counts.iter() {
             for u in NUM_USERS.into_iter() {
-                // Many of the statistics tracked by `jemalloc` are cached.
-                // The epoch controls when they are refreshed.
-                // We care about measuring proof verification so we refresh before it's construction
-                e.advance().unwrap();
-                let before = alloc.read().unwrap();
-
                 let max_users_for_height = 2_u64.pow((h - 1) as u32);
 
                 if u > max_users_for_height {
@@ -295,19 +263,10 @@ fn bench_verify_proof(c: &mut Criterion) {
                     },
                 );
 
-                e.advance().unwrap();
-                let after = alloc.read().unwrap();
-
-                // mem used is the difference between the 2 measurements
-                let diff = after - before;
-
-                let proof_verification = Metrics {
-                    variable: Variable::ProofVerification,
-                    mem_usage: setup::bytes_as_string(diff),
-                    file_size: proof_file_size,
-                };
-
-                println!("\n{:?}\n", proof_verification);
+                println!(
+                    "\n Metrics {{ variable: \"ProofVerification\", file_size: {:?} }} \n",
+                    proof_file_size
+                );
             }
         }
     }
@@ -349,8 +308,8 @@ fn bench_test_jemalloc_readings() {
 
 criterion_group!(
     benches,
-    bench_build_tree,
-    bench_generate_proof,
+    // bench_build_tree,
+    // bench_generate_proof,
     bench_verify_proof
 );
 

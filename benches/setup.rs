@@ -47,23 +47,6 @@ pub const NUM_USERS: [u64; 35] = [
     250_000_000,
 ];
 
-// STRUCTS + ENUMS
-// ================================================================================================
-
-#[derive(Debug)]
-pub enum Variable {
-    TreeBuild,
-    ProofGeneration,
-    ProofVerification,
-}
-
-#[derive(Debug)]
-pub struct Metrics {
-    pub variable: Variable,
-    pub mem_usage: String,
-    pub file_size: String,
-}
-
 // HELPER FUNCTIONS
 // ================================================================================================
 
