@@ -105,10 +105,8 @@ fn bench_build_tree(c: &mut Criterion) {
 
 fn bench_generate_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("dapol");
-    group.sample_size(10);
-    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
-    // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
-    group.sampling_mode(SamplingMode::Flat);
+    group.sample_size(20);
+    group.sampling_mode(SamplingMode::Auto);
 
     dapol::initialize_machine_parallelism();
 
@@ -191,10 +189,8 @@ fn bench_generate_proof(c: &mut Criterion) {
 
 fn bench_verify_proof(c: &mut Criterion) {
     let mut group = c.benchmark_group("dapol");
-    group.sample_size(10);
-    // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
-    // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
-    group.sampling_mode(SamplingMode::Flat);
+    group.sample_size(20);
+    group.sampling_mode(SamplingMode::Auto);
 
     dapol::initialize_machine_parallelism();
 
@@ -296,10 +292,7 @@ fn bench_test_jemalloc_readings() {
         setup::bytes_as_string(buf.capacity())
     );
 
-    println!(
-        "Memory usage: {} allocated",
-        setup::bytes_as_string(diff),
-    );
+    println!("Memory usage: {} allocated", setup::bytes_as_string(diff),);
 }
 
 // ================================================================================================
@@ -311,4 +304,4 @@ criterion_group!(
     bench_verify_proof
 );
 
-criterion_main!(/* benches, */ bench_test_jemalloc_readings);
+criterion_main!(benches, bench_test_jemalloc_readings);
