@@ -308,8 +308,8 @@ fn bench_test_jemalloc_readings() {
 
 criterion_group!(
     benches,
-    // bench_build_tree,
-    // bench_generate_proof,
+    bench_build_tree,
+    bench_generate_proof,
     bench_verify_proof
 );
 
