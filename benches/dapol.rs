@@ -92,7 +92,7 @@ fn bench_build_tree(c: &mut Criterion) {
                     PathBuf::from("./target"),
                 );
                 println!(
-                    "\n Metrics {{ variable: \"TreeBuild\", mem_usage: {:?}, file_size: {:?} }} \n",
+                    "\n Metrics {{ variable: \"TreeBuild\", mem_usage: {}, file_size: {} }} \n",
                     setup::bytes_as_string(diff),
                     tree_build_file_size
                 );
@@ -179,7 +179,7 @@ fn bench_generate_proof(c: &mut Criterion) {
                 );
 
                 println!(
-                    "\n Metrics {{ variable: \"ProofGeneration\", file_size: {:?} }} \n",
+                    "\n Metrics {{ variable: \"ProofGeneration\", file_size: {} }} \n",
                     proof_file_size
                 );
             }
@@ -264,7 +264,7 @@ fn bench_verify_proof(c: &mut Criterion) {
                 );
 
                 println!(
-                    "\n Metrics {{ variable: \"ProofVerification\", file_size: {:?} }} \n",
+                    "\n Metrics {{ variable: \"ProofVerification\", file_size: {} }} \n",
                     proof_file_size
                 );
             }
@@ -279,28 +279,26 @@ fn bench_verify_proof(c: &mut Criterion) {
 fn bench_test_jemalloc_readings() {
     let e = epoch::mib().unwrap();
     let alloc = stats::allocated::mib().unwrap();
-    let act = stats::active::mib().unwrap();
-    let res = stats::resident::mib().unwrap();
+
+    e.advance().unwrap();
+    let before = alloc.read().unwrap();
 
     // 1 MB
     let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
 
     e.advance().unwrap();
+    let after = alloc.read().unwrap();
+
+    let diff = after - before;
 
     println!(
         "buf capacity: {:<6}",
         setup::bytes_as_string(buf.capacity())
     );
 
-    let alloc = alloc.read().unwrap();
-    let act = act.read().unwrap();
-    let res = res.read().unwrap();
-
     println!(
-        "Memory usage: {} allocated / {} active / {} resident",
-        setup::bytes_as_string(alloc),
-        setup::bytes_as_string(act),
-        setup::bytes_as_string(res)
+        "Memory usage: {} allocated",
+        setup::bytes_as_string(diff),
     );
 }
 
@@ -313,4 +311,4 @@ criterion_group!(
     bench_verify_proof
 );
 
-criterion_main!(benches, bench_test_jemalloc_readings);
+criterion_main!(/* benches, */ bench_test_jemalloc_readings);
