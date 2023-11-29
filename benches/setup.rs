@@ -159,7 +159,6 @@ pub fn bytes_as_string(num_bytes: usize) -> String {
 //     );
 // }
 
-
 // EXAMPLE 2
 
 // This Python code to Rust:
@@ -338,6 +337,38 @@ pub fn bytes_as_string(num_bytes: usize) -> String {
 //     chart
 //         .draw_series(SurfaceSeries::new(plane_points, 100, &WHITE.mix(0.5)))
 //         .unwrap();
+// }
+
+// EXAMPLE 4
+
+// This Python code to Rust
+// https://math.stackexchange.com/a/99317
+
+// use nalgebra::{Matrix3, Vector3, U2};
+
+// fn main() {
+//     // Generate some random test points
+//     let m = 20; // number of points
+//     let delta = 0.01; // size of random displacement
+//     let origin = Vector3::new(rand::random(), rand::random(), rand::random()); // random origin for the plane
+//     let basis = Matrix3::from_fn(|_, _| rand::random()); // random basis vectors for the plane
+//     let coefficients = Matrix3::from_fn(|_, _| rand::random()); // random coefficients for points on the plane
+
+//     // Generate random points on the plane and add random displacement
+//     let points = basis * coefficients + origin.broadcast(m);
+
+//     // Now find the best-fitting plane for the test points
+
+//     // Subtract out the centroid and take the SVD
+//     let centroid = points.column_mean();
+//     let centered_points = points - centroid.broadcast(m);
+//     let svd = centered_points.svd(true, true);
+
+//     // Extract the left singular vectors
+//     let left = svd.u.unwrap();
+
+//     // Print the left singular vectors
+//     println!("Left singular vectors:\n{}", left);
 // }
 
 // DEPENDENCIES (for exx. 2 and 3)
