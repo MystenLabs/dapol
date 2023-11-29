@@ -8,6 +8,7 @@ use rand::distributions::{Distribution, Uniform};
 use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
+mod heuristic_func_examples;
 mod setup;
 use crate::setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -91,6 +92,7 @@ fn bench_build_tree(c: &mut Criterion) {
                     &ndm_smt.as_ref().expect("Tree not found"),
                     PathBuf::from("./target"),
                 );
+
                 println!(
                     "\n Metrics {{ variable: \"TreeBuild\", mem_usage: {}, file_size: {} }} \n",
                     setup::bytes_as_string(diff),
@@ -176,7 +178,7 @@ fn bench_generate_proof(c: &mut Criterion) {
                     PathBuf::from("./target"),
                 );
 
-                println!(
+                let point = println!(
                     "\n Metrics {{ variable: \"ProofGeneration\", file_size: {} }} \n",
                     proof_file_size
                 );
@@ -295,7 +297,7 @@ fn bench_test_jemalloc_readings() {
     println!("Memory usage: {} allocated", setup::bytes_as_string(diff),);
 }
 
-// ================================================================================================
+// ================================================================================================÷
 
 criterion_group!(
     benches,
