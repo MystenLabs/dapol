@@ -8,7 +8,7 @@ use rand::distributions::{Distribution, Uniform};
 use dapol::accumulators::NdmSmt;
 use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
-mod heuristic_func_examples;
+mod heuristic_func;
 mod setup;
 use crate::setup::{NUM_USERS, TREE_HEIGHTS};
 
@@ -20,7 +20,7 @@ fn bench_build_tree(c: &mut Criterion) {
     let alloc = stats::allocated::mib().unwrap();
 
     let mut group = c.benchmark_group("dapol");
-    group.sample_size(10);
+    group.sample_size(20);
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
@@ -297,6 +297,10 @@ fn bench_test_jemalloc_readings() {
     println!("Memory usage: {} allocated", setup::bytes_as_string(diff),);
 }
 
+fn plot_plane() {
+    heuristic_func::plot();
+}
+
 // ================================================================================================÷
 
 criterion_group!(
@@ -306,4 +310,4 @@ criterion_group!(
     bench_verify_proof
 );
 
-criterion_main!(benches, bench_test_jemalloc_readings);
+criterion_main!(/* benches, bench_test_jemalloc_readings, */ plot_plane);
