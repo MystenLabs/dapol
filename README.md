@@ -43,7 +43,7 @@ The library has not been released as a crate yet (as of Nov 2023) but the API ha
 - generate inclusion proofs from a list of entity IDs (tree required)
 - verify an inclusion proof using a root hash (no tree required)
 
-See the [examples](https://github.com/silversixpence-crypto/dapol/examples) directory for details on how to use the API.
+See the [examples](https://github.com/silversixpence-crypto/dapol/examples) directory or [docs](https://docs.rs/dapol/latest/dapol/#rust-api) for details on how to use the API.
 
 ### CLI
 
