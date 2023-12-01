@@ -20,10 +20,10 @@ const HASH_SIZE_BYTES: usize = 32;
 
 type Data = HashMap<Variable, Metrics>;
 
-#[derive(Clone, Hash, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Deserialize)]
 struct Variable(String);
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct Metrics {
     compute_time: f64,
     mem_usage: f64,
@@ -60,7 +60,7 @@ impl TryFrom<&Record> for Metrics {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct Record {
     _variable: Variable,
     compute_time: Option<f64>,
@@ -82,19 +82,13 @@ pub fn estimate_memory_usage(height: u8, num_users: u64) -> usize {
 
 pub fn plot() -> Result<(), Box<dyn Error>> {
     // Define points
-    // let points = vec![
-    //     na::Point3::new(0.0, 0.0, 0.0),
-    //     na::Point3::new(1.0, 3.0, 5.0),
-    //     na::Point3::new(-5.0, 6.0, 3.0),
-    //     na::Point3::new(3.0, 6.0, 7.0),
-    //     na::Point3::new(-2.0, 6.0, 7.0),
-    // ];
-
     let data: Data = get_data(PathBuf::from("benches/bench_data.csv"))?;
+    
     let mut points: Vec<na::Point3<f64>> = Vec::new();
 
     data.values().for_each(|m| {
         points.push(na::Point3::new(m.compute_time, m.mem_usage, m.file_size));
+        // println!("{:#?}", m);
     });
 
     // Calculate best-fit plane
@@ -158,27 +152,28 @@ fn plot_3d(
 
 // helper method
 fn get_data(path: PathBuf) -> Result<Data, Box<dyn Error>> {
-    let file: File = OpenOptions::new().read(true).open(path)?; // open summaries
+    let file: File = OpenOptions::new().read(true).open(&path)?; // open summaries
+
+    println!("path: {:?}", &path);
+    println!("file len: {:?}", file.metadata()?.len());
 
     let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
-        .trim(csv::Trim::All)
+        // .trim(csv::Trim::All)
         .from_reader(file);
+
+    // rdr.byte_records().for_each(|r| println!("{:?}", r));
 
     let mut data: Data = HashMap::new();
 
-    let headers = ByteRecord::from(vec![
-        "tree_height/max_threads/num_users",
-        "compute_time (s)",
-        "mem_usage (MB)",
-        "file_size (MB)",
-    ]);
-
     for result in rdr.byte_records() {
         let byte_record: ByteRecord = result?;
-        let record: Record = byte_record.deserialize(Some(&headers))?;
+        let record: Record = byte_record.deserialize(None)?;
+        // println!("{:?}", record);
 
         let variable: Variable = record.clone()._variable;
         let metrics: Metrics = Metrics::try_from(&record)?;
+
+        // println!("{:?}, {:?}", variable, metrics);
 
         data.insert(variable, metrics);
     }

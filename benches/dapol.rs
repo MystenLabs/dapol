@@ -12,7 +12,7 @@ use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 mod heuristic_func;
 mod setup;
 
-use crate::setup::{NUM_USERS, TREE_HEIGHTS};
+pub use crate::setup::{NUM_USERS, TREE_HEIGHTS};
 
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -78,7 +78,7 @@ fn bench_build_tree(c: &mut Criterion) {
                     &tup,
                     |bench, tup| {
                         bench.iter(|| {
-                            ndm_smt = Some(setup::build_ndm_smt(tup.clone()));
+                            ndm_smt = Some(crate::setup::build_ndm_smt(tup.clone()));
                         });
                     },
                 );
@@ -178,11 +178,6 @@ fn bench_generate_proof(c: &mut Criterion) {
                     proof.as_ref().expect("Proof not found"),
                     &entity_ids[0],
                     PathBuf::from("./target"),
-                );
-
-                let point = println!(
-                    "\n Metrics {{ variable: \"ProofGeneration\", file_size: {} }} \n",
-                    proof_file_size
                 );
             }
         }
