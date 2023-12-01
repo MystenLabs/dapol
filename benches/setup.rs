@@ -1,4 +1,4 @@
-use std::fs;
+use std::fs::{self};
 use std::path::PathBuf;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};

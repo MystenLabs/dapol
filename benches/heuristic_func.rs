@@ -1,6 +1,13 @@
 extern crate nalgebra as na;
 
+use std::collections::HashMap;
+use std::error::Error;
+use std::fs::{File, OpenOptions};
 use std::mem;
+use std::path::PathBuf;
+
+use csv::ByteRecord;
+use serde::Deserialize;
 
 use gnuplot::{
     Figure,
@@ -10,6 +17,56 @@ use na::{ArrayStorage, Const, Matrix};
 
 // Assuming each hash value is 32 bytes (adjust based on your use case)
 const HASH_SIZE_BYTES: usize = 32;
+
+type Data = HashMap<Variable, Metrics>;
+
+#[derive(Clone, Hash, Eq, PartialEq, Deserialize)]
+struct Variable(String);
+
+#[derive(Deserialize)]
+struct Metrics {
+    compute_time: f64,
+    mem_usage: f64,
+    file_size: f64,
+}
+
+impl TryFrom<&Record> for Metrics {
+    type Error = &'static str;
+
+    fn try_from(value: &Record) -> Result<Self, Self::Error> {
+        let compute_time = if let Some(c) = value.compute_time {
+            c
+        } else {
+            return Err("missing compute_time");
+        };
+
+        let mem_usage = if let Some(m) = value.mem_usage {
+            m
+        } else {
+            return Err("missing mem_usage");
+        };
+
+        let file_size = if let Some(f) = value.file_size {
+            f
+        } else {
+            return Err("missing file_size");
+        };
+
+        Ok(Self {
+            compute_time,
+            mem_usage,
+            file_size,
+        })
+    }
+}
+
+#[derive(Clone, Deserialize)]
+struct Record {
+    _variable: Variable,
+    compute_time: Option<f64>,
+    mem_usage: Option<f64>,
+    file_size: Option<f64>,
+}
 
 // Heuristic function to estimate memory usage for a Merkle Tree
 pub fn estimate_memory_usage(height: u8, num_users: u64) -> usize {
@@ -23,22 +80,30 @@ pub fn estimate_memory_usage(height: u8, num_users: u64) -> usize {
     memory_usage_bytes
 }
 
-pub fn plot() {
-    // TODO: replace with actual data (already collected)
+pub fn plot() -> Result<(), Box<dyn Error>> {
     // Define points
-    let points = vec![
-        na::Point3::new(0.0, 0.0, 0.0),
-        na::Point3::new(1.0, 3.0, 5.0),
-        na::Point3::new(-5.0, 6.0, 3.0),
-        na::Point3::new(3.0, 6.0, 7.0),
-        na::Point3::new(-2.0, 6.0, 7.0),
-    ];
+    // let points = vec![
+    //     na::Point3::new(0.0, 0.0, 0.0),
+    //     na::Point3::new(1.0, 3.0, 5.0),
+    //     na::Point3::new(-5.0, 6.0, 3.0),
+    //     na::Point3::new(3.0, 6.0, 7.0),
+    //     na::Point3::new(-2.0, 6.0, 7.0),
+    // ];
+
+    let data: Data = get_data(PathBuf::from("benches/bench_data.csv"))?;
+    let mut points: Vec<na::Point3<f64>> = Vec::new();
+
+    data.values().for_each(|m| {
+        points.push(na::Point3::new(m.compute_time, m.mem_usage, m.file_size));
+    });
 
     // Calculate best-fit plane
     let plane = fit_plane(&points);
 
     // Plot points and plane
     plot_3d(&points, plane);
+
+    Ok(())
 }
 
 fn fit_plane(
@@ -89,4 +154,34 @@ fn plot_3d(
     fg.show().unwrap();
 
     // fg.save_to_png("benches/3d_plot.png", 640, 480)
+}
+
+// helper method
+fn get_data(path: PathBuf) -> Result<Data, Box<dyn Error>> {
+    let file: File = OpenOptions::new().read(true).open(path)?; // open summaries
+
+    let mut rdr: csv::Reader<File> = csv::ReaderBuilder::new()
+        .trim(csv::Trim::All)
+        .from_reader(file);
+
+    let mut data: Data = HashMap::new();
+
+    let headers = ByteRecord::from(vec![
+        "tree_height/max_threads/num_users",
+        "compute_time (s)",
+        "mem_usage (MB)",
+        "file_size (MB)",
+    ]);
+
+    for result in rdr.byte_records() {
+        let byte_record: ByteRecord = result?;
+        let record: Record = byte_record.deserialize(Some(&headers))?;
+
+        let variable: Variable = record.clone()._variable;
+        let metrics: Metrics = Metrics::try_from(&record)?;
+
+        data.insert(variable, metrics);
+    }
+
+    Ok(data)
 }

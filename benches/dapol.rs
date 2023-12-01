@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::path::PathBuf;
 
 use criterion::{criterion_group, criterion_main};
@@ -10,6 +11,7 @@ use dapol::{EntityId, Height, InclusionProof, MaxThreadCount};
 
 mod heuristic_func;
 mod setup;
+
 use crate::setup::{NUM_USERS, TREE_HEIGHTS};
 
 #[global_allocator]
@@ -297,8 +299,9 @@ fn bench_test_jemalloc_readings() {
     println!("Memory usage: {} allocated", setup::bytes_as_string(diff),);
 }
 
-fn plot_plane() {
-    heuristic_func::plot();
+fn plot_plane() -> Result<(), Box<dyn Error>> {
+    heuristic_func::plot()?;
+    Ok(())
 }
 
 // ================================================================================================÷
