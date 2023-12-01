@@ -134,18 +134,12 @@ fn plot_3d(
     let z = points.iter().map(|p| p.z).collect::<Vec<f64>>();
 
     // Plot points
-    fg.axes3d()
-        .set_x_axis(true, &[PlotOption::Color("black")])
-        .set_y_axis(true, &[PlotOption::Color("black")])
-        .set_z_axis(true, &[PlotOption::Color("black")])
-        .lines_points(x, y, z.clone(), &[PlotOption::Color("black"), PlotOption::PointSize(2.0)])
-        .surface(
-            plane.into_iter(),
-            points.len(),
-            points.len(),
-            None,
-            &[PlotOption::Color("blue"), PlotOption::Caption("Plane")],
-        );
+    fg.axes3d().points(
+        x,
+        y,
+        z,
+        &[PlotOption::Color("black"), PlotOption::PointSize(2.0)],
+    );
 
     // Show the plot
     fg.show().unwrap();
