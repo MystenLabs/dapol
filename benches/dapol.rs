@@ -360,8 +360,8 @@ fn estimate_memory_usage(height: u8, num_users: u64) -> usize {
     memory_usage_bytes
 }
 
-pub fn plot_heuristic_function() {
-    let mut values: Vec<usize> = Vec::with_capacity(3 * 35);
+fn plot_heuristic_function() {
+    let mut values: Vec<usize> = Vec::with_capacity(TREE_HEIGHTS.len() * NUM_USERS.len());
 
     for h in TREE_HEIGHTS.into_iter() {
         for u in NUM_USERS.into_iter() {
