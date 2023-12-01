@@ -83,7 +83,7 @@ pub fn estimate_memory_usage(height: u8, num_users: u64) -> usize {
 pub fn plot() -> Result<(), Box<dyn Error>> {
     // Define points
     let data: Data = get_data(PathBuf::from("benches/bench_data.csv"))?;
-    
+
     let mut points: Vec<na::Point3<f64>> = Vec::new();
 
     data.values().for_each(|m| {
@@ -134,15 +134,18 @@ fn plot_3d(
     let z = points.iter().map(|p| p.z).collect::<Vec<f64>>();
 
     // Plot points
-    fg.axes3d().points(x, y, z, &[PlotOption::Color("black")]);
-
-    fg.axes3d().surface(
-        &plane,
-        points.len(),
-        3,
-        None,
-        &[PlotOption::Color("blue"), PlotOption::Caption("Plane")],
-    );
+    fg.axes3d()
+        .set_x_axis(true, &[PlotOption::Color("black")])
+        .set_y_axis(true, &[PlotOption::Color("black")])
+        .set_z_axis(true, &[PlotOption::Color("black")])
+        .lines_points(x, y, z.clone(), &[PlotOption::Color("black"), PlotOption::PointSize(2.0)])
+        .surface(
+            plane.into_iter(),
+            points.len(),
+            points.len(),
+            None,
+            &[PlotOption::Color("blue"), PlotOption::Caption("Plane")],
+        );
 
     // Show the plot
     fg.show().unwrap();
