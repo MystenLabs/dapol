@@ -238,7 +238,7 @@ where
             .into_iter()
             // Sort nodes into pairs (left & right siblings).
             .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
-                let sibling = Sibling::from_node(node);
+                let sibling = Sibling::from(node);
                 match sibling {
                     // If we have found a left sibling then create a new pair.
                     Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {

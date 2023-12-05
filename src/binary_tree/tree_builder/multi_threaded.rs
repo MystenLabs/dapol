@@ -194,7 +194,7 @@ impl<C: Mergeable> MatchedPair<C> {
         C: Send + 'static,
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
-        let sibling = Sibling::from_node(node);
+        let sibling = Sibling::from(node);
         match sibling {
             Sibling::Left(left) => MatchedPair::from(
                 left.new_sibling_padding_node_arc(new_padding_node_content),

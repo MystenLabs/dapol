@@ -366,9 +366,9 @@ struct MatchedPair<C> {
     right: Node<C>,
 }
 
-impl<C> Sibling<C> {
+impl<C> From<Node<C>> for Sibling<C> {
     /// Move a generic node into the left/right sibling type.
-    fn from_node(node: Node<C>) -> Self {
+    fn from(node: Node<C>) -> Self {
         match node.orientation() {
             NodeOrientation::Left => Sibling::Left(node),
             NodeOrientation::Right => Sibling::Right(node),
@@ -573,7 +573,7 @@ mod tests {
     fn sibling_from_node_works() {
         let x_coord = 11;
         let right_node = single_leaf(x_coord).into_node();
-        let sibling = Sibling::from_node(right_node);
+        let sibling = Sibling::from(right_node);
         match sibling {
             Sibling::Left(_) => panic!("Node should be a right sibling"),
             Sibling::Right(_) => {}
@@ -581,7 +581,7 @@ mod tests {
 
         let x_coord = 16;
         let left_node = single_leaf(x_coord).into_node();
-        let sibling = Sibling::from_node(left_node);
+        let sibling = Sibling::from(left_node);
         match sibling {
             Sibling::Right(_) => panic!("Node should be a left sibling"),
             Sibling::Left(_) => {}
