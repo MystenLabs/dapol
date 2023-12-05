@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// Used for generating unique x-coordinate values on the bottom layer of the
 /// tree.
 ///
-/// A struct is needed as apposed to just a function because the algorithm used
+/// A struct is needed as opposed to just a function because the algorithm used
 /// to generate new values requires keeping a memory of previously used values
 /// so that it can generate new ones that are different from previous ones.
 ///

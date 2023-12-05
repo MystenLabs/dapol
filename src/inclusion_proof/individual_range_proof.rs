@@ -97,7 +97,7 @@ impl IndividualRangeProof {
 // -------------------------------------------------------------------------------------------------
 // Unit tests
 //
-// Note that the tests here penetrate into the Bulletproofs library, as apposed
+// Note that the tests here penetrate into the Bulletproofs library, as opposed
 // to mocking that library. This is intentional because we cannot write our own
 // unit tests for that library so we rather use the unit tests here as
 // integration tests.
@@ -223,7 +223,7 @@ mod tests {
     }
 
     #[test]
-    fn verfication_error_when_commitment_not_same_as_secret_used_for_generation() {
+    fn verification_error_when_commitment_not_same_as_secret_used_for_generation() {
         let secret = 7u64; // for generation
         let other_secret = 8u64; // for the commitment, for verification
 
@@ -248,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn verfication_error_when_commitment_not_same_as_blinding_used_for_generation() {
+    fn verification_error_when_commitment_not_same_as_blinding_used_for_generation() {
         let blinding_factor = Scalar::from_bytes_mod_order(*b"33334444555566667777888811112222");
         let other_blinding_factor =
             Scalar::from_bytes_mod_order(*b"44445555666677778888111122223333");

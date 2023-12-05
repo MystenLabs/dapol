@@ -19,7 +19,7 @@ pub const MAX_LENGTH_BYTES: usize = 32;
 /// data such as a nonce or the blinding factor for a Pedersen commitment.
 ///
 /// The main purpose for this struct is to abstract away the [u8; 32] storage
-/// array and offer functions for moving data as apposed to copying.
+/// array and offer functions for moving data as opposed to copying.
 ///
 /// Currently there is no need for the functionality provided by something like
 /// [primitive_types][U256] or [num256][Uint256] but those are options for
