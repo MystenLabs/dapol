@@ -1,5 +1,6 @@
 use log::error;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
 const UNDERLYING_INT_TYPE_STR: &str = "u8";
 type UnderlyingInt = u8;
@@ -39,20 +40,6 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 pub struct Height(UnderlyingInt);
 
 impl Height {
-    /// Create a [Height] object from `int`.
-    ///
-    /// Returns an error if `int` is greater than [MAX_HEIGHT] or less than
-    /// [MIN_HEIGHT].
-    pub fn from_with_err(int: UnderlyingInt) -> Result<Self, HeightError> {
-        if int < MIN_HEIGHT.0 {
-            Err(HeightError::InputTooSmall)
-        } else if int > MAX_HEIGHT.0 {
-            Err(HeightError::InputTooBig)
-        } else {
-            Ok(Height(int))
-        }
-    }
-
     /// Return the height for the given y-coord.
     ///
     /// Why the offset? `y` starts from 0 but height starts from 1.
@@ -87,15 +74,18 @@ impl Height {
 
 /// Create a [Height] object from `int`.
 ///
-/// Panics if `int` is greater than [MAX_HEIGHT] or less than [MIN_HEIGHT].
-impl From<u8> for Height {
-    fn from(int: u8) -> Self {
-        match Self::from_with_err(int) {
-            Ok(h) => h,
-            Err(e) => {
-                error!("Malformed input, error: {:?}", e);
-                panic!("Malformed input, error: {:?}", e);
-            }
+/// Returns an error if `int` is greater than [MAX_HEIGHT] or less than
+/// [MIN_HEIGHT].
+impl TryFrom<u8> for Height {
+    type Error = HeightError;
+
+    fn try_from(int: u8) -> Result<Self, Self::Error> {
+        if int < MIN_HEIGHT.0 {
+            Err(HeightError::InputTooSmall)
+        } else if int > MAX_HEIGHT.0 {
+            Err(HeightError::InputTooBig)
+        } else {
+            Ok(Height(int))
         }
     }
 }
