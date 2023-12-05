@@ -77,5 +77,9 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     }
     tc.push(max_thread_count);
 
+    println!("\n====================================================== \
+              max_thread_counts {:?} \
+              \n======================================================", tc);
+
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()
 }

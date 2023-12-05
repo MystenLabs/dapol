@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use statistical::*;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::Accumulator;
+use dapol::{Accumulator, initialize_machine_parallelism};
 
 mod inputs;
 use inputs::{max_thread_counts, num_entities_less_than_eq, tree_heights};
@@ -50,6 +50,8 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
+
+    initialize_machine_parallelism();
 
     let mut group = c.benchmark_group("build_tree");
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches

@@ -3,6 +3,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder};
+use dapol::initialize_machine_parallelism;
 
 mod inputs;
 use inputs::{max_thread_counts, num_entities_greater_than, tree_heights};
@@ -33,6 +34,8 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 fn main() {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
+
+    initialize_machine_parallelism();
 
     println!("==========================================================\n \
               Manual benchmarks");
