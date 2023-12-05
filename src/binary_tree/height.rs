@@ -77,6 +77,9 @@ impl Height {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// TryFrom for u8.
+
 /// Create a [Height] object from `int`.
 ///
 /// Returns an error if `int` is greater than [MAX_HEIGHT] or less than
