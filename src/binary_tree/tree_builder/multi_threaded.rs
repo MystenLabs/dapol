@@ -196,14 +196,14 @@ impl<C: Mergeable> MatchedPair<C> {
     {
         let sibling = Sibling::from(node);
         match sibling {
-            Sibling::Left(left) => MatchedPair::from(
+            Sibling::Left(left) => MatchedPair::from((
                 left.new_sibling_padding_node_arc(new_padding_node_content),
                 left,
-            ),
-            Sibling::Right(right) => MatchedPair::from(
+            )),
+            Sibling::Right(right) => MatchedPair::from((
                 right.new_sibling_padding_node_arc(new_padding_node_content),
                 right,
-            ),
+            )),
         }
     }
 }
@@ -419,7 +419,7 @@ where
             map.insert(left.coord.clone(), left.clone());
             map.insert(right.coord.clone(), right.clone());
 
-            MatchedPair::from(left, right)
+            MatchedPair::from((left, right))
         } else {
             let node = leaves.pop().unwrap();
 
@@ -475,7 +475,7 @@ where
                     .join()
                     .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
-                MatchedPair::from(left, right)
+                MatchedPair::from((left, right))
             } else {
                 let right = build_node(
                     params.clone().into_right_child(),
@@ -491,7 +491,7 @@ where
                     Arc::clone(&map),
                 );
 
-                MatchedPair::from(left, right)
+                MatchedPair::from((left, right))
             }
         }
         NumNodes::Full => {
@@ -503,7 +503,7 @@ where
                 Arc::clone(&map),
             );
             let right = left.new_sibling_padding_node_arc(new_padding_node_content);
-            MatchedPair::from(left, right)
+            MatchedPair::from((left, right))
         }
         NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
@@ -514,7 +514,7 @@ where
                 Arc::clone(&map),
             );
             let left = right.new_sibling_padding_node_arc(new_padding_node_content);
-            MatchedPair::from(left, right)
+            MatchedPair::from((left, right))
         }
     };
 

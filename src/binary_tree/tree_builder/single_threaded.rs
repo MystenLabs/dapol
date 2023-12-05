@@ -126,15 +126,15 @@ impl<C> MaybeUnmatchedPair<C> {
         F: Fn(&Coordinate) -> C,
     {
         match (self.left, self.right) {
-            (Some(left), Some(right)) => MatchedPair::from(left, right),
-            (Some(left), None) => MatchedPair::from(
+            (Some(left), Some(right)) => MatchedPair::from((left, right)),
+            (Some(left), None) => MatchedPair::from((
                 left.new_sibling_padding_node(new_padding_node_content),
                 left,
-            ),
-            (None, Some(right)) => MatchedPair::from(
+            )),
+            (None, Some(right)) => MatchedPair::from((
                 right.new_sibling_padding_node(new_padding_node_content),
                 right,
-            ),
+            )),
             (None, None) => {
                 panic!("{} Invalid pair (None, None) found", BUG)
             }

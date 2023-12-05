@@ -386,29 +386,29 @@ impl<C: Mergeable> MatchedPair<C> {
     }
 }
 
-impl<C> MatchedPair<C> {
+impl<C> From<(Node<C>, Node<C>)> for MatchedPair<C> {
     /// Construct a [MatchedPair] using the 2 given nodes.
     ///
     /// Only build the pair if the 2 nodes are siblings, otherwise panic.
     /// Since this code is only used internally for tree construction, and this
     /// state is unrecoverable, panicking is the best option. It is a sanity
     /// check and should never actually happen unless code is changed.
-    fn from(sibling_a: Node<C>, sibling_b: Node<C>) -> Self {
-        if sibling_b.is_right_sibling_of(&sibling_a) {
+    fn from(siblings: (Node<C>, Node<C>)) -> Self {
+        if siblings.1.is_right_sibling_of(&siblings.0) {
             MatchedPair {
-                left: sibling_a,
-                right: sibling_b,
+                left: siblings.0,
+                right: siblings.1,
             }
-        } else if sibling_b.is_left_sibling_of(&sibling_a) {
+        } else if siblings.1.is_left_sibling_of(&siblings.0) {
             MatchedPair {
-                left: sibling_b,
-                right: sibling_a,
+                left: siblings.1,
+                right: siblings.0,
             }
         } else {
             panic!(
                 "A pair cannot be made from 2 nodes that are not siblings {:?} {:?}",
-                sibling_a.coord.clone(),
-                sibling_b.coord.clone(),
+                siblings.0.coord.clone(),
+                siblings.1.coord.clone(),
             )
         }
     }
@@ -597,7 +597,7 @@ mod tests {
         let x_coord = 16;
         let left = single_leaf(x_coord).into_node();
 
-        let pair = MatchedPair::from(left, right);
+        let pair = MatchedPair::from((left, right));
         let parent = pair.merge();
 
         assert_eq!(
