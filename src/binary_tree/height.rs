@@ -32,8 +32,7 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 /// use std::str::FromStr;
 ///
 /// let height = Height::default();
-/// let height = Height::from_with_err(8u8).unwrap();
-/// let height = Height::from(8u8);
+/// let height = Height::try_from(8u8).unwrap();
 /// let height = Height::from_str("8");
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

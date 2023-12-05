@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = Height::from(5);
+        let height = Height::try_from(5).unwrap();
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
@@ -662,7 +662,7 @@ mod tests {
 
     #[test]
     fn bottom_layer_leaf_nodes_all_present_in_store() {
-        let height = Height::from(5);
+        let height = Height::try_from(5).unwrap();
         let leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()

@@ -348,7 +348,7 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = Height::from(5);
+        let height = Height::try_from(5).unwrap();
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
@@ -359,7 +359,7 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
@@ -436,7 +436,7 @@ mod tests {
 
     #[test]
     fn bottom_layer_leaf_nodes_all_present_in_store() {
-        let height = Height::from(5);
+        let height = Height::try_from(5).unwrap();
         let leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
