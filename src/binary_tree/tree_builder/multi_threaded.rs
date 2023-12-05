@@ -130,7 +130,7 @@ where
 
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashMapStore<C> {
     map: Map<C>,
 }
