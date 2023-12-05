@@ -53,7 +53,7 @@ type Content = FullNodeContent;
 /// mapped to a leaf node, and this assignment is non-deterministic. The map
 /// keeps track of which entity is assigned to which leaf node.
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NdmSmt {
     secrets: NdmSmtSecrets,
     tree: BinaryTree<Content>,

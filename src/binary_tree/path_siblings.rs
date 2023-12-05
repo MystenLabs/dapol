@@ -527,7 +527,7 @@ mod tests {
     fn path_works_for_single_leaf_single_threaded() {
         let height = Height::from(8u8);
 
-        for i in 0..max_bottom_layer_nodes(&height) {
+        for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
 
             let tree_single_threaded = TreeBuilder::new()
@@ -561,7 +561,7 @@ mod tests {
     fn path_works_for_multi_leaf_multi_threaded() {
         let height = Height::from(8u8);
 
-        for x_coord in 0..max_bottom_layer_nodes(&height) {
+        for x_coord in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(x_coord)];
 
             let tree_multi_threaded = TreeBuilder::new()

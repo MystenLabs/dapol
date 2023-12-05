@@ -62,16 +62,14 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 ///     .height(height)
 ///     .secrets_file_path(PathBuf::from("./examples/ndm_smt_secrets_example.toml"))
 ///     .entities_path(PathBuf::from("./examples/entities_example.csv"))
-///     .build()
-///     .unwrap();
+///     .build();
 /// ```
 #[derive(Deserialize, Debug, Builder)]
+#[builder(build_fn(skip))]
 pub struct NdmSmtConfig {
-    #[builder(setter(name = "height_opt"), default)]
-    height: Option<Height>,
-    #[builder(setter(name = "max_thread_count_opt"), default)]
-    max_thread_count: Option<MaxThreadCount>,
-    #[builder(setter(name = "secrets_file_path_opt"))]
+    height: Height,
+    max_thread_count: MaxThreadCount,
+    #[builder(setter(strip_option))]
     secrets_file_path: Option<PathBuf>,
     #[builder(private)]
     entities: EntityConfig,
@@ -80,7 +78,7 @@ pub struct NdmSmtConfig {
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct EntityConfig {
     file_path: Option<PathBuf>,
-    generate_random: Option<u64>,
+    num_random_entities: Option<u64>,
 }
 
 impl NdmSmtConfig {
@@ -91,12 +89,12 @@ impl NdmSmtConfig {
         let secrets = NdmSmtSecretsParser::from_path_opt(self.secrets_file_path)
             .parse_or_generate_random()?;
 
-        let height = self.height.unwrap_or_default();
-        let max_thread_count = self.max_thread_count.unwrap_or_default();
+        let height = self.height;
+        let max_thread_count = self.max_thread_count;
 
         let entities = EntitiesParser::new()
             .with_path_opt(self.entities.file_path)
-            .with_num_entities_opt(self.entities.generate_random)
+            .with_num_entities_opt(self.entities.num_random_entities)
             .parse_file_or_generate_random()?;
 
         let ndm_smt = NdmSmt::new(secrets, height, max_thread_count, entities).log_on_err()?;
@@ -111,16 +109,9 @@ impl NdmSmtConfig {
 }
 
 impl NdmSmtConfigBuilder {
-    pub fn height(&mut self, height: Height) -> &mut Self {
-        self.height_opt(Some(height))
-    }
-
-    pub fn secrets_file_path(&mut self, path: PathBuf) -> &mut Self {
-        self.secrets_file_path_opt(Some(path))
-    }
-
-    pub fn max_thread_count(&mut self, max_thread_count: MaxThreadCount) -> &mut Self {
-        self.max_thread_count_opt(Some(max_thread_count))
+    pub fn secrets_file_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
+        self.secrets_file_path = Some(path);
+        self
     }
 
     pub fn entities_path_opt(&mut self, path: Option<PathBuf>) -> &mut Self {
@@ -128,7 +119,7 @@ impl NdmSmtConfigBuilder {
             None => {
                 self.entities = Some(EntityConfig {
                     file_path: path,
-                    generate_random: None,
+                    num_random_entities: None,
                 })
             }
             Some(entities) => entities.file_path = path,
@@ -140,21 +131,35 @@ impl NdmSmtConfigBuilder {
         self.entities_path_opt(Some(path))
     }
 
-    pub fn num_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
+    pub fn num_random_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
                     file_path: None,
-                    generate_random: num_entites,
+                    num_random_entities: num_entites,
                 })
             }
-            Some(entities) => entities.generate_random = num_entites,
+            Some(entities) => entities.num_random_entities = num_entites,
         }
         self
     }
 
-    pub fn num_entities(&mut self, num_entites: u64) -> &mut Self {
-        self.num_entities_opt(Some(num_entites))
+    pub fn num_random_entities(&mut self, num_entites: u64) -> &mut Self {
+        self.num_random_entities_opt(Some(num_entites))
+    }
+
+    pub fn build(&self) -> NdmSmtConfig {
+        let entities = EntityConfig {
+            file_path: self.entities.clone().and_then(|e| e.file_path).or(None),
+            num_random_entities: self.entities.clone().and_then(|e| e.num_random_entities).or(None),
+        };
+
+        NdmSmtConfig {
+            height: self.height.clone().unwrap_or_default(),
+            max_thread_count: self.max_thread_count.clone().unwrap_or_default(),
+            secrets_file_path: self.secrets_file_path.clone().unwrap_or(None),
+            entities,
+        }
     }
 }
 
@@ -174,6 +179,8 @@ pub enum NdmSmtConfigParserError {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::test_utils::assert_err;
+
     use super::*;
     use std::fs::File;
     use std::io::{BufRead, BufReader};
@@ -198,7 +205,6 @@ mod tests {
             .secrets_file_path(secrets_file_path)
             .entities_path(entities_file_path)
             .build()
-            .unwrap()
             .parse()
             .unwrap();
 
@@ -218,9 +224,8 @@ mod tests {
         let ndm_smt = NdmSmtConfigBuilder::default()
             .height(height.clone())
             .secrets_file_path(secrets_file)
-            .num_entities(num_random_entities)
+            .num_random_entities(num_random_entities)
             .build()
-            .unwrap()
             .parse()
             .unwrap();
 
@@ -238,13 +243,58 @@ mod tests {
 
         let ndm_smt = NdmSmtConfigBuilder::default()
             .secrets_file_path(secrets_file)
-            .num_entities(num_random_entities)
+            .num_random_entities(num_random_entities)
             .build()
-            .unwrap()
             .parse()
             .unwrap();
 
         assert_eq!(ndm_smt.entity_mapping.len(), num_random_entities as usize);
         assert_eq!(ndm_smt.height(), &Height::default());
+    }
+
+    #[test]
+    fn builder_without_any_values_fails() {
+        use crate::entity::EntitiesParserError;
+        let res = NdmSmtConfigBuilder::default().build().parse();
+        assert_err!(res, Err(NdmSmtConfigParserError::EntitiesError(EntitiesParserError::NumEntitiesNotSet)));
+    }
+
+    #[test]
+    fn builder_with_all_values() {
+        let height = Height::from(8);
+        let num_random_entities = 10;
+
+        let src_dir = env!("CARGO_MANIFEST_DIR");
+        let resources_dir = Path::new(&src_dir).join("examples");
+        let secrets_file_path = resources_dir.join("ndm_smt_secrets_example.toml");
+        let entities_file_path = resources_dir.join("entities_example.csv");
+
+        let entities_file = File::open(entities_file_path.clone()).unwrap();
+        // "-1" because we don't include the top line of the csv which defines
+        // the column headings.
+        let num_entities = BufReader::new(entities_file).lines().count() - 1;
+
+        let ndm_smt = NdmSmtConfigBuilder::default()
+            .height(height.clone())
+            .secrets_file_path(secrets_file_path)
+            .entities_path(entities_file_path)
+            .num_random_entities(num_random_entities)
+            .build()
+            .parse()
+            .unwrap();
+
+        assert_eq!(ndm_smt.entity_mapping.len(), num_entities);
+        assert_eq!(ndm_smt.height(), &height);
+    }
+
+    #[test]
+    fn builder_without_secrets_file_path() {
+        let num_random_entities = 10;
+
+        let _ndm_smt = NdmSmtConfigBuilder::default()
+            .num_random_entities(num_random_entities)
+            .build()
+            .parse()
+            .unwrap();
     }
 }
