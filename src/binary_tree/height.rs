@@ -53,19 +53,6 @@ impl Height {
         }
     }
 
-    /// Create a [Height] object from `int`.
-    ///
-    /// Panics if `int` is greater than [MAX_HEIGHT] or less than [MIN_HEIGHT].
-    pub fn from(int: UnderlyingInt) -> Self {
-        match Self::from_with_err(int) {
-            Ok(h) => h,
-            Err(e) => {
-                error!("Malformed input, error: {:?}", e);
-                panic!("Malformed input, error: {:?}", e);
-            }
-        }
-    }
-
     /// Return the height for the given y-coord.
     ///
     /// Why the offset? `y` starts from 0 but height starts from 1.
@@ -95,6 +82,21 @@ impl Height {
     /// Return the underlying integer value as type u32.
     pub fn as_u32(&self) -> u32 {
         self.0 as u32
+    }
+}
+
+/// Create a [Height] object from `int`.
+///
+/// Panics if `int` is greater than [MAX_HEIGHT] or less than [MIN_HEIGHT].
+impl From<u8> for Height {
+    fn from(int: u8) -> Self {
+        match Self::from_with_err(int) {
+            Ok(h) => h,
+            Err(e) => {
+                error!("Malformed input, error: {:?}", e);
+                panic!("Malformed input, error: {:?}", e);
+            }
+        }
     }
 }
 
