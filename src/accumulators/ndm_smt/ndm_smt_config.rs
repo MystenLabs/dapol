@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn builder_with_entities_file() {
-        let height = Height::from(8);
+        let height = Height::try_from(8).unwrap();
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
@@ -208,7 +208,7 @@ mod tests {
 
     #[test]
     fn builder_with_random_entities() {
-        let height = Height::from(8);
+        let height = Height::try_from(8).unwrap();
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");

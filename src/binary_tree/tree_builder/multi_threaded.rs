@@ -551,7 +551,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
@@ -563,7 +563,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let res = TreeBuilder::new()
             .with_height(height)
             .build_using_multi_threaded_algorithm(get_padding_function());
@@ -585,7 +585,7 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn err_for_duplicate_leaves() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
@@ -621,7 +621,7 @@ mod tests {
 
     #[test]
     fn err_when_x_coord_greater_than_max() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let leaf_node = single_leaf(max_bottom_layer_nodes(&height) + 1);
 
         let res = TreeBuilder::new()
@@ -639,7 +639,7 @@ mod tests {
         use rand::seq::SliceRandom;
         use rand::thread_rng;
 
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let mut leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
@@ -683,7 +683,7 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
-        let height = Height::from(8);
+        let height = Height::try_from(8).unwrap();
         let leaf_nodes = full_bottom_layer(&height);
 
         let tree = TreeBuilder::new()
@@ -719,7 +719,7 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
-        let height = Height::from(8);
+        let height = Height::try_from(8).unwrap();
         let leaf_nodes = full_bottom_layer(&height);
         // TODO fuzz on this store depth
         let store_depth = 1;

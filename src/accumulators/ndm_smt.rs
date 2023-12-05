@@ -318,7 +318,7 @@ mod tests {
             salt_s,
         };
 
-        let height = Height::from(4u8);
+        let height = Height::try_from(4u8).unwrap();
         let max_thread_count = MaxThreadCount::default();
         let entities = vec![Entity {
             liability: 5u64,

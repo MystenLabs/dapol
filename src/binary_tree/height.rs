@@ -45,7 +45,13 @@ impl Height {
     /// Why the offset? `y` starts from 0 but height starts from 1.
     /// See [crate][binary_tree][Coordinate] for more details.
     pub fn from_y_coord(y_coord: u8) -> Self {
-        Self::from(y_coord + 1)
+        match Self::try_from(y_coord + 1) {
+            Ok(h) => h,
+            Err(e) => {
+                error!("Malformed input, error: {:?}", e);
+                panic!("Malformed input, error: {:?}", e);
+            }
+        }
     }
 
     /// Return the y-coord for the given height.
@@ -101,7 +107,7 @@ impl FromStr for Height {
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Height::from_with_err(UnderlyingInt::from_str(s)?)
+        Height::try_from(UnderlyingInt::from_str(s)?)
     }
 }
 

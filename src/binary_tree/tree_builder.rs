@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_sparse_leaves() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
 
         let leaf_nodes = sparse_leaves(&height);
 
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_full_tree() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
 
         let leaf_nodes = full_bottom_layer(&height);
 
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn multi_and_single_give_same_root_single_leaf() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
 
         for i in 0..max_bottom_layer_nodes(&height) {
             let leaf_node = vec![single_leaf(i)];
@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new().with_leaf_nodes(leaf_nodes).height();
 
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height.clone())
             .leaf_nodes(&height);
@@ -411,7 +411,7 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = Height::from(5);
+        let height = Height::try_from(5).unwrap();
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height.clone())
             .with_leaf_nodes(Vec::new())
@@ -421,7 +421,7 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves() {
-        let height = Height::from(8u8);
+        let height = Height::try_from(8u8).unwrap();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn err_for_duplicate_leaves() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.last().unwrap().x_coord));
 
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn no_err_if_duplicates_but_not_sorted() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
@@ -463,7 +463,7 @@ mod tests {
 
     #[test]
     fn no_err_if_no_duplicates() {
-        let height = Height::from(4);
+        let height = Height::try_from(4).unwrap();
         let leaf_nodes = sparse_leaves(&height);
         verify_no_duplicate_leaves(&leaf_nodes).unwrap();
     }
