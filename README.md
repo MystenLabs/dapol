@@ -129,6 +129,6 @@ The env vars are optional. The benches are split into 2 parts: Criterion for sma
 
 Some of the values of $n$ cause the benchmarks to take *really* long (multiple hours), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. This is why the benches are split by the $n$ input: smaller $n$ is fine for Criterion, larger $n$ is handled by manual benches that only run once. The env vars control where this split occurs.
 
-You may experience an error building the benches if you are on a fresh Linux machine. If the jemalloc-sys package fails to build then maybe [this](https://github.com/nervosnetwork/ckb/issues/1886) will help.
+You may experience an error building the benches if you are on a fresh Linux machine. If the jemalloc-sys package fails to build then maybe [this](https://github.com/tikv/jemallocator/issues/29) will help.
 
 
