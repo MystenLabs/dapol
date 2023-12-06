@@ -5,7 +5,7 @@
 //! a) an env var `MAX_ENTITIES_FOR_CRITERION_BENCHES` to change how many
 //! benches are run using Criterion,
 //! b) a different framework that is used to benchmark the runs that take really
-//! long.
+//! long (see large_input_benches.rs).
 
 use std::path::Path;
 
@@ -16,7 +16,7 @@ use once_cell::sync::Lazy;
 use statistical::*;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{Accumulator, initialize_machine_parallelism};
+use dapol::{initialize_machine_parallelism, Accumulator};
 
 mod inputs;
 use inputs::{max_thread_counts, num_entities_less_than_eq, tree_heights};
@@ -47,6 +47,7 @@ static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 // -------------------------------------------------------------------------------------------------
 // Benchmarks
 
+/// Loop over height, max thread counts, and number of entities.
 pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
@@ -204,10 +205,40 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 
     for h in tree_heights().iter() {
         for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
-            // TODO continue if the memory heuristic check fails
+            {
+                // We attempt to guess the amount of memory that the tree
+                // build will require, and if that is greater than the
+                // amount of memory available on the machine then we skip
+                // the input tuple.
 
+                let total_mem = system_total_memory_mb();
+                let expected_mem = estimated_total_memory_usage_mb(h, n);
+
+                if total_mem < expected_mem {
+                    println!(
+                        "Skipping input height_{}/num_entities_{} since estimated memory \
+                                  usage {} is greater than the system max {}",
+                        h.as_u32(),
+                        n,
+                        expected_mem,
+                        total_mem
+                    );
+
+                    continue;
+                }
+            }
+
+            // Do not try build the tree if the number of entities exceeds
+            // the maximum number allowed. If this check is not done then
+            // we would get an error on tree build.
             if n > &h.max_bottom_layer_nodes() {
-                println!("Skipping input height_{}/num_entities_{} since number of entities is greater than max allowed", h.as_u32(), n);
+                println!(
+                    "Skipping input height_{}/num_entities_{} since number of entities is \
+                              greater than max allowed",
+                    h.as_u32(),
+                    n
+                );
+
                 continue;
             }
 
@@ -249,10 +280,40 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
 
     for h in tree_heights().iter() {
         for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
-            // TODO continue if the memory heuristic check fails
+            {
+                // We attempt to guess the amount of memory that the tree
+                // build will require, and if that is greater than the
+                // amount of memory available on the machine then we skip
+                // the input tuple.
 
+                let total_mem = system_total_memory_mb();
+                let expected_mem = estimated_total_memory_usage_mb(h, n);
+
+                if total_mem < expected_mem {
+                    println!(
+                        "Skipping input height_{}/num_entities_{} since estimated memory \
+                                  usage {} is greater than the system max {}",
+                        h.as_u32(),
+                        n,
+                        expected_mem,
+                        total_mem
+                    );
+
+                    continue;
+                }
+            }
+
+            // Do not try build the tree if the number of entities exceeds
+            // the maximum number allowed. If this check is not done then
+            // we would get an error on tree build.
             if n > &h.max_bottom_layer_nodes() {
-                println!("Skipping input height_{}/num_entities_{} since number of entities is greater than max allowed", h.as_u32(), n);
+                println!(
+                    "Skipping input height_{}/num_entities_{} since number of entities is \
+                              greater than max allowed",
+                    h.as_u32(),
+                    n
+                );
+
                 continue;
             }
 
@@ -289,41 +350,13 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
 }
 
 // -------------------------------------------------------------------------------------------------
-// TODO move to another file
-
-// pub fn bench_test_jemalloc_readings() {
-//     use jemalloc_ctl::{epoch, stats};
-
-//     let e = epoch::mib().unwrap();
-//     let alloc = stats::allocated::mib().unwrap();
-
-//     e.advance().unwrap();
-//     let before = alloc.read().unwrap();
-
-//     // 1 MB
-//     let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
-
-//     e.advance().unwrap();
-//     let after = alloc.read().unwrap();
-
-//     let diff = after - before;
-
-//     println!(
-//         "buf capacity: {:<6}",
-//         setup::bytes_as_string(buf.capacity())
-//     );
-
-//     println!("Memory usage: {} allocated", setup::bytes_as_string(diff),);
-// }
-
-// -------------------------------------------------------------------------------------------------
 // Macros.
 
 use std::time::Duration;
 
 criterion_group! {
     name = wall_clock_time;
-    config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(60));
+    config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
     targets = bench_build_tree, bench_generate_proof, bench_verify_proof,
 }
 

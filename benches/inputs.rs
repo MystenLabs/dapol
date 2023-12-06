@@ -1,6 +1,6 @@
 //! Input values for benchmarking.
 
-use dapol::{Accumulator, EntityId, Height, InclusionProof, MaxThreadCount};
+use dapol::{Height, MaxThreadCount};
 
 /// We only bench for heights 16, 32 & 64 because smaller than 16 is fairly
 /// useless in practice and greater than 64 is not supported yet.
@@ -78,7 +78,7 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     tc.push(max_thread_count);
 
     println!("\n====================================================== \
-              max_thread_counts {:?} \
+              \nmax_thread_counts {:?} \
               \n======================================================", tc);
 
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()

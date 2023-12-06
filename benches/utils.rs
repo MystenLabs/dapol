@@ -42,3 +42,31 @@ pub fn bytes_as_string(num_bytes: usize) -> String {
         )
     }
 }
+
+// -------------------------------------------------------------------------------------------------
+// Testing jemalloc_ctl to make sure it gives expected memory readings.
+
+pub fn bench_test_jemalloc_readings() {
+    use jemalloc_ctl::{epoch, stats};
+
+    let e = epoch::mib().unwrap();
+    let alloc = stats::allocated::mib().unwrap();
+
+    e.advance().unwrap();
+    let before = alloc.read().unwrap();
+
+    // 1 MB
+    let buf: Vec<u8> = Vec::with_capacity(1024u32.pow(2) as usize);
+
+    e.advance().unwrap();
+    let after = alloc.read().unwrap();
+
+    let diff = after - before;
+
+    println!(
+        "buf capacity: {:<6}",
+        bytes_as_string(buf.capacity())
+    );
+
+    println!("Memory usage: {} allocated", bytes_as_string(diff),);
+}
