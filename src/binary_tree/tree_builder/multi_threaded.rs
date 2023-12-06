@@ -94,7 +94,7 @@ where
     };
 
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
-    let params = RecursionParams::from_tree_height(height.clone())
+    let params = RecursionParams::from(height.clone())
         .with_store_depth(store_depth)
         .with_max_thread_count(max_thread_count.get_value());
 
@@ -240,6 +240,26 @@ pub struct RecursionParams {
 
 /// Private functions for use within this file only.
 impl RecursionParams {
+    /// Convert the params for the node which is the focus of the current
+    /// iteration to params for that node's left child.
+    fn into_left_child(mut self) -> Self {
+        self.x_coord_max = self.x_coord_mid;
+        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
+        self.y_coord -= 1;
+        self
+    }
+
+    /// Convert the params for the node which is the focus of the current
+    /// iteration to params for that node's right child.
+    fn into_right_child(mut self) -> Self {
+        self.x_coord_min = self.x_coord_mid + 1;
+        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
+        self.y_coord -= 1;
+        self
+    }
+}
+
+impl From<Height> for RecursionParams {
     /// Construct the parameters given only the height of the tree.
     ///
     /// - `x_coord_min` points to the start of the bottom layer.
@@ -253,7 +273,7 @@ impl RecursionParams {
     /// - `store_depth` defaults to the min value.
     ///
     /// [parallelism]: std::thread::available_parallelism
-    fn from_tree_height(height: Height) -> Self {
+    fn from(height: Height) -> Self {
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = height.max_bottom_layer_nodes() - 1;
@@ -272,24 +292,6 @@ impl RecursionParams {
             store_depth: MIN_STORE_DEPTH,
             height,
         }
-    }
-
-    /// Convert the params for the node which is the focus of the current
-    /// iteration to params for that node's left child.
-    fn into_left_child(mut self) -> Self {
-        self.x_coord_max = self.x_coord_mid;
-        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y_coord -= 1;
-        self
-    }
-
-    /// Convert the params for the node which is the focus of the current
-    /// iteration to params for that node's right child.
-    fn into_right_child(mut self) -> Self {
-        self.x_coord_min = self.x_coord_mid + 1;
-        self.x_coord_mid = (self.x_coord_min + self.x_coord_max) / 2;
-        self.y_coord -= 1;
-        self
     }
 }
 
