@@ -61,20 +61,6 @@ pub struct RandomXCoordGenerator {
 }
 
 impl RandomXCoordGenerator {
-    /// Constructor.
-    ///
-    /// `height` is used to determine `max_x_coords`: `2^(height-1)`. This means
-    /// that `max_x_coords` is the total number of available leaf nodes on the
-    /// bottom layer of the tree.
-    pub fn from(height: &Height) -> Self {
-        RandomXCoordGenerator {
-            used_x_coords: HashMap::<u64, u64>::new(),
-            max_x_coord: height.max_bottom_layer_nodes(),
-            rng: thread_rng(),
-            i: 0,
-        }
-    }
-
     /// Generate a new unique random x-coord using Durstenfeld’s shuffle
     /// algorithm optimized by HashMap.
     ///
@@ -104,6 +90,22 @@ impl RandomXCoordGenerator {
         self.used_x_coords.insert(random_x, self.i);
         self.i += 1;
         Ok(x)
+    }
+}
+
+impl From<&Height> for RandomXCoordGenerator {
+    /// Convert `&Height` to a `RandomXCoordGenerator`.
+    ///
+    /// `height` is used to determine `max_x_coords`: `2^(height-1)`. This means
+    /// that `max_x_coords` is the total number of available leaf nodes on the
+    /// bottom layer of the tree.
+    fn from(height: &Height) -> Self {
+        Self {
+            used_x_coords: HashMap::<u64, u64>::new(),
+            max_x_coord: height.max_bottom_layer_nodes(),
+            rng: thread_rng(),
+            i: 0,
+        }
     }
 }
 
