@@ -6,7 +6,10 @@ use dapol::{Height, MaxThreadCount};
 /// useless in practice and greater than 64 is not supported yet.
 pub fn tree_heights() -> Vec<Height> {
     let tree_heights: Vec<u8> = Vec::from([16, 32, 64]);
-    tree_heights.into_iter().map(|x| Height::from(x)).collect()
+    tree_heights
+        .into_iter()
+        .map(|x| Height::try_from(x).unwrap())
+        .collect()
 }
 
 /// For <10M entities we increase linearly, bumping the increment amount an
@@ -77,9 +80,12 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     }
     tc.push(max_thread_count);
 
-    println!("\n====================================================== \
+    println!(
+        "\n====================================================== \
               \nmax_thread_counts {:?} \
-              \n======================================================", tc);
+              \n======================================================",
+        tc
+    );
 
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()
 }

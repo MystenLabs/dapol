@@ -131,34 +131,19 @@ impl NdmSmtConfigBuilder {
         self.entities_path_opt(Some(path))
     }
 
-<<<<<<< HEAD
-    pub fn num_entities_opt(&mut self, num_entities: Option<u64>) -> &mut Self {
-=======
     pub fn num_random_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
->>>>>>> main
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
                     file_path: None,
-<<<<<<< HEAD
-                    generate_random: num_entities,
-                })
-            }
-            Some(entities) => entities.generate_random = num_entities,
-=======
                     num_random_entities: num_entites,
                 })
             }
             Some(entities) => entities.num_random_entities = num_entites,
->>>>>>> main
         }
         self
     }
 
-<<<<<<< HEAD
-    pub fn num_entities(&mut self, num_entities: u64) -> &mut Self {
-        self.num_entities_opt(Some(num_entities))
-=======
     pub fn num_random_entities(&mut self, num_entites: u64) -> &mut Self {
         self.num_random_entities_opt(Some(num_entites))
     }
@@ -175,7 +160,6 @@ impl NdmSmtConfigBuilder {
             secrets_file_path: self.secrets_file_path.clone().unwrap_or(None),
             entities,
         }
->>>>>>> main
     }
 }
 
@@ -277,7 +261,7 @@ mod tests {
 
     #[test]
     fn builder_with_all_values() {
-        let height = Height::from(8);
+        let height = Height::try_from(8).unwrap();
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");

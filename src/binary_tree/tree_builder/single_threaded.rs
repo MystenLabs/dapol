@@ -392,13 +392,8 @@ mod tests {
 
     #[test]
     fn err_when_x_coord_greater_than_max() {
-<<<<<<< HEAD
         let height = Height::try_from(4).unwrap();
-        let leaf_node = single_leaf(max_bottom_layer_nodes(&height) + 1);
-=======
-        let height = Height::from(4);
         let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
->>>>>>> main
 
         let res = TreeBuilder::new()
             .with_height(height)
