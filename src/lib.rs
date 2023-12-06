@@ -101,8 +101,7 @@
 //!         .height(height)
 //!         .secrets_file_path(secrets_file)
 //!         .entities_path(entities_file)
-//!         .build()
-//!         .unwrap();
+//!         .build();
 //!
 //!     config.parse().unwrap()
 //! }

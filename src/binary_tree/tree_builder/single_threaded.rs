@@ -22,8 +22,6 @@ use log::warn;
 use logging_timer::stime;
 use serde::{Deserialize, Serialize};
 
-use crate::binary_tree::max_bottom_layer_nodes;
-
 use super::super::{
     BinaryTree, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node, Sibling, Store,
     MIN_RECOMMENDED_SPARSITY,
@@ -69,7 +67,7 @@ where
             .collect::<Vec<Node<C>>>()
     };
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    if height.max_bottom_layer_nodes() / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
     {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
@@ -195,7 +193,7 @@ where
     {
         // Some simple parameter checks.
 
-        let max = max_bottom_layer_nodes(height);
+        let max = height.max_bottom_layer_nodes();
 
         assert!(
             leaf_nodes.len() <= max as usize,
@@ -313,7 +311,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::max_bottom_layer_nodes;
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
         full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
@@ -363,7 +360,7 @@ mod tests {
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: max_bottom_layer_nodes(&height) + 1,
+            x_coord: height.max_bottom_layer_nodes() + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -396,7 +393,7 @@ mod tests {
     #[test]
     fn err_when_x_coord_greater_than_max() {
         let height = Height::from(4);
-        let leaf_node = single_leaf(max_bottom_layer_nodes(&height) + 1);
+        let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
 
         let res = TreeBuilder::new()
             .with_height(height)

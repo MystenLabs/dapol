@@ -58,9 +58,8 @@ fn main() {
                             .entities_path_opt(
                                 entity_source.entities_file.and_then(|arg| arg.into_path()),
                             )
-                            .num_entities_opt(entity_source.random_entities)
+                            .num_random_entities_opt(entity_source.random_entities)
                             .build()
-                            .log_on_err_unwrap()
                             .parse()
                             .log_on_err_unwrap();
 
