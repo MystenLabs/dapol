@@ -124,6 +124,7 @@ To run the benchmarks first clone the repo and then run:
 MAX_ENTITIES_FOR_CRITERION=100000 MIN_ENTITIES_FOR_MANUAL_BENCHES=100000 cargo bench
 ```
 The env vars are optional. The benches are split into 2 parts: Criterion for small benches and manual for large benches. A set of tuples is used as input to the benches:
+
 ![](resources/readme_eq_benchmark.svg)
 
 Some of the values of $n$ cause the benchmarks to take *really* long (multiple hours), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. This is why the benches are split by the $n$ input: smaller $n$ is fine for Criterion, larger $n$ is handled by manual benches that only run once. The env vars control where this split occurs.
