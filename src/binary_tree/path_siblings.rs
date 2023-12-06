@@ -129,7 +129,7 @@ impl<C> PathSiblings<C> {
             let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
 
             // TODO This copying of leaf nodes could be optimized away by
-            // changing the build function to accept a map parameter as apposed
+            // changing the build function to accept a map parameter as opposed
             // to the leaf node vector.
             let mut leaf_nodes = Vec::<Node<C>>::new();
             for x in x_coord_min..x_coord_max + 1 {

@@ -131,21 +131,21 @@ impl NdmSmtConfigBuilder {
         self.entities_path_opt(Some(path))
     }
 
-    pub fn num_random_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
+    pub fn num_random_entities_opt(&mut self, num_entities: Option<u64>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
                     file_path: None,
-                    num_random_entities: num_entites,
+                    num_random_entities: num_entities,
                 })
             }
-            Some(entities) => entities.num_random_entities = num_entites,
+            Some(entities) => entities.num_random_entities = num_entities,
         }
         self
     }
 
-    pub fn num_random_entities(&mut self, num_entites: u64) -> &mut Self {
-        self.num_random_entities_opt(Some(num_entites))
+    pub fn num_random_entities(&mut self, num_entities: u64) -> &mut Self {
+        self.num_random_entities_opt(Some(num_entities))
     }
 
     pub fn build(&self) -> NdmSmtConfig {
