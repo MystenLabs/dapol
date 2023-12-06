@@ -66,7 +66,7 @@ impl<C> PathSiblings<C> {
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
         let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
-            let params = RecursionParams::from_coordinate(coord)
+            let params = RecursionParams::from(coord)
                 // We don't want to store anything because the store already exists
                 // inside the binary tree struct.
                 .with_store_depth(MIN_STORE_DEPTH)

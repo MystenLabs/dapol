@@ -297,24 +297,6 @@ impl From<Height> for RecursionParams {
 
 /// Public functions available to [super][super][path_builder].
 impl RecursionParams {
-    pub fn from_coordinate(coord: &Coordinate) -> Self {
-        use super::super::MAX_HEIGHT;
-
-        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
-        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
-
-        RecursionParams {
-            x_coord_min,
-            x_coord_mid,
-            x_coord_max,
-            y_coord: coord.y,
-            thread_count: Arc::new(Mutex::new(0)),
-            max_thread_count: 1,
-            store_depth: MIN_STORE_DEPTH,
-            height: MAX_HEIGHT.clone(),
-        }
-    }
-
     pub fn x_coord_range(&self) -> Range<u64> {
         self.x_coord_min..self.x_coord_max + 1
     }
@@ -332,6 +314,26 @@ impl RecursionParams {
     pub fn with_max_thread_count(mut self, max_thread_count: u8) -> Self {
         self.max_thread_count = max_thread_count;
         self
+    }
+}
+
+impl From<&Coordinate> for RecursionParams {
+    fn from(coord: &Coordinate) -> Self {
+        use super::super::MAX_HEIGHT;
+
+        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y_coord: coord.y,
+            thread_count: Arc::new(Mutex::new(0)),
+            max_thread_count: 1,
+            store_depth: MIN_STORE_DEPTH,
+            height: MAX_HEIGHT.clone(),
+        }
     }
 }
 
