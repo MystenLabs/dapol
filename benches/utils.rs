@@ -19,7 +19,7 @@ pub fn abs_diff(x: usize, y: usize) -> usize {
     }
 }
 
-pub fn bytes_as_string(num_bytes: usize) -> String {
+pub fn bytes_to_string(num_bytes: usize) -> String {
     if num_bytes < 1024 {
         format!("{} bytes", num_bytes)
     } else if num_bytes >= 1024 && num_bytes < 1024usize.pow(2) {
@@ -65,8 +65,8 @@ pub fn bench_test_jemalloc_readings() {
 
     println!(
         "buf capacity: {:<6}",
-        bytes_as_string(buf.capacity())
+        bytes_to_string(buf.capacity())
     );
 
-    println!("Memory usage: {} allocated", bytes_as_string(diff),);
+    println!("Memory usage: {} allocated", bytes_to_string(diff),);
 }

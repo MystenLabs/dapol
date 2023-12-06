@@ -277,7 +277,7 @@ fn new_padding_node_content_closure(
     move |coord: &Coordinate| {
         // TODO unfortunately we copy data here, maybe there is a way to do without
         // copying
-        let coord_bytes = coord.as_bytes();
+        let coord_bytes = coord.to_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
         let pad_secret = generate_key(None, &master_secret_bytes, Some(&coord_bytes));
         let pad_secret_bytes: [u8; 32] = pad_secret.into();

@@ -187,7 +187,7 @@ impl Coordinate {
     /// the next 8 elements of the array, directly after the first element.
     /// Both x- & y-coords are given in Little Endian byte order.
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
-    pub fn as_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
         let (left, mid) = c.split_at_mut(1);
         left.copy_from_slice(&self.y.to_le_bytes());

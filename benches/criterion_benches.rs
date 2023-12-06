@@ -25,7 +25,7 @@ mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
 
 mod utils;
-use utils::{abs_diff, bytes_as_string, system_total_memory_mb};
+use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
 /// Determines how many runs are done for number of entities.
 /// The higher this value the more runs that are done.
@@ -190,7 +190,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
                 println!(
                     "\nSerialized tree file size: {}\n",
-                    bytes_as_string(file_size as usize)
+                    bytes_to_string(file_size as usize)
                 );
             }
         }

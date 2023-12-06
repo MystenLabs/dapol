@@ -49,7 +49,7 @@ impl Measurement for Memory {
 struct MemoryFormatter;
 impl ValueFormatter for MemoryFormatter {
     fn format_value(&self, value: f64) -> String {
-        bytes_as_string(value as usize)
+        bytes_to_string(value as usize)
     }
 
     fn format_throughput(&self, throughput: &Throughput, value: f64) -> String {
@@ -105,7 +105,7 @@ impl ValueFormatter for MemoryFormatter {
     }
 }
 
-fn bytes_as_string(num_bytes: usize) -> String {
+fn bytes_to_string(num_bytes: usize) -> String {
     if num_bytes < 1024 {
         format!("{} bytes", num_bytes)
     } else if num_bytes >= 1024 && num_bytes < 1024usize.pow(2) {
