@@ -159,7 +159,7 @@ mod tests {
         #[test]
         fn fifty_percent_gives_half_aggregation() {
             let tree_height = Height::try_from(10).unwrap();
-            let aggregation_factor = AggregationFactor::Percent(Percentage::from(50));
+            let aggregation_factor = AggregationFactor::Percent(Percentage::expect_from(50));
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
                 tree_height.as_raw_int() / 2
@@ -172,7 +172,7 @@ mod tests {
         #[test]
         fn zero_percent_gives_zero_aggregation() {
             let tree_height = Height::try_from(10).unwrap();
-            let aggregation_factor = AggregationFactor::Percent(Percentage::from(0));
+            let aggregation_factor = AggregationFactor::Percent(Percentage::expect_from(0));
             assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
             assert!(aggregation_factor.is_zero(&tree_height));
             assert!(!aggregation_factor.is_max(&tree_height));

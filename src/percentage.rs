@@ -2,7 +2,7 @@
 
 use clap::builder::{OsStr, Str};
 use serde::{Deserialize, Serialize};
-use std::{convert::From, num::ParseIntError, str::FromStr};
+use std::{convert::TryFrom, num::ParseIntError, str::FromStr};
 
 pub const ZERO_PERCENT: Percentage = Percentage { value: 0 };
 pub const FIFTY_PERCENT: Percentage = Percentage { value: 50 };
@@ -15,18 +15,8 @@ pub struct Percentage {
 
 impl Percentage {
     /// Returns a new `Percentage` with the given value.
-    /// Returns an error if the value is greater than 100.
-    pub fn from_with_err(value: u8) -> Result<Percentage, PercentageParserError> {
-        if value > 100 {
-            Err(PercentageParserError::InputTooBig(value))
-        } else {
-            Ok(Percentage { value })
-        }
-    }
-
-    /// Returns a new `Percentage` with the given value.
     /// Panics if the value is greater than 100.
-    pub fn from(value: u8) -> Percentage {
+    pub fn expect_from(value: u8) -> Percentage {
         if value > 100 {
             panic!("Invalid percentage value {}", value);
         } else {
@@ -42,6 +32,20 @@ impl Percentage {
     /// Returns the percentage saved.
     pub fn value(&self) -> u8 {
         self.value
+    }
+}
+
+impl TryFrom<u8> for Percentage {
+    type Error = PercentageParserError;
+
+    /// Returns a new `Percentage` with the given value.
+    /// Returns an error if the value is greater than 100.
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        if value > 100 {
+            Err(PercentageParserError::InputTooBig(value))
+        } else {
+            Ok(Percentage { value })
+        }
     }
 }
 
@@ -65,7 +69,7 @@ impl FromStr for Percentage {
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Percentage::from_with_err(u8::from_str(s)?)
+        Percentage::try_from(u8::from_str(s)?)
     }
 }
 
@@ -86,12 +90,12 @@ mod tests {
     #[test]
     #[should_panic]
     fn from_should_panic_if_value_is_over_100() {
-        Percentage::from(101);
+        Percentage::expect_from(101);
     }
 
     #[test]
     fn from_should_give_err_if_value_is_over_100() {
-        let res = Percentage::from_with_err(101);
+        let res = Percentage::try_from(101);
         assert_err!(res, Err(PercentageParserError::InputTooBig(101)));
     }
 
@@ -113,14 +117,14 @@ mod tests {
     }
 
     #[test]
-    fn from_with_err_happy_case() {
+    fn try_from_happy_case() {
         let test = 15;
-        assert_eq!(test, Percentage::from_with_err(15).unwrap().value);
+        assert_eq!(test, Percentage::try_from(15).unwrap().value);
     }
 
     #[test]
     fn from_happy_case() {
         let test = 15;
-        assert_eq!(test, Percentage::from(15).value);
+        assert_eq!(test, Percentage::expect_from(15).value);
     }
 }
