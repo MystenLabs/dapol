@@ -25,12 +25,14 @@ pub const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 pub struct MaxThreadCount(u8);
 
 impl MaxThreadCount {
-    pub fn from(max_thread_count: u8) -> Self {
-        MaxThreadCount(max_thread_count)
-    }
-
     pub fn get_value(&self) -> u8 {
         self.0
+    }
+}
+
+impl From<u8> for MaxThreadCount {
+    fn from(max_thread_count: u8) -> Self {
+        Self(max_thread_count)
     }
 }
 
@@ -39,25 +41,23 @@ impl MaxThreadCount {
 
 impl Default for MaxThreadCount {
     fn default() -> Self {
-        MaxThreadCount(
-            MACHINE_PARALLELISM.with(|opt| match *opt.borrow() {
-                None => {
-                    warn!(
-                        "Machine parallelism not set, defaulting max thread count to {}",
-                        DEFAULT_MAX_THREAD_COUNT
-                    );
+        MaxThreadCount(MACHINE_PARALLELISM.with(|opt| match *opt.borrow() {
+            None => {
+                warn!(
+                    "Machine parallelism not set, defaulting max thread count to {}",
                     DEFAULT_MAX_THREAD_COUNT
-                }
-                Some(par) => par,
-            }),
-        )
+                );
+                DEFAULT_MAX_THREAD_COUNT
+            }
+            Some(par) => par,
+        }))
     }
 }
 
 // -------------------------------------------------------------------------------------------------
 // From for str.
 
-use std::{str::FromStr};
+use std::str::FromStr;
 
 impl FromStr for MaxThreadCount {
     type Err = MaxThreadCountError;
@@ -122,6 +122,9 @@ mod tests {
 
     #[test]
     fn default_without_initializing_machine_parallelism() {
-        assert_eq!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
+        assert_eq!(
+            MaxThreadCount::default().get_value(),
+            DEFAULT_MAX_THREAD_COUNT
+        );
     }
 }
