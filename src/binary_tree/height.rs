@@ -75,6 +75,13 @@ impl Height {
     pub fn as_u32(&self) -> u32 {
         self.0 as u32
     }
+
+    /// The maximum number of leaf nodes on the bottom layer of the binary tree.
+    ///
+    /// $$\text{max} = 2^{\text{height}-1}$$
+    pub fn max_bottom_layer_nodes(&self) -> u64 {
+        2u64.pow(self.as_u32() - 1)
+    }
 }
 
 // -------------------------------------------------------------------------------------------------

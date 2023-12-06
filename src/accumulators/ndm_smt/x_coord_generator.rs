@@ -67,11 +67,9 @@ impl RandomXCoordGenerator {
     /// that `max_x_coords` is the total number of available leaf nodes on the
     /// bottom layer of the tree.
     pub fn from(height: &Height) -> Self {
-        use crate::binary_tree::max_bottom_layer_nodes;
-
         RandomXCoordGenerator {
             used_x_coords: HashMap::<u64, u64>::new(),
-            max_x_coord: max_bottom_layer_nodes(height),
+            max_x_coord: height.max_bottom_layer_nodes(),
             rng: thread_rng(),
             i: 0,
         }
@@ -118,7 +116,7 @@ pub struct OutOfBoundsError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::binary_tree::{max_bottom_layer_nodes, Height};
+    use crate::binary_tree::Height;
     use std::collections::HashSet;
 
     #[test]
@@ -131,7 +129,7 @@ mod tests {
     fn new_unique_value_works() {
         let height = Height::try_from(4u8).unwrap();
         let mut rxcg = RandomXCoordGenerator::from(&height);
-        for _i in 0..max_bottom_layer_nodes(&height) {
+        for _i in 0..height.max_bottom_layer_nodes() {
             rxcg.new_unique_x_coord().unwrap();
         }
     }
@@ -141,7 +139,7 @@ mod tests {
         let height = Height::try_from(4u8).unwrap();
         let mut rxcg = RandomXCoordGenerator::from(&height);
         let mut set = HashSet::<u64>::new();
-        for _i in 0..max_bottom_layer_nodes(&height) {
+        for _i in 0..height.max_bottom_layer_nodes() {
             let x = rxcg.new_unique_x_coord().unwrap();
             if set.contains(&x) {
                 panic!("{:?} was generated twice!", x);
@@ -156,7 +154,7 @@ mod tests {
 
         let height = Height::try_from(4u8).unwrap();
         let mut rxcg = RandomXCoordGenerator::from(&height);
-        let max = max_bottom_layer_nodes(&height);
+        let max = height.max_bottom_layer_nodes();
         let mut res = rxcg.new_unique_x_coord();
 
         for _i in 0..max {

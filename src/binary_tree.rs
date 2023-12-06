@@ -36,15 +36,15 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 mod tree_builder;
+pub use tree_builder::multi_threaded;
 pub use tree_builder::{
-    multi_threaded, single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
+    single_threaded, InputLeafNode, TreeBuildError, TreeBuilder, MIN_STORE_DEPTH,
 };
 
 mod path_siblings;
 pub use path_siblings::{PathSiblings, PathSiblingsBuildError, PathSiblingsError};
 
 mod utils;
-pub use utils::max_bottom_layer_nodes;
 
 mod height;
 pub use height::{Height, HeightError, MAX_HEIGHT, MIN_HEIGHT};
@@ -485,7 +485,7 @@ mod tests {
         assert!(!left_node.is_right_sibling_of(&right_node));
 
         // check no other nodes trigger true for sibling check
-        for i in 0..max_bottom_layer_nodes(&height) {
+        for i in 0..height.max_bottom_layer_nodes() {
             let node = single_leaf(i).into_node();
             if left_node.coord.x != i && right_node.coord.x != i {
                 assert!(!right_node.is_right_sibling_of(&node));

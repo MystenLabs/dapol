@@ -50,8 +50,8 @@ use serde::{Deserialize, Serialize};
 use crate::MaxThreadCount;
 
 use super::super::{
-    max_bottom_layer_nodes, Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node,
-    Sibling, Store, MIN_RECOMMENDED_SPARSITY, MIN_STORE_DEPTH,
+    Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node, Sibling, Store,
+    MIN_RECOMMENDED_SPARSITY, MIN_STORE_DEPTH,
 };
 use super::{BinaryTree, TreeBuildError};
 
@@ -98,7 +98,7 @@ where
         .with_store_depth(store_depth)
         .with_max_thread_count(max_thread_count.get_value());
 
-    if max_bottom_layer_nodes(&height) / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
+    if height.max_bottom_layer_nodes() / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
     {
         warn!(
             "Minimum recommended tree sparsity of {} reached, consider increasing tree height",
@@ -260,7 +260,7 @@ impl RecursionParams {
     fn from_tree_height(height: Height) -> Self {
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
-        let x_coord_max = max_bottom_layer_nodes(&height) - 1;
+        let x_coord_max = height.max_bottom_layer_nodes() - 1;
         let x_coord_mid = (x_coord_min + x_coord_max) / 2;
         // y-coords also start from 0, hence the `- 1`.
         let y_coord = height.as_y_coord();
@@ -375,7 +375,7 @@ where
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
     {
-        let max_nodes = max_bottom_layer_nodes(&Height::from_y_coord(params.y_coord));
+        let max_nodes = Height::from_y_coord(params.y_coord).max_bottom_layer_nodes();
         assert!(
             leaves.len() <= max_nodes as usize,
             "{} Leaf node count ({}) exceeds layer max node number ({})",
@@ -589,7 +589,7 @@ mod tests {
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: max_bottom_layer_nodes(&height) + 1,
+            x_coord: height.max_bottom_layer_nodes() + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -621,8 +621,13 @@ mod tests {
 
     #[test]
     fn err_when_x_coord_greater_than_max() {
+<<<<<<< HEAD
         let height = Height::try_from(4).unwrap();
         let leaf_node = single_leaf(max_bottom_layer_nodes(&height) + 1);
+=======
+        let height = Height::from(4);
+        let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
+>>>>>>> main
 
         let res = TreeBuilder::new()
             .with_height(height)

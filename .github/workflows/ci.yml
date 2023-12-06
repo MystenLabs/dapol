@@ -43,9 +43,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Build
-        run: cargo test --examples --tests --no-run
-        # TODO rather use the below as apposed to the above, when benches are done
-        # run: cargo test --all-targets --no-run
+        run: cargo test --all-targets --no-run
 
       - name: Test
         run: cargo test

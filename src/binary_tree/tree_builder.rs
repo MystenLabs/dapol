@@ -204,7 +204,6 @@ where
     ///
     /// No default value, returns an error if not set.
     fn leaf_nodes(self, height: &Height) -> Result<Vec<InputLeafNode<C>>, TreeBuildError> {
-        use super::max_bottom_layer_nodes;
         use crate::utils::ErrUnlessTrue;
 
         let leaf_nodes = self.leaf_nodes.ok_or(TreeBuildError::NoLeafNodesProvided)?;
@@ -213,7 +212,7 @@ where
             return Err(TreeBuildError::EmptyLeaves);
         }
 
-        let max_leaf_nodes = max_bottom_layer_nodes(height);
+        let max_leaf_nodes = height.max_bottom_layer_nodes();
 
         if leaf_nodes.len() > max_leaf_nodes as usize {
             return Err(TreeBuildError::TooManyLeaves);
@@ -365,7 +364,7 @@ mod tests {
     fn multi_and_single_give_same_root_single_leaf() {
         let height = Height::try_from(8u8).unwrap();
 
-        for i in 0..max_bottom_layer_nodes(&height) {
+        for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
 
             let single_threaded = TreeBuilder::new()
@@ -425,7 +424,7 @@ mod tests {
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: max_bottom_layer_nodes(&height) + 1,
+            x_coord: height.max_bottom_layer_nodes() + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
