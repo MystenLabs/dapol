@@ -55,7 +55,7 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// use dapol::{Height, MaxThreadCount};
 /// use dapol::accumulators::NdmSmtConfigBuilder;
 ///
-/// let height = Height::from(8);
+/// let height = Height::try_from(8).unwrap();
 /// let max_thread_count = MaxThreadCount::default();
 ///
 /// let config = NdmSmtConfigBuilder::default()
@@ -86,7 +86,7 @@ impl NdmSmtConfig {
     pub fn parse(self) -> Result<NdmSmt, NdmSmtConfigParserError> {
         debug!("Parsing config to create a new NDM-SMT: {:?}", self);
 
-        let secrets = NdmSmtSecretsParser::from_path_opt(self.secrets_file_path)
+        let secrets = NdmSmtSecretsParser::from(self.secrets_file_path)
             .parse_or_generate_random()?;
 
         let height = self.height;
