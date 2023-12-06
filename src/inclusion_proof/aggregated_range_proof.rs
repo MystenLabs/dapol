@@ -207,7 +207,7 @@ impl AggregatedRangeProof {
         commitments: &Vec<CompressedRistretto>,
         upper_bound_bit_length: u8,
     ) -> Result<(), RangeProofError> {
-        if commitments.len() != self.get_input_size() as usize {
+        if commitments.len() != self.input_size() as usize {
             return Err(RangeProofError::InputVectorLengthMismatch);
         }
 
@@ -261,7 +261,7 @@ impl AggregatedRangeProof {
         .map_err(RangeProofError::BulletproofVerificationError)
     }
 
-    fn get_input_size(&self) -> u8 {
+    fn input_size(&self) -> u8 {
         match self {
             AggregatedRangeProof::Padding {
                 proof: _,

@@ -87,7 +87,7 @@ fn main() {
                     "\nRunning benchmark for input values \
                      (height {}, max_thread_count {}, num_entities {})",
                     h.as_u32(),
-                    t.get_value(),
+                    t.as_u8(),
                     n
                 );
 

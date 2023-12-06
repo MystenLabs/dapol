@@ -29,7 +29,7 @@ impl MaxThreadCount {
         MaxThreadCount(max_thread_count)
     }
 
-    pub fn get_value(&self) -> u8 {
+    pub fn as_u8(&self) -> u8 {
         self.0
     }
 }
@@ -74,7 +74,7 @@ use clap::builder::{OsStr, Str};
 
 impl From<MaxThreadCount> for OsStr {
     fn from(max_thread_count: MaxThreadCount) -> OsStr {
-        OsStr::from(Str::from(max_thread_count.get_value().to_string()))
+        OsStr::from(Str::from(max_thread_count.as_u8().to_string()))
     }
 }
 
@@ -122,6 +122,6 @@ mod tests {
 
     #[test]
     fn default_without_initializing_machine_parallelism() {
-        assert_eq!(MaxThreadCount::default().get_value(), DEFAULT_MAX_THREAD_COUNT);
+        assert_eq!(MaxThreadCount::default().as_u8(), DEFAULT_MAX_THREAD_COUNT);
     }
 }

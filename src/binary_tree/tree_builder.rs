@@ -296,7 +296,7 @@ mod tests {
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
     };
 
     use crate::utils::test_utils::{assert_err, assert_err_simple};
@@ -323,13 +323,13 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -346,13 +346,13 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -370,13 +370,13 @@ mod tests {
             let single_threaded = TreeBuilder::new()
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
-                .build_using_single_threaded_algorithm(get_padding_function())
+                .build_using_single_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             let multi_threaded = TreeBuilder::new()
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node)
-                .build_using_multi_threaded_algorithm(get_padding_function())
+                .build_using_multi_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             assert_eq!(single_threaded.root, multi_threaded.root);

@@ -392,7 +392,7 @@ mod tests {
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
     };
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let leaf_node = tree_single_threaded.get_leaf_node(10).unwrap();
@@ -413,7 +413,7 @@ mod tests {
         let siblings = PathSiblings::build_using_single_threaded_algorithm(
             &tree_single_threaded,
             &leaf_node,
-            get_padding_function(),
+            generate_padding_closure(),
         )
         .expect("PathSiblings generation should have been successful");
 
@@ -437,7 +437,7 @@ mod tests {
             .with_height(height)
             .with_store_depth(MIN_STORE_DEPTH)
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let leaf_node = tree_multi_threaded.get_leaf_node(10).unwrap();
@@ -445,7 +445,7 @@ mod tests {
         let siblings = PathSiblings::build_using_multi_threaded_algorithm(
             &tree_multi_threaded,
             &leaf_node,
-            get_padding_function(),
+            generate_padding_closure(),
         )
         .expect("PathSiblings generation should have been successful");
 
@@ -469,7 +469,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let leaf_node = tree_single_threaded.get_leaf_node(6).unwrap();
@@ -477,7 +477,7 @@ mod tests {
         let siblings = PathSiblings::build_using_single_threaded_algorithm(
             &tree_single_threaded,
             &leaf_node,
-            get_padding_function(),
+            generate_padding_closure(),
         )
         .expect("PathSiblings generation should have been successful");
 
@@ -501,7 +501,7 @@ mod tests {
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(MIN_STORE_DEPTH)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let leaf_node = tree_multi_threaded.get_leaf_node(6).unwrap();
@@ -509,7 +509,7 @@ mod tests {
         let siblings = PathSiblings::build_using_multi_threaded_algorithm(
             &tree_multi_threaded,
             &leaf_node,
-            get_padding_function(),
+            generate_padding_closure(),
         )
         .expect("PathSiblings generation should have been successful");
 
@@ -534,7 +534,7 @@ mod tests {
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
-                .build_using_single_threaded_algorithm(get_padding_function())
+                .build_using_single_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             let leaf_node = tree_single_threaded.get_leaf_node(i).unwrap();
@@ -542,7 +542,7 @@ mod tests {
             let siblings = PathSiblings::build_using_single_threaded_algorithm(
                 &tree_single_threaded,
                 &leaf_node,
-                get_padding_function(),
+                generate_padding_closure(),
             )
             .expect("PathSiblings generation should have been successful");
 
@@ -568,7 +568,7 @@ mod tests {
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
-                .build_using_multi_threaded_algorithm(get_padding_function())
+                .build_using_multi_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             let leaf_node = tree_multi_threaded.get_leaf_node(x_coord).unwrap();
@@ -576,7 +576,7 @@ mod tests {
             let siblings = PathSiblings::build_using_multi_threaded_algorithm(
                 &tree_multi_threaded,
                 &leaf_node,
-                get_padding_function(),
+                generate_padding_closure(),
             )
             .expect("PathSiblings build should have been successful");
 

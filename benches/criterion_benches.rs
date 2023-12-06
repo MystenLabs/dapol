@@ -116,7 +116,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
@@ -174,7 +174,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
