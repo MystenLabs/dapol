@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
-use log::error;
+use log::{error, info};
 use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
@@ -88,6 +88,20 @@ impl NdmSmt {
         let master_secret_bytes = secrets.master_secret.as_bytes();
         let salt_b_bytes = secrets.salt_b.as_bytes();
         let salt_s_bytes = secrets.salt_s.as_bytes();
+
+        info!(
+            "\nCreating NDM-SMT with the following configuration:\n \
+             - height: {}\n \
+             - number of entities: {}\n \
+             - master secret: 0x{}\n \
+             - salt b: 0x{}\n \
+             - salt s: 0x{}",
+            height.as_u32(),
+            entities.len(),
+            master_secret_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            salt_b_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            salt_s_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+        );
 
         let (leaf_nodes, entity_coord_tuples) = {
             // Map the entities to bottom-layer leaf nodes.
