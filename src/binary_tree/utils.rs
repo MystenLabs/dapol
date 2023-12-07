@@ -37,7 +37,7 @@ pub mod test_utils {
         }
     }
 
-    pub fn get_padding_function() -> impl Fn(&Coordinate) -> TestContent {
+    pub fn generate_padding_closure() -> impl Fn(&Coordinate) -> TestContent {
         |_coord: &Coordinate| -> TestContent {
             TestContent {
                 value: 0,

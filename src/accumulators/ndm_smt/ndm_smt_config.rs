@@ -151,7 +151,11 @@ impl NdmSmtConfigBuilder {
     pub fn build(&self) -> NdmSmtConfig {
         let entities = EntityConfig {
             file_path: self.entities.clone().and_then(|e| e.file_path).or(None),
-            num_random_entities: self.entities.clone().and_then(|e| e.num_random_entities).or(None),
+            num_random_entities: self
+                .entities
+                .clone()
+                .and_then(|e| e.num_random_entities)
+                .or(None),
         };
 
         NdmSmtConfig {
@@ -256,7 +260,12 @@ mod tests {
     fn builder_without_any_values_fails() {
         use crate::entity::EntitiesParserError;
         let res = NdmSmtConfigBuilder::default().build().parse();
-        assert_err!(res, Err(NdmSmtConfigParserError::EntitiesError(EntitiesParserError::NumEntitiesNotSet)));
+        assert_err!(
+            res,
+            Err(NdmSmtConfigParserError::EntitiesError(
+                EntitiesParserError::NumEntitiesNotSet
+            ))
+        );
     }
 
     #[test]

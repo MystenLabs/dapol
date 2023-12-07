@@ -43,7 +43,7 @@ The library has not been released as a crate yet (as of Nov 2023) but the API ha
 - generate inclusion proofs from a list of entity IDs (tree required)
 - verify an inclusion proof using a root hash (no tree required)
 
-See the [examples](https://github.com/silversixpence-crypto/dapol/examples) directory for details on how to use the API.
+See the [examples](https://github.com/silversixpence-crypto/dapol/examples) directory or [docs](https://docs.rs/dapol/latest/dapol/#rust-api) for details on how to use the API.
 
 ### CLI
 
@@ -81,12 +81,12 @@ Building a tree can be done:
 
 Build a tree using config file (full log verbosity):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./tree_config_example.toml
+./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml
 ```
 
 Add serialization:
 ```bash
-./target/release/dapol -vvv build-tree config-file ./tree_config_example.toml --serialize .
+./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml --serialize .
 ```
 
 Deserialize a tree from a file:
@@ -96,7 +96,13 @@ Deserialize a tree from a file:
 
 Generate proofs (proofs will live in the `./inclusion_proofs/` directory):
 ```bash
-./target/release/dapol -vvv build-tree config-file ./tree_config_example.toml --gen-proofs ./examples/entities_example.csv
+./target/release/dapol -vvv build-tree config-file ./examples/tree_config_example.toml --gen-proofs ./examples/entities_example.csv
+```
+
+Build a tree using cli args as apposed to a config file:
+```bash
+# this will generate random secrets & 1000 random entities
+./target/release/dapol -vvv build-tree new --accumulator ndm-smt --height 16 --random-entities 1000
 ```
 
 #### Proof generation

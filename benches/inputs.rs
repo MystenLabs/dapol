@@ -64,7 +64,7 @@ pub fn num_entities_greater_than(n: u64) -> Vec<u64> {
 pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     let mut tc: Vec<u8> = Vec::new();
 
-    let max_thread_count: u8 = MaxThreadCount::default().get_value();
+    let max_thread_count: u8 = MaxThreadCount::default().as_u8();
 
     let step = if max_thread_count < 8 {
         1

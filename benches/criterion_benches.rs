@@ -25,7 +25,7 @@ mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
 
 mod utils;
-use utils::{abs_diff, bytes_as_string, system_total_memory_mb};
+use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
 /// Determines how many runs are done for number of entities.
 /// The higher this value the more runs that are done.
@@ -116,7 +116,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
@@ -168,19 +168,18 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
                 let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
 
-                group.bench_with_input(
+                group.bench_function(
                     BenchmarkId::new(
                         "serialize_tree",
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
-                    &(h, t, n),
-                    |bench, tup| {
-                        bench.iter(|| acc.serialize(path.clone()));
+                    |bench| {
+                        bench.iter(|| acc.serialize(path.clone()).unwrap());
                     },
                 );
 
@@ -190,7 +189,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
                 println!(
                     "\nSerialized tree file size: {}\n",
-                    bytes_as_string(file_size as usize)
+                    bytes_to_string(file_size as usize)
                 );
             }
         }

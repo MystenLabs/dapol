@@ -35,24 +35,37 @@ use std::collections::HashMap;
 /// optimized by a HashMap. This algorithm wraps the `rng`, efficiently avoiding
 /// collisions. Here is some pseudo code explaining how it works:
 ///
-/// ```bash,ignore
-/// if N > max_x_coord throw error
-/// for i in range [0, N]:
-/// - pick random k in range [i, max_x_coord]
-/// - if k in map then set v = map[k]
-///   - while map[v] exists: v = map[v]
-///   - result = v
-/// - else result = k
-/// - set map[k] = i
+/// Key:
+/// - `n` is the number of users that need to be mapped to leaf nodes
+/// - `x_coord` is the index of the leaf node (left-most x-coord is 0,
+///   right-most x-coord is `max_x_coord`)
+/// - `user_mapping` is the result of the algorithm, where each user is given a
+///   leaf node index i.e. `user_mapping: users -> indices`
+/// - `tracking_map` is used to determine which indices have been used
+///
+/// ```python,ignore
+/// if n > max_x_coord throw error
+///
+/// user_mapping = new_empty_hash_map()
+/// tracking_map = new_empty_hash_map()
+///
+/// for i in [0, n):
+///   pick random k in range [i, max_x_coord]
+///   if k in tracking_map then set v = traking_map[k]
+///     while traking_map[v] exists: v = tracking_map[v]
+///     set user_mapping[i] = v
+///   else user_mapping[i] = k
+///   set tracking_map[k] = i
 /// ```
 ///
-/// Assuming `rng` is constant-time the above algorithm has time complexity
-/// `O(N)`. Note that the second loop (the while loop) will only execute a
-/// total of `N` times throughout the entire loop cycle of the first loop.
-/// This is because the second loop will only execute if a chain in the map
-/// exists, and the worst case happens when there is 1 long chain containing
-/// all the elements of the map; in this case the second loop will only execute
-/// on 1 of the iterations of the first loop.
+/// Assuming `rng` is constant-time and the HashMap is optimized by some
+/// balanced search tree then the above algorithm has time and memory complexity
+/// `O(n log(n))` in the worst case. Note that the second loop (the while loop)
+/// will only execute a total of `n` times throughout the entire loop cycle of
+/// the first loop. This is because the second loop will only execute if a chain
+/// in the map exists, and the worst case happens when there is 1 long chain
+/// containing all the elements of the map; in this case the second loop will
+/// only execute on 1 of the iterations of the first loop.
 pub struct RandomXCoordGenerator {
     rng: ThreadRng,
     used_x_coords: HashMap<u64, u64>,

@@ -12,7 +12,7 @@ mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
 
 mod utils;
-use utils::{bytes_as_string, system_total_memory_mb, abs_diff};
+use utils::{bytes_to_string, system_total_memory_mb, abs_diff};
 
 /// Determines how many runs are done for number of entities.
 /// The higher this value the fewer runs that are done.
@@ -87,7 +87,7 @@ fn main() {
                     "\nRunning benchmark for input values \
                      (height {}, max_thread_count {}, num_entities {})",
                     h.as_u32(),
-                    t.get_value(),
+                    t.as_u8(),
                     n
                 );
 
@@ -137,9 +137,9 @@ fn main() {
                      Serialized tree file size: {}\n \
                      ========================================================================",
                     tree_build_time,
-                    bytes_as_string(mem_used_tree_build),
+                    bytes_to_string(mem_used_tree_build),
                     serialization_time,
-                    bytes_as_string(file_size as usize)
+                    bytes_to_string(file_size as usize)
                 );
             }
         }

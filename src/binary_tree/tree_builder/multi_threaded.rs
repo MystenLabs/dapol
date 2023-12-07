@@ -96,7 +96,7 @@ where
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
     let params = RecursionParams::from_tree_height(height.clone())
         .with_store_depth(store_depth)
-        .with_max_thread_count(max_thread_count.get_value());
+        .with_max_thread_count(max_thread_count.as_u8());
 
     if height.max_bottom_layer_nodes() / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
     {
@@ -150,7 +150,7 @@ impl<C: Clone> DashMapStore<C> {
 /// If all nodes satisfy `node.coord.x <= mid` then `Full` is returned.
 /// If no nodes satisfy `node.coord.x <= mid` then `Empty` is returned.
 // TODO can be optimized using a binary search
-fn get_num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
+fn num_nodes_left_of<C>(x_coord_mid: u64, nodes: &Vec<Node<C>>) -> NumNodes {
     nodes
         .iter()
         .rposition(|leaf| leaf.coord.x <= x_coord_mid)
@@ -437,7 +437,7 @@ where
     let within_store_depth_for_children =
         params.y_coord > params.height.as_raw_int() - params.store_depth;
 
-    let pair = match get_num_nodes_left_of(params.x_coord_mid, &leaves) {
+    let pair = match num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::Partial(index) => {
             let right_leaves = leaves.split_off(index + 1);
             let left_leaves = leaves;
@@ -542,7 +542,7 @@ mod tests {
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
     };
     use crate::utils::test_utils::{assert_err, assert_err_simple};
 
@@ -555,7 +555,7 @@ mod tests {
         let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -566,7 +566,7 @@ mod tests {
         let height = Height::from(4);
         let res = TreeBuilder::new()
             .with_height(height)
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
@@ -578,7 +578,7 @@ mod tests {
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
@@ -599,7 +599,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         assert_err!(res, Err(TreeBuildError::TooManyLeaves));
     }
@@ -613,7 +613,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::DuplicateLeaves));
@@ -627,7 +627,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
-            .build_using_multi_threaded_algorithm(get_padding_function());
+            .build_using_multi_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::InvalidXCoord));
@@ -645,7 +645,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
         let root = tree.root();
 
@@ -654,7 +654,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         assert_eq!(root, tree.root());
@@ -668,7 +668,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         for leaf in leaf_nodes {
@@ -689,7 +689,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let middle_layer = height.as_raw_int() / 2;
@@ -728,7 +728,7 @@ mod tests {
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let layer_below_root = height.as_raw_int() - 1;
