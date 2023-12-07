@@ -1,4 +1,4 @@
-use dapol::{Accumulator, EntityId, Height, InclusionProof, MaxThreadCount};
+use dapol::{Height};
 
 /// Estimated memory usage in MB.
 /// The equation was calculated using the plane_of_best_fit.py script

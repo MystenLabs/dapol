@@ -168,7 +168,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
                 let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
 
-                group.bench_with_input(
+                group.bench_function(
                     BenchmarkId::new(
                         "serialize_tree",
                         format!(
@@ -178,9 +178,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                             n
                         ),
                     ),
-                    &(h, t, n),
-                    |bench, tup| {
-                        bench.iter(|| acc.serialize(path.clone()));
+                    |bench| {
+                        bench.iter(|| acc.serialize(path.clone()).unwrap());
                     },
                 );
 

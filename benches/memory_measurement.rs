@@ -60,7 +60,7 @@ impl ValueFormatter for MemoryFormatter {
         }
     }
 
-    fn scale_values(&self, typical_value: f64, values: &mut [f64]) -> &'static str {
+    fn scale_values(&self, _typical_value: f64, values: &mut [f64]) -> &'static str {
         for val in values {
             *val = ((*val / 1024u64.pow(2) as f64) * 1000.0).round() / 1000.0;
         }
@@ -69,7 +69,7 @@ impl ValueFormatter for MemoryFormatter {
 
     fn scale_throughputs(
         &self,
-        typical_value: f64,
+        _typical_value: f64,
         throughput: &Throughput,
         values: &mut [f64],
     ) -> &'static str {

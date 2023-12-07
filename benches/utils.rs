@@ -46,6 +46,7 @@ pub fn bytes_to_string(num_bytes: usize) -> String {
 // -------------------------------------------------------------------------------------------------
 // Testing jemalloc_ctl to make sure it gives expected memory readings.
 
+#[allow(dead_code)]
 pub fn bench_test_jemalloc_readings() {
     use jemalloc_ctl::{epoch, stats};
 
