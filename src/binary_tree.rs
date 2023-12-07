@@ -427,7 +427,7 @@ mod tests {
         let x = 258;
         let y = 12;
         let coord = Coordinate { x, y };
-        let bytes = coord.as_bytes();
+        let bytes = coord.to_bytes();
 
         assert_eq!(bytes.len(), 32, "Byte array should be 256 bits");
 
