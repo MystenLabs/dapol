@@ -1,3 +1,10 @@
+//! Manual benches that do not use Criterion.
+//!
+//! Criterion has a minimum of 10 runs per bench, so if the bench takes an hour
+//! to run then you suddenly need half a day for running a single bench. These
+//! benches just do a single run. The measurements will not be as accurate,
+//! unfortunately, but this is the trade-off.
+
 use once_cell::sync::Lazy;
 use std::{time::Instant, str::FromStr};
 
@@ -52,12 +59,6 @@ fn main() {
     for h in tree_heights().iter() {
         for t in max_thread_counts().iter() {
             for n in num_entities_greater_than(*MIN_ENTITIES_FOR_MANUAL_BENCHES).iter() {
-                // only: (height 32, max_thread_count 16, num_entities 30000000)
-                if *h != Height::from(32) || *t != MaxThreadCount::from(16) || *n != 30000000u64 {
-                    println!("Skipping, targeting only (height 32, max_thread_count 16, num_entities 30000000)");
-                    continue;
-                }
-
                 // ==============================================================
                 // Input validation.
 
