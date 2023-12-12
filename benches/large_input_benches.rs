@@ -32,6 +32,8 @@ static MIN_ENTITIES_FOR_MANUAL_BENCHES: Lazy<u64> = Lazy::new(|| {
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() {
+    use dapol::{Height, MaxThreadCount};
+
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
@@ -43,6 +45,12 @@ fn main() {
     for h in tree_heights().iter() {
         for t in max_thread_counts().iter() {
             for n in num_entities_greater_than(*MIN_ENTITIES_FOR_MANUAL_BENCHES).iter() {
+                // only: (height 32, max_thread_count 16, num_entities 30000000)
+                if *h != Height::from(32) || *t != MaxThreadCount::from(16) || *n != 30000000u64 {
+                    println!("Skipping, targeting only (height 32, max_thread_count 16, num_entities 30000000)");
+                    continue;
+                }
+
                 // ==============================================================
                 // Input validation.
 
@@ -113,19 +121,19 @@ fn main() {
                 // ==============================================================
                 // Tree serialization.
 
-                let src_dir = env!("CARGO_MANIFEST_DIR");
-                let target_dir = Path::new(&src_dir).join("target");
-                let dir = target_dir.join("serialized_trees");
-                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc = Accumulator::NdmSmt(ndm_smt);
+                // let src_dir = env!("CARGO_MANIFEST_DIR");
+                // let target_dir = Path::new(&src_dir).join("target");
+                // let dir = target_dir.join("serialized_trees");
+                // let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
+                // let acc = Accumulator::NdmSmt(ndm_smt);
 
-                let time_start = Instant::now();
-                acc.serialize(path.clone());
-                let serialization_time = time_start.elapsed();
+                // let time_start = Instant::now();
+                // acc.serialize(path.clone());
+                // let serialization_time = time_start.elapsed();
 
-                let file_size = std::fs::metadata(path)
-                    .expect("Unable to get serialized tree metadata for {path}")
-                    .len();
+                // let file_size = std::fs::metadata(path)
+                //     .expect("Unable to get serialized tree metadata for {path}")
+                //     .len();
 
                 // ==============================================================
                 // Print stats.
@@ -138,8 +146,10 @@ fn main() {
                      ========================================================================",
                     tree_build_time,
                     bytes_to_string(mem_used_tree_build),
-                    serialization_time,
-                    bytes_to_string(file_size as usize)
+                    "NA",
+                    "NA",
+                    // serialization_time,
+                    // bytes_to_string(file_size as usize)
                 );
             }
         }
