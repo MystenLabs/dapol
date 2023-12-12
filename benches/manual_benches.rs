@@ -111,7 +111,7 @@ fn main() {
 
                 epoch.advance().unwrap();
                 let mem_before = allocated.read().unwrap();
-                println!("Memory before build {}", bytes_as_string(mem_before));
+                println!("Memory before build {}", bytes_to_string(mem_before));
                 let time_start = Instant::now();
 
                 let ndm_smt = NdmSmtConfigBuilder::default()
@@ -125,7 +125,7 @@ fn main() {
                 let tree_build_time = time_start.elapsed();
                 epoch.advance().unwrap();
                 let mem_after = allocated.read().unwrap();
-                println!("Memory after build {}", bytes_as_string(mem_after));
+                println!("Memory after build {}", bytes_to_string(mem_after));
                 let mem_used_tree_build = abs_diff(mem_after, mem_before);
 
                 // ==============================================================
