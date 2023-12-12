@@ -2,7 +2,6 @@ use once_cell::sync::Lazy;
 use std::time::Instant;
 
 use dapol::accumulators::NdmSmtConfigBuilder;
-use dapol::initialize_machine_parallelism;
 
 mod inputs;
 use inputs::{max_thread_counts, num_entities_greater_than, tree_heights};
@@ -38,7 +37,8 @@ fn main() {
 
     let total_mem = system_total_memory_mb();
 
-    initialize_machine_parallelism();
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(clap_verbosity_flag::LevelFilter::Debug);
 
     println!(
         "==========================================================\n \
