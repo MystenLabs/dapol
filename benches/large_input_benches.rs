@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use std::time::Instant;
+use std::{time::Instant, str::FromStr};
 
 use dapol::accumulators::NdmSmtConfigBuilder;
 
@@ -25,6 +25,10 @@ static MIN_ENTITIES_FOR_MANUAL_BENCHES: Lazy<u64> = Lazy::new(|| {
         .unwrap()
 });
 
+static LOG_VERBOSITY: Lazy<clap_verbosity_flag::LevelFilter> = Lazy::new(|| {
+    clap_verbosity_flag::Level::from_str(&std::env::var("LOG_VERBOSITY").unwrap_or("WARN".to_string())).unwrap().to_level_filter()
+});
+
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -38,7 +42,7 @@ fn main() {
     let total_mem = system_total_memory_mb();
 
     dapol::initialize_machine_parallelism();
-    dapol::utils::activate_logging(clap_verbosity_flag::LevelFilter::Debug);
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     println!(
         "==========================================================\n \
