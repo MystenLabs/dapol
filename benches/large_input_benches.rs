@@ -1,8 +1,7 @@
 use once_cell::sync::Lazy;
-use std::path::Path;
 use std::time::Instant;
 
-use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder};
+use dapol::accumulators::NdmSmtConfigBuilder;
 use dapol::initialize_machine_parallelism;
 
 mod inputs;
@@ -12,7 +11,7 @@ mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
 
 mod utils;
-use utils::{bytes_to_string, system_total_memory_mb, abs_diff};
+use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
 /// Determines how many runs are done for number of entities.
 /// The higher this value the fewer runs that are done.
@@ -37,10 +36,14 @@ fn main() {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
+    let total_mem = system_total_memory_mb();
+
     initialize_machine_parallelism();
 
-    println!("==========================================================\n \
-              Manual benchmarks");
+    println!(
+        "==========================================================\n \
+              Manual benchmarks"
+    );
 
     for h in tree_heights().iter() {
         for t in max_thread_counts().iter() {
@@ -60,7 +63,6 @@ fn main() {
                     // amount of memory available on the machine then we skip
                     // the input tuple.
 
-                    let total_mem = system_total_memory_mb();
                     let expected_mem = estimated_total_memory_usage_mb(h, n);
 
                     if total_mem < expected_mem {
@@ -104,6 +106,7 @@ fn main() {
 
                 epoch.advance().unwrap();
                 let mem_before = allocated.read().unwrap();
+                println!("Memory before build {}", bytes_as_string(mem_before));
                 let time_start = Instant::now();
 
                 let ndm_smt = NdmSmtConfigBuilder::default()
@@ -116,7 +119,9 @@ fn main() {
 
                 let tree_build_time = time_start.elapsed();
                 epoch.advance().unwrap();
-                let mem_used_tree_build = abs_diff(allocated.read().unwrap(), mem_before);
+                let mem_after = allocated.read().unwrap();
+                println!("Memory after build {}", bytes_as_string(mem_after));
+                let mem_used_tree_build = abs_diff(mem_after, mem_before);
 
                 // ==============================================================
                 // Tree serialization.
