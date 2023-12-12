@@ -77,7 +77,7 @@ name = "criterion_benches"
 harness = false
 
 [[bench]]
-name = "large_input_benches"
+name = "manual_benches"
 harness = false
 
 [profile.bench]
