@@ -5,13 +5,15 @@
 //! benches just do a single run. The measurements will not be as accurate,
 //! unfortunately, but this is the trade-off.
 
-use std::{time::Instant, str::FromStr};
 use std::path::Path;
+use std::{str::FromStr, time::Instant};
 
-use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder};
+use statistical::*;
+
+use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder, NdmSmt};
 
 mod inputs;
-use inputs::{max_thread_counts, tree_heights, num_entities_in_range};
+use inputs::{max_thread_counts, num_entities_in_range, tree_heights};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -30,8 +32,6 @@ use crate::inputs::tree_heights_in_range;
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 fn main() {
-    use dapol::{Height, MaxThreadCount};
-
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
@@ -98,24 +98,43 @@ fn main() {
                 // ==============================================================
                 // Tree build.
 
-                epoch.advance().unwrap();
-                let mem_before = allocated.read().unwrap();
-                println!("Memory before build {}", bytes_to_string(mem_before));
-                let time_start = Instant::now();
+                let mut ndm_smt = Option::<NdmSmt>::None;
+                let mut memory_readings = vec![];
+                let mut timings = vec![];
 
-                let ndm_smt = NdmSmtConfigBuilder::default()
-                    .height(h.clone())
-                    .max_thread_count(t.clone())
-                    .num_random_entities(*n)
-                    .build()
-                    .parse()
-                    .expect("Unable to parse NdmSmtConfig");
+                for _i in 0..3 {
+                    // this is necessary for the memory readings to work
+                    ndm_smt = None;
 
-                let tree_build_time = time_start.elapsed();
-                epoch.advance().unwrap();
-                let mem_after = allocated.read().unwrap();
-                println!("Memory after build {}", bytes_to_string(mem_after));
-                let mem_used_tree_build = abs_diff(mem_after, mem_before);
+                    epoch.advance().unwrap();
+                    let mem_before = allocated.read().unwrap();
+                    let time_start = Instant::now();
+
+                    let ndm_smt = Some(NdmSmtConfigBuilder::default()
+                        .height(h.clone())
+                        .max_thread_count(t.clone())
+                        .num_random_entities(*n)
+                        .build()
+                        .parse()
+                        .expect("Unable to parse NdmSmtConfig"));
+
+                    let tree_build_time = time_start.elapsed();
+                    epoch.advance().unwrap();
+                    let mem_after = allocated.read().unwrap();
+                    timings.push(tree_build_time.as_secs_f64());
+                    memory_readings.push(abs_diff(mem_after, mem_before) as f64);
+                }
+
+                // Convert from bytes to GB.
+                memory_readings = memory_readings
+                    .into_iter()
+                    .map(|m| m / 1024u64.pow(3) as f64)
+                    .collect();
+                let mean_mem = mean(&memory_readings);
+
+                // Convert from seconds to minutes.
+                timings = timings.into_iter().map(|m| m / 60f64).collect();
+                let mean_time = mean(&timings);
 
                 // ==============================================================
                 // Tree serialization.
@@ -124,10 +143,10 @@ fn main() {
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc = Accumulator::NdmSmt(ndm_smt);
+                let acc = Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
 
                 let time_start = Instant::now();
-                acc.serialize(path.clone());
+                acc.serialize(path.clone()).unwrap();
                 let serialization_time = time_start.elapsed();
 
                 let file_size = std::fs::metadata(path)
@@ -138,13 +157,17 @@ fn main() {
                 // Print stats.
 
                 println!(
-                    "\nTime taken to build tree: {:?}\n \
-                     Memory used to build tree: {}\n \
+                    "\nTime taken to build tree (minutes): {:.2} +/- {:.4} ({:.2})\n \
+                     Memory used to build tree (GB): {:.2} +/- {:.4} ({:.2})\n \
                      Time taken to serialize tree: {:?}\n \
                      Serialized tree file size: {}\n \
                      ========================================================================",
-                    tree_build_time,
-                    bytes_to_string(mem_used_tree_build),
+                    mean(&timings),
+                    standard_deviation(&timings, Some(mean_time)),
+                    median(&timings),
+                    mean(&memory_readings),
+                    standard_deviation(&memory_readings, Some(mean_mem)),
+                    median(&memory_readings),
                     serialization_time,
                     bytes_to_string(file_size as usize)
                 );
