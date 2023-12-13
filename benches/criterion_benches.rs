@@ -15,10 +15,10 @@ use criterion::{BenchmarkId, Criterion, SamplingMode};
 use statistical::*;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{initialize_machine_parallelism, Accumulator};
+use dapol::{Accumulator, InclusionProof};
 
 mod inputs;
-use inputs::{max_thread_counts, tree_heights, num_entities_in_range};
+use inputs::{max_thread_counts, num_entities_in_range, tree_heights};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -41,7 +41,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
-    initialize_machine_parallelism();
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     let mut group = c.benchmark_group("build_tree");
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
@@ -243,6 +244,8 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 .next()
                 .expect("Tree should have at least 1 entity");
 
+            let mut proof = Option::<InclusionProof>::None;
+
             group.bench_function(
                 BenchmarkId::new(
                     "generate_proof",
@@ -250,11 +253,32 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 ),
                 |bench| {
                     bench.iter(|| {
-                        let _proof = ndm_smt
-                            .generate_inclusion_proof(entity_id)
-                            .expect("Proof should have been generated successfully");
+                        proof = Some(
+                            ndm_smt
+                                .generate_inclusion_proof(entity_id)
+                                .expect("Proof should have been generated successfully"),
+                        );
                     });
                 },
+            );
+
+            // =============================================================
+            // Proof serialization.
+
+            let src_dir = env!("CARGO_MANIFEST_DIR");
+            let target_dir = Path::new(&src_dir).join("target");
+            let dir = target_dir.join("serialized_proofs");
+            let path = proof
+                .expect("Proof should be set")
+                .serialize(entity_id, dir)
+                .unwrap();
+            let file_size = std::fs::metadata(path)
+                .expect("Unable to get serialized tree metadata for {path}")
+                .len();
+
+            println!(
+                "\nSerialized tree file size: {}\n",
+                bytes_to_string(file_size as usize)
             );
         }
     }
@@ -345,7 +369,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_generate_proof, bench_verify_proof, bench_build_tree
+    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
 }
 
 // Does not work, see memory_measurement.rs

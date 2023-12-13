@@ -230,7 +230,7 @@ impl InclusionProof {
     /// An error is returned if
     /// 1. [bincode] fails to serialize the file.
     /// 2. There is an issue opening or writing the file.
-    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<(), InclusionProofError> {
+    pub fn serialize(&self, entity_id: &EntityId, dir: PathBuf) -> Result<PathBuf, InclusionProofError> {
         let mut file_name = entity_id.to_string();
         file_name.push('.');
         file_name.push_str(SERIALIZED_PROOF_EXTENSION);
@@ -238,9 +238,9 @@ impl InclusionProof {
         let path = dir.join(file_name);
         info!("Serializing inclusion proof to path {:?}", path);
 
-        read_write_utils::serialize_to_bin_file(&self, path)?;
+        read_write_utils::serialize_to_bin_file(&self, path.clone())?;
 
-        Ok(())
+        Ok(path)
     }
 
     /// Deserialize the [InclusionProof] structure from a binary file.
