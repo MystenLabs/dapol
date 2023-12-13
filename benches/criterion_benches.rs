@@ -345,7 +345,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_generate_proof, bench_verify_proof,
+    targets = bench_generate_proof, bench_verify_proof, bench_build_tree
 }
 
 // Does not work, see memory_measurement.rs
