@@ -23,11 +23,11 @@ pub static MAX_ENTITIES: Lazy<u64> = Lazy::new(|| {
         .unwrap()
 });
 
+use clap_verbosity_flag::{Level, LevelFilter};
+
 /// Set the log level of the dapol code.
-pub static LOG_VERBOSITY: Lazy<clap_verbosity_flag::LevelFilter> = Lazy::new(|| {
-    clap_verbosity_flag::Level::from_str(
-        &std::env::var("LOG_VERBOSITY").unwrap_or("WARN".to_string()),
-    )
-    .unwrap()
-    .to_level_filter()
+pub static LOG_VERBOSITY: Lazy<LevelFilter> = Lazy::new(|| {
+    std::env::var("LOG_VERBOSITY")
+        .map(|x| Level::from_str(&x).unwrap().to_level_filter())
+        .unwrap_or(LevelFilter::Off)
 });
