@@ -5,13 +5,12 @@
 //! benches just do a single run. The measurements will not be as accurate,
 //! unfortunately, but this is the trade-off.
 
-use once_cell::sync::Lazy;
 use std::{time::Instant, str::FromStr};
 
 use dapol::accumulators::NdmSmtConfigBuilder;
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_greater_than, tree_heights};
+use inputs::{max_thread_counts, tree_heights, num_entities_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -19,22 +18,8 @@ use memory_usage_estimation::estimated_total_memory_usage_mb;
 mod utils;
 use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
-/// Determines how many runs are done for number of entities.
-/// The higher this value the fewer runs that are done.
-///
-/// Some of the tree builds can take a few hours, and Criterion does a minimum
-/// of 10 samples per bench. So this value gives us to decide how much of the
-/// num_entities
-static MIN_ENTITIES_FOR_MANUAL_BENCHES: Lazy<u64> = Lazy::new(|| {
-    std::env::var("MIN_ENTITIES_FOR_MANUAL_BENCHES")
-        .unwrap_or("100000".to_string())
-        .parse()
-        .unwrap()
-});
-
-static LOG_VERBOSITY: Lazy<clap_verbosity_flag::LevelFilter> = Lazy::new(|| {
-    clap_verbosity_flag::Level::from_str(&std::env::var("LOG_VERBOSITY").unwrap_or("WARN".to_string())).unwrap().to_level_filter()
-});
+mod env_vars;
+use env_vars::{LOG_VERBOSITY, MAX_ENTITIES, MIN_ENTITIES};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -58,7 +43,7 @@ fn main() {
 
     for h in tree_heights().iter() {
         for t in max_thread_counts().iter() {
-            for n in num_entities_greater_than(*MIN_ENTITIES_FOR_MANUAL_BENCHES).iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 // ==============================================================
                 // Input validation.
 

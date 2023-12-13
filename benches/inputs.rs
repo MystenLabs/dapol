@@ -53,12 +53,8 @@ pub fn num_entities() -> Vec<u64> {
     ])
 }
 
-pub fn num_entities_less_than_eq(n: u64) -> Vec<u64> {
-    num_entities().into_iter().filter(|x| x <= &n).collect()
-}
-
-pub fn num_entities_greater_than(n: u64) -> Vec<u64> {
-    num_entities().into_iter().filter(|x| x > &n).collect()
+pub fn num_entities_in_range(lower: u64, upper: u64) -> Vec<u64> {
+    num_entities().into_iter().filter(|x| &lower <= x && x <= &upper).collect()
 }
 
 pub fn max_thread_counts() -> Vec<MaxThreadCount> {

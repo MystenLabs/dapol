@@ -12,14 +12,13 @@ use std::path::Path;
 use criterion::measurement::Measurement;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
-use once_cell::sync::Lazy;
 use statistical::*;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::{initialize_machine_parallelism, Accumulator};
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_less_than_eq, tree_heights};
+use inputs::{max_thread_counts, tree_heights, num_entities_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -27,18 +26,8 @@ use memory_usage_estimation::estimated_total_memory_usage_mb;
 mod utils;
 use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
-/// Determines how many runs are done for number of entities.
-/// The higher this value the more runs that are done.
-///
-/// Some of the tree builds can take a few hours, and Criterion does a minimum
-/// of 10 samples per bench. So this value gives us to decide how much of the
-/// num_entities
-static MAX_ENTITIES_FOR_CRITERION_BENCHES: Lazy<u64> = Lazy::new(|| {
-    std::env::var("MAX_ENTITIES_FOR_CRITERION")
-        .unwrap_or("100000".to_string())
-        .parse()
-        .unwrap()
-});
+mod env_vars;
+use env_vars::{LOG_VERBOSITY, MAX_ENTITIES, MIN_ENTITIES};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -61,7 +50,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
     for h in tree_heights().iter() {
         for t in max_thread_counts().iter() {
-            for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 println!("=============================================================\n");
 
                 // =============================================================
@@ -203,7 +192,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     group.sample_size(20);
 
     for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
@@ -278,7 +267,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     group.sample_size(20);
 
     for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
