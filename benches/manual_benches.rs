@@ -6,8 +6,9 @@
 //! unfortunately, but this is the trade-off.
 
 use std::{time::Instant, str::FromStr};
+use std::path::Path;
 
-use dapol::accumulators::NdmSmtConfigBuilder;
+use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder};
 
 mod inputs;
 use inputs::{max_thread_counts, tree_heights, num_entities_in_range};
