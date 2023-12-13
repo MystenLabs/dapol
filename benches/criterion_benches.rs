@@ -99,19 +99,19 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let mut memory_readings = vec![];
                 let mut ndm_smt = Option::<NdmSmt>::None;
 
-                // group.bench_with_input(
-                //     BenchmarkId::new(
-                //         "build_tree",
-                //         format!(
-                //             "height_{}/max_thread_count_{}/num_entities_{}",
-                //             h.as_u32(),
-                //             t.as_u8(),
-                //             n
-                //         ),
-                //     ),
-                //     &(h, t, n),
-                //     |bench, tup| {
-                //         bench.iter(|| {
+                group.bench_with_input(
+                    BenchmarkId::new(
+                        "build_tree",
+                        format!(
+                            "height_{}/max_thread_count_{}/num_entities_{}",
+                            h.as_u32(),
+                            t.as_u8(),
+                            n
+                        ),
+                    ),
+                    &(h, t, n),
+                    |bench, tup| {
+                        bench.iter(|| {
                             // this is necessary for the memory readings to work
                             ndm_smt = None;
 
@@ -120,12 +120,9 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
                             ndm_smt = Some(
                                 NdmSmtConfigBuilder::default()
-                                    //.height(tup.0.clone())
-                                    .height(h.clone())
-                                    //.max_thread_count(tup.1.clone())
-                                    .max_thread_count(t.clone())
-                                    //.num_random_entities(*tup.2)
-                                    .num_random_entities(*n)
+                                    .height(tup.0.clone())
+                                    .max_thread_count(tup.1.clone())
+                                    .num_random_entities(*tup.2)
                                     .build()
                                     .parse()
                                     .expect("Unable to parse NdmSmtConfig"),
@@ -134,9 +131,9 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                             epoch.advance().unwrap();
                             memory_readings
                                 .push(abs_diff(allocated.read().unwrap(), before) as f64);
-                //         });
-                //     },
-                // );
+                        });
+                    },
+                );
 
                 memory_readings = memory_readings
                     .into_iter()
@@ -160,22 +157,20 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
                 let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
 
-                // group.bench_function(
-                //     BenchmarkId::new(
-                //         "serialize_tree",
-                //         format!(
-                //             "height_{}/max_thread_count_{}/num_entities_{}",
-                //             h.as_u32(),
-                //             t.as_u8(),
-                //             n
-                //         ),
-                //     ),
-                //     |bench| {
-                //         bench.iter(||
-                                   acc.serialize(path.clone()).unwrap();
-                //         );
-                //     },
-                // );
+                group.bench_function(
+                    BenchmarkId::new(
+                        "serialize_tree",
+                        format!(
+                            "height_{}/max_thread_count_{}/num_entities_{}",
+                            h.as_u32(),
+                            t.as_u8(),
+                            n
+                        ),
+                    ),
+                    |bench| {
+                        bench.iter(|| acc.serialize(path.clone()).unwrap());
+                    },
+                );
 
                 let file_size = std::fs::metadata(path)
                     .expect("Unable to get serialized tree metadata for {path}")

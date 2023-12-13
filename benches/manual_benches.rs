@@ -116,19 +116,19 @@ fn main() {
                 // ==============================================================
                 // Tree serialization.
 
-                // let src_dir = env!("CARGO_MANIFEST_DIR");
-                // let target_dir = Path::new(&src_dir).join("target");
-                // let dir = target_dir.join("serialized_trees");
-                // let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                // let acc = Accumulator::NdmSmt(ndm_smt);
+                let src_dir = env!("CARGO_MANIFEST_DIR");
+                let target_dir = Path::new(&src_dir).join("target");
+                let dir = target_dir.join("serialized_trees");
+                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
+                let acc = Accumulator::NdmSmt(ndm_smt);
 
-                // let time_start = Instant::now();
-                // acc.serialize(path.clone());
-                // let serialization_time = time_start.elapsed();
+                let time_start = Instant::now();
+                acc.serialize(path.clone());
+                let serialization_time = time_start.elapsed();
 
-                // let file_size = std::fs::metadata(path)
-                //     .expect("Unable to get serialized tree metadata for {path}")
-                //     .len();
+                let file_size = std::fs::metadata(path)
+                    .expect("Unable to get serialized tree metadata for {path}")
+                    .len();
 
                 // ==============================================================
                 // Print stats.
@@ -141,10 +141,8 @@ fn main() {
                      ========================================================================",
                     tree_build_time,
                     bytes_to_string(mem_used_tree_build),
-                    "NA",
-                    "NA",
-                    // serialization_time,
-                    // bytes_to_string(file_size as usize)
+                    serialization_time,
+                    bytes_to_string(file_size as usize)
                 );
             }
         }
