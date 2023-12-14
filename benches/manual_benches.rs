@@ -22,6 +22,9 @@ use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 mod env_vars;
 use env_vars::{LOG_VERBOSITY, MAX_ENTITIES, MIN_ENTITIES};
 
+use crate::env_vars::{MIN_HEIGHT, MAX_HEIGHT};
+use crate::inputs::tree_heights_in_range;
+
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -42,7 +45,7 @@ fn main() {
               Manual benchmarks"
     );
 
-    for h in tree_heights().iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
         for t in max_thread_counts().iter() {
             for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 // ==============================================================
