@@ -57,10 +57,6 @@ use super::{BinaryTree, TreeBuildError};
 
 const BUG: &str = "[Bug in multi-threaded builder]";
 
-/// This is required to get jemalloc_ctl to work properly.
-#[global_allocator]
-static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
-
 // -------------------------------------------------------------------------------------------------
 // Tree build function.
 
