@@ -413,7 +413,9 @@ where
         );
     }
 
-    debug!("Inside parallel build algo {:?}", params);
+    if params.y_coord > params.height.as_u32() / 2 {
+        debug!("Inside parallel build algo {:?}", params);
+    }
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
