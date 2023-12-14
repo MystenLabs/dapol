@@ -10,7 +10,7 @@ pub static MIN_ENTITIES: Lazy<u64> = Lazy::new(|| {
     std::env::var("MIN_ENTITIES")
         .unwrap_or("0".to_string())
         .parse()
-        .unwrap()
+        .expect("MIN_ENTITIES env var string parsing error")
 });
 
 /// Sets the upper bound on the number of entities for benchmarks.
@@ -21,7 +21,7 @@ pub static MAX_ENTITIES: Lazy<u64> = Lazy::new(|| {
     std::env::var("MAX_ENTITIES")
         .unwrap_or("250000000".to_string())
         .parse()
-        .unwrap()
+        .expect("MAX_ENTITIES env var string parsing error")
 });
 
 /// Sets the lower bound on the tree height for benchmarks.
@@ -31,10 +31,10 @@ pub static MAX_ENTITIES: Lazy<u64> = Lazy::new(|| {
 pub static MIN_HEIGHT: Lazy<Height> = Lazy::new(|| {
     Height::from_str(
         std::env::var("MIN_HEIGHT")
-            .unwrap_or("0".to_string())
+            .unwrap_or(dapol::MIN_HEIGHT.as_u32().to_string())
             .as_str(),
     )
-    .unwrap()
+    .expect("MIN_HEIGHT env var string parsing error")
 });
 
 /// Sets the upper bound on the number of height for benchmarks.
@@ -44,10 +44,10 @@ pub static MIN_HEIGHT: Lazy<Height> = Lazy::new(|| {
 pub static MAX_HEIGHT: Lazy<Height> = Lazy::new(|| {
     Height::from_str(
         std::env::var("MAX_HEIGHT")
-            .unwrap_or("250000000".to_string())
+            .unwrap_or(dapol::MAX_HEIGHT.as_u32().to_string())
             .as_str(),
     )
-    .unwrap()
+    .expect("MAX_HEIGHT env var string parsing error")
 });
 
 use clap_verbosity_flag::{Level, LevelFilter};
