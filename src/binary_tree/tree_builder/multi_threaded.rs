@@ -413,7 +413,7 @@ where
         );
     }
 
-    if params.y_coord > params.height.as_u32() / 2 {
+    if params.y_coord > params.height.as_raw_int() / 2 {
         debug!("Inside parallel build algo {:?}", params);
     }
 
