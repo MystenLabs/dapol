@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{warn, debug};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -106,6 +106,8 @@ where
         );
     }
 
+    debug!("Before parallel build algo");
+
     // Parallelized build algorithm.
     let root = build_node(
         params,
@@ -113,6 +115,8 @@ where
         Arc::new(new_padding_node_content),
         Arc::clone(&store),
     );
+
+    debug!("After parallel build algo");
 
     let store = DashMapStore {
         map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
@@ -408,6 +412,8 @@ where
             v
         );
     }
+
+    debug!("Inside parallel build algo height {} thread count {:?}", params.height.as_u32(), params.thread_count);
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
