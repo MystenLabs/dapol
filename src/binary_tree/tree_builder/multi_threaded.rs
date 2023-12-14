@@ -234,7 +234,7 @@ impl<C: Mergeable> MatchedPair<C> {
 /// `max_thread_count` is there to prevent more threads being spawned
 /// than there are cores to execute them. If too many threads are spawned then
 /// the parallelization can actually be detrimental to the run-time. Threads
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RecursionParams {
     x_coord_min: u64,
     x_coord_mid: u64,
@@ -413,7 +413,7 @@ where
         );
     }
 
-    debug!("Inside parallel build algo height {} thread count {:?}", params.height.as_u32(), params.thread_count);
+    debug!("Inside parallel build algo {:?}", params);
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
