@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{warn, debug};
+use log::{debug, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -56,6 +56,10 @@ use super::super::{
 use super::{BinaryTree, TreeBuildError};
 
 const BUG: &str = "[Bug in multi-threaded builder]";
+
+/// This is required to get jemalloc_ctl to work properly.
+#[global_allocator]
+static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
 // -------------------------------------------------------------------------------------------------
 // Tree build function.
@@ -378,6 +382,8 @@ where
     C: Debug + Clone + Mergeable + Send + Sync + 'static,
     F: Fn(&Coordinate) -> C + Send + Sync + 'static,
 {
+    debug!("Inside parallel build algo {}", params.y_coord);
+
     {
         let max_nodes = Height::from_y_coord(params.y_coord).max_bottom_layer_nodes();
         assert!(
@@ -413,13 +419,14 @@ where
         );
     }
 
-    if params.y_coord > params.height.as_raw_int() / 2 {
-        debug!("Inside parallel build algo {:?}", params);
-    }
+    let epoch = jemalloc_ctl::epoch::mib().unwrap();
+    let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
+    debug!("  passed tests");
 
     // Base case: reached the 2nd-to-bottom layer.
     // There are either 2 or 1 leaves left (which is checked above).
     if params.y_coord == 1 {
+        debug!("  base case");
         let pair = if leaves.len() == 2 {
             let right = leaves.pop().unwrap();
             let left = leaves.pop().unwrap();
@@ -527,11 +534,53 @@ where
     };
 
     if within_store_depth_for_children {
+        debug!("  inserting into store");
+        epoch.advance().unwrap();
+        let mem_before = allocated.read().unwrap();
         map.insert(pair.left.coord.clone(), pair.left.clone());
         map.insert(pair.right.coord.clone(), pair.right.clone());
+        epoch.advance().unwrap();
+        let mem_after = allocated.read().unwrap();
+        let mem_used = abs_diff(mem_after, mem_before);
+        debug!(
+            "  done inserting into store, mem diff {}",
+            bytes_to_string(mem_used),
+        );
     }
 
     pair.merge()
+}
+
+pub fn abs_diff(x: usize, y: usize) -> usize {
+    if y < x {
+        x - y
+    } else {
+        y - x
+    }
+}
+
+pub fn bytes_to_string(num_bytes: usize) -> String {
+    if num_bytes < 1024 {
+        format!("{} bytes", num_bytes)
+    } else if num_bytes >= 1024 && num_bytes < 1024usize.pow(2) {
+        format!("{} kB", num_bytes / 1024)
+    } else if num_bytes >= 1024usize.pow(2) && num_bytes < 1024usize.pow(3) {
+        // scale to get accurate decimal values
+        format!(
+            "{:.2} MB",
+            ((num_bytes as f32 / 1024u64.pow(2) as f32) * 1000.0).round() / 1000.0
+        )
+    } else if num_bytes >= 1024usize.pow(3) && num_bytes < 1024usize.pow(4) {
+        format!(
+            "{:.2} GB",
+            ((num_bytes as f32 / 1024u64.pow(3) as f32) * 1000000.0).round() / 1000000.0
+        )
+    } else {
+        format!(
+            "{:.2} TB",
+            ((num_bytes as f32 / 1024u64.pow(4) as f32) * 1000000000.0).round() / 1000000000.0
+        )
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
