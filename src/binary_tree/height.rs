@@ -97,6 +97,11 @@ impl Height {
         self.0 as u32
     }
 
+    /// Return the underlying integer value as type u64.
+    pub fn as_u64(&self) -> u64 {
+        self.0 as u64
+    }
+
     /// The maximum number of leaf nodes on the bottom layer of the binary tree.
     ///
     /// $$\text{max} = 2^{\text{height}-1}$$

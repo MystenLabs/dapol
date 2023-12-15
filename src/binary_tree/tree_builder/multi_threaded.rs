@@ -93,7 +93,8 @@ where
             .collect::<Vec<Node<C>>>()
     };
 
-    let store = Arc::new(DashMap::<Coordinate, Node<C>>::new());
+    let max_nodes = max_nodes_to_store(leaf_nodes.len() as u64, height.clone());
+    let store = Arc::new(DashMap::<Coordinate, Node<C>>::with_capacity(max_nodes as usize));
     let params = RecursionParams::from_tree_height(height.clone())
         .with_store_depth(store_depth)
         .with_max_thread_count(max_thread_count.as_u8());
@@ -553,6 +554,11 @@ pub fn abs_diff(x: usize, y: usize) -> usize {
     } else {
         y - x
     }
+}
+
+fn max_nodes_to_store(num_leaf_nodes: u64, height: Height) -> u64 {
+    let k = num_leaf_nodes.ilog2();
+    2u64.pow(k) * (2 * (height.as_u64() - (k as u64) - 1) + 1) + 2u64.pow(k) - 1
 }
 
 pub fn bytes_to_string(num_bytes: usize) -> String {
