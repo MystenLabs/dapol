@@ -1,6 +1,19 @@
-use dapol::Height;
+use dapol::{Height, MaxThreadCount};
 use once_cell::sync::Lazy;
 use std::str::FromStr;
+
+/// Sets the lower bound on the number of total thread count for benchmarks.
+///
+/// A pre-determined list of entity numbers is looped over, and each one is used
+/// as input for a benchmark. This env var sets the lower bound in that list.
+pub static MIN_TOTAL_THREAD_COUNT: Lazy<MaxThreadCount> = Lazy::new(|| {
+    MaxThreadCount::from_str(
+        std::env::var("MIN_TOTAL_THREAD_COUNT")
+            .unwrap_or("0".to_string())
+            .as_str(),
+    )
+    .expect("MIN_TOTAL_THREAD_COUNT env var string parsing error")
+});
 
 /// Sets the lower bound on the number of entities for benchmarks.
 ///

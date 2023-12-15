@@ -10,10 +10,13 @@ use std::{str::FromStr, time::Instant};
 
 use statistical::*;
 
-use dapol::accumulators::{Accumulator, NdmSmtConfigBuilder, NdmSmt};
+use dapol::accumulators::{Accumulator, NdmSmt, NdmSmtConfigBuilder};
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_in_range, tree_heights};
+use inputs::{
+    max_thread_counts, max_thread_counts_greater_than, num_entities_in_range, tree_heights,
+    tree_heights_in_range,
+};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -22,10 +25,9 @@ mod utils;
 use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
 mod env_vars;
-use env_vars::{LOG_VERBOSITY, MAX_ENTITIES, MIN_ENTITIES};
-
-use crate::env_vars::{MIN_HEIGHT, MAX_HEIGHT};
-use crate::inputs::tree_heights_in_range;
+use env_vars::{
+    LOG_VERBOSITY, MAX_ENTITIES, MAX_HEIGHT, MIN_ENTITIES, MIN_HEIGHT, MIN_TOTAL_THREAD_COUNT,
+};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -46,7 +48,7 @@ fn main() {
     );
 
     for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
-        for t in max_thread_counts().iter() {
+        for t in max_thread_counts_greater_than(&MIN_TOTAL_THREAD_COUNT).iter() {
             for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 // ==============================================================
                 // Input validation.
@@ -110,13 +112,15 @@ fn main() {
                     let mem_before = allocated.read().unwrap();
                     let time_start = Instant::now();
 
-                    let ndm_smt = Some(NdmSmtConfigBuilder::default()
-                        .height(h.clone())
-                        .max_thread_count(t.clone())
-                        .num_random_entities(*n)
-                        .build()
-                        .parse()
-                        .expect("Unable to parse NdmSmtConfig"));
+                    let ndm_smt = Some(
+                        NdmSmtConfigBuilder::default()
+                            .height(h.clone())
+                            .max_thread_count(t.clone())
+                            .num_random_entities(*n)
+                            .build()
+                            .parse()
+                            .expect("Unable to parse NdmSmtConfig"),
+                    );
 
                     let tree_build_time = time_start.elapsed();
                     epoch.advance().unwrap();
@@ -143,7 +147,8 @@ fn main() {
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc = Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
+                let acc =
+                    Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
 
                 let time_start = Instant::now();
                 acc.serialize(path.clone()).unwrap();

@@ -85,10 +85,17 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
 
     println!(
         "\n====================================================== \
-              \nmax_thread_counts {:?} \
-              \n======================================================",
+         \nmax_thread_counts {:?} \
+         \n======================================================",
         tc
     );
 
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()
+}
+
+pub fn max_thread_counts_greater_than(lower_bound: &MaxThreadCount) -> Vec<MaxThreadCount> {
+     max_thread_counts()
+        .into_iter()
+        .filter(|x| lower_bound <= x)
+        .collect()
 }
