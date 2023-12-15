@@ -112,7 +112,7 @@ fn main() {
                     let mem_before = allocated.read().unwrap();
                     let time_start = Instant::now();
 
-                    let ndm_smt = Some(
+                    ndm_smt = Some(
                         NdmSmtConfigBuilder::default()
                             .height(h.clone())
                             .max_thread_count(t.clone())
