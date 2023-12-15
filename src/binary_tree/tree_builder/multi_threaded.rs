@@ -37,10 +37,10 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{warn, debug};
 use logging_timer::stime;
 
-use dashmap::DashMap;
+use dashmap::{DashMap};
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -116,6 +116,8 @@ where
         Arc::new(new_padding_node_content),
         Arc::clone(&store),
     );
+
+    store.shrink_to_fit();
 
     let store = DashMapStore {
         map: Arc::into_inner(store).ok_or(TreeBuildError::StoreOwnershipFailure)?,
@@ -522,6 +524,7 @@ where
     };
 
     if within_store_depth_for_children {
+        debug!("shards {} capacity {} len {}", map.shards().len(), map.capacity(), map.len());
         map.insert(pair.left.coord.clone(), pair.left.clone());
         map.insert(pair.right.coord.clone(), pair.right.clone());
     }
