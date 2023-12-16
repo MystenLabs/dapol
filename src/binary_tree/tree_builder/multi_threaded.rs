@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{debug, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -450,7 +450,18 @@ where
             let mut spawn_thread = false;
             {
                 let mut thread_count = params.thread_count.lock().unwrap();
+                debug!(
+                    "id {:?} lock A params.thread_count {} y_coord {}",
+                    std::thread::current().id(),
+                    *thread_count,
+                    params.y_coord
+                );
+
                 if *thread_count < params.max_thread_count {
+                    debug!(
+                        "id {:?} increasing thread_count",
+                        std::thread::current().id()
+                    );
                     *thread_count += 1;
                     spawn_thread = true;
                 }
@@ -462,7 +473,9 @@ where
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 
+                debug!("id {:?} spawning thread", std::thread::current().id());
                 let right_handler = thread::spawn(move || -> Node<C> {
+                    debug!("id {:?} thread spawned", std::thread::current().id());
                     build_node(
                         params_clone.into_right_child(),
                         right_leaves,
@@ -532,12 +545,23 @@ where
         map.insert(pair.right.coord.clone(), pair.right.clone());
     }
 
-    // {
-    //     let mut thread_count = params.thread_count.lock().unwrap();
-    //     if *thread_count > 1 {
-    //         *thread_count -= 1;
-    //     }
-    // }
+    {
+        let mut thread_count = params.thread_count.lock().unwrap();
+        debug!(
+            "id {:?} lock B params.thread_count {} y_coord {}",
+            std::thread::current().id(),
+            *thread_count,
+            params.y_coord
+        );
+
+        if *thread_count > 1 {
+            debug!(
+                "id {:?} decreasing thread_count",
+                std::thread::current().id()
+            );
+            *thread_count -= 1;
+        }
+    }
 
     pair.merge()
 }
