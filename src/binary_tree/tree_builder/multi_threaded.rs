@@ -447,12 +447,18 @@ where
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
 
+            let mut spawn_thread = false;
+            {
+                let mut thread_count = params.thread_count.lock().unwrap();
+                if *thread_count > params.max_thread_count {
+                    *thread_count += 1;
+                    spawn_thread = true;
+                }
+            }
+
             // Split off a thread to build the right child, but only do this if the thread
             // count is less than the max allowed.
-            if *params.thread_count.lock().unwrap() < params.max_thread_count {
-                {
-                    *params.thread_count.lock().unwrap() += 1;
-                }
+            if spawn_thread {
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 
