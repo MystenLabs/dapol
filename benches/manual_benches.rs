@@ -107,6 +107,7 @@ fn main() {
                 for _i in 0..3 {
                     // this is necessary for the memory readings to work
                     ndm_smt = None;
+                    println!("building tree i {}", _i);
 
                     epoch.advance().unwrap();
                     let mem_before = allocated.read().unwrap();
@@ -143,6 +144,7 @@ fn main() {
                 // ==============================================================
                 // Tree serialization.
 
+                println!("seriliazing tree");
                 let src_dir = env!("CARGO_MANIFEST_DIR");
                 let target_dir = Path::new(&src_dir).join("target");
                 let dir = target_dir.join("serialized_trees");

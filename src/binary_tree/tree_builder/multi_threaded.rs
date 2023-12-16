@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::warn;
+use log::{warn, debug};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -455,6 +455,8 @@ where
                 }
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
+
+                debug!("spawning new thread, total threads {} y_coord {}", *params.thread_count.lock().unwrap(), params.y_coord);
 
                 let right_handler = thread::spawn(move || -> Node<C> {
                     build_node(
