@@ -450,7 +450,7 @@ where
             let mut spawn_thread = false;
             {
                 let mut thread_count = params.thread_count.lock().unwrap();
-                if *thread_count > params.max_thread_count {
+                if *thread_count < params.max_thread_count {
                     *thread_count += 1;
                     spawn_thread = true;
                 }
