@@ -532,12 +532,12 @@ where
         map.insert(pair.right.coord.clone(), pair.right.clone());
     }
 
-    {
-        let mut thread_count = params.thread_count.lock().unwrap();
-        if *thread_count > 1 {
-            *thread_count -= 1;
-        }
-    }
+    // {
+    //     let mut thread_count = params.thread_count.lock().unwrap();
+    //     if *thread_count > 1 {
+    //         *thread_count -= 1;
+    //     }
+    // }
 
     pair.merge()
 }
