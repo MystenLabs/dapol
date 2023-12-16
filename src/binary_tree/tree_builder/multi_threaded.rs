@@ -37,7 +37,7 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{warn, debug};
+use log::{debug, warn};
 use logging_timer::stime;
 
 use dashmap::DashMap;
@@ -456,7 +456,11 @@ where
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 
-                debug!("spawning new thread, total threads {} y_coord {}", *params.thread_count.lock().unwrap(), params.y_coord);
+                debug!(
+                    "spawning new thread, total threads {} y_coord {}",
+                    *params.thread_count.lock().unwrap(),
+                    params.y_coord
+                );
 
                 let right_handler = thread::spawn(move || -> Node<C> {
                     build_node(
@@ -468,7 +472,7 @@ where
                 });
 
                 let left = build_node(
-                    params.into_left_child(),
+                    params.clone().into_left_child(),
                     left_leaves,
                     new_padding_node_content,
                     Arc::clone(&map),
@@ -490,7 +494,7 @@ where
                 );
 
                 let left = build_node(
-                    params.into_left_child(),
+                    params.clone().into_left_child(),
                     left_leaves,
                     new_padding_node_content,
                     Arc::clone(&map),
@@ -502,7 +506,7 @@ where
         NumNodes::Full => {
             // Go down left child only (there are no leaves living on the right side).
             let left = build_node(
-                params.into_left_child(),
+                params.clone().into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
                 Arc::clone(&map),
@@ -513,7 +517,7 @@ where
         NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
             let right = build_node(
-                params.into_right_child(),
+                params.clone().into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
                 Arc::clone(&map),
@@ -526,6 +530,12 @@ where
     if within_store_depth_for_children {
         map.insert(pair.left.coord.clone(), pair.left.clone());
         map.insert(pair.right.coord.clone(), pair.right.clone());
+    }
+
+    if *params.thread_count.lock().unwrap() > 1 {
+        {
+            *params.thread_count.lock().unwrap() -= 1;
+        }
     }
 
     pair.merge()
