@@ -450,18 +450,18 @@ where
             let mut spawn_thread = false;
             {
                 let mut thread_count = params.thread_count.lock().unwrap();
-                debug!(
-                    "id {:?} lock A params.thread_count {} y_coord {}",
-                    std::thread::current().id(),
-                    *thread_count,
-                    params.y_coord
-                );
+                // debug!(
+                //     "id {:?} lock A params.thread_count {} y_coord {}",
+                //     std::thread::current().id(),
+                //     *thread_count,
+                //     params.y_coord
+                // );
 
                 if *thread_count < params.max_thread_count {
-                    debug!(
-                        "id {:?} increasing thread_count",
-                        std::thread::current().id()
-                    );
+                    // debug!(
+                    //     "id {:?} increasing thread_count",
+                    //     std::thread::current().id()
+                    // );
                     *thread_count += 1;
                     spawn_thread = true;
                 }
@@ -473,7 +473,7 @@ where
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 
-                debug!("id {:?} spawning thread", std::thread::current().id());
+                // debug!("id {:?} spawning thread", std::thread::current().id());
                 let right_handler = thread::spawn(move || -> Node<C> {
                     debug!("id {:?} thread spawned", std::thread::current().id());
                     build_node(
@@ -497,6 +497,24 @@ where
                     .join()
                     .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
+                {
+                    let mut thread_count = params.thread_count.lock().unwrap();
+                    // debug!(
+                    //     "id {:?} lock B params.thread_count {} y_coord {}",
+                    //     std::thread::current().id(),
+                    //     *thread_count,
+                    //     params.y_coord
+                    // );
+
+                    if *thread_count > 1 {
+                        // debug!(
+                        //     "id {:?} decreasing thread_count",
+                        //     std::thread::current().id()
+                        // );
+                        *thread_count -= 1;
+                    }
+                }
+
                 MatchedPair::from(left, right)
             } else {
                 let right = build_node(
@@ -507,7 +525,7 @@ where
                 );
 
                 let left = build_node(
-                    params.clone().into_left_child(),
+                    params.into_left_child(),
                     left_leaves,
                     new_padding_node_content,
                     Arc::clone(&map),
@@ -519,7 +537,7 @@ where
         NumNodes::Full => {
             // Go down left child only (there are no leaves living on the right side).
             let left = build_node(
-                params.clone().into_left_child(),
+                params.into_left_child(),
                 leaves,
                 new_padding_node_content.clone(),
                 Arc::clone(&map),
@@ -530,7 +548,7 @@ where
         NumNodes::Empty => {
             // Go down right child only (there are no leaves living on the left side).
             let right = build_node(
-                params.clone().into_right_child(),
+                params.into_right_child(),
                 leaves,
                 new_padding_node_content.clone(),
                 Arc::clone(&map),
@@ -543,24 +561,6 @@ where
     if within_store_depth_for_children {
         map.insert(pair.left.coord.clone(), pair.left.clone());
         map.insert(pair.right.coord.clone(), pair.right.clone());
-    }
-
-    {
-        let mut thread_count = params.thread_count.lock().unwrap();
-        debug!(
-            "id {:?} lock B params.thread_count {} y_coord {}",
-            std::thread::current().id(),
-            *thread_count,
-            params.y_coord
-        );
-
-        if *thread_count > 1 {
-            debug!(
-                "id {:?} decreasing thread_count",
-                std::thread::current().id()
-            );
-            *thread_count -= 1;
-        }
     }
 
     pair.merge()
