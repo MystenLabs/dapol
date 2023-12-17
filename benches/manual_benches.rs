@@ -144,21 +144,21 @@ fn main() {
                 // ==============================================================
                 // Tree serialization.
 
-                println!("seriliazing tree");
-                let src_dir = env!("CARGO_MANIFEST_DIR");
-                let target_dir = Path::new(&src_dir).join("target");
-                let dir = target_dir.join("serialized_trees");
-                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                let acc =
-                    Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
+                // println!("seriliazing tree");
+                // let src_dir = env!("CARGO_MANIFEST_DIR");
+                // let target_dir = Path::new(&src_dir).join("target");
+                // let dir = target_dir.join("serialized_trees");
+                // let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
+                // let acc =
+                //     Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
 
-                let time_start = Instant::now();
-                acc.serialize(path.clone()).unwrap();
-                let serialization_time = time_start.elapsed();
+                // let time_start = Instant::now();
+                // acc.serialize(path.clone()).unwrap();
+                // let serialization_time = time_start.elapsed();
 
-                let file_size = std::fs::metadata(path)
-                    .expect("Unable to get serialized tree metadata for {path}")
-                    .len();
+                // let file_size = std::fs::metadata(path)
+                //     .expect("Unable to get serialized tree metadata for {path}")
+                //     .len();
 
                 // ==============================================================
                 // Print stats.
@@ -175,8 +175,10 @@ fn main() {
                     mean(&memory_readings),
                     standard_deviation(&memory_readings, Some(mean_mem)),
                     median(&memory_readings),
-                    serialization_time,
-                    bytes_to_string(file_size as usize)
+                    "NA",
+                        "NA"
+                    // serialization_time,
+                    // bytes_to_string(file_size as usize)
                 );
             }
         }
