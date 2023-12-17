@@ -107,7 +107,8 @@ fn main() {
                 for _i in 0..3 {
                     // this is necessary for the memory readings to work
                     ndm_smt = None;
-                    println!("building tree i {}", _i);
+
+                    println!("building tree i {} time {}", _i, chrono::Local::now().format("%Y-%m-%d][%H:%M:%S"));
 
                     epoch.advance().unwrap();
                     let mem_before = allocated.read().unwrap();
