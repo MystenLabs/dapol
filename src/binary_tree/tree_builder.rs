@@ -19,8 +19,8 @@ pub mod multi_threaded;
 pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
-/// `height / DEFAULT_STORE_DEPTH_RATIO`
-pub const DEFAULT_STORE_DEPTH_RATIO: u8 = 1;
+/// `height / DEFAULT_STORE_DEPTH_RATIO_INVERTED`
+pub const DEFAULT_STORE_DEPTH_RATIO_INVERTED: u8 = 2;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
@@ -185,7 +185,7 @@ where
     /// dividing it by the default ratio.
     fn store_depth(&self, height: &Height) -> u8 {
         self.store_depth
-            .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO)
+            .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO_INVERTED)
     }
 
     /// Private function used internally to retrieve height for building.
