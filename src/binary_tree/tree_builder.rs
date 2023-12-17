@@ -20,7 +20,7 @@ pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
 /// `height / DEFAULT_STORE_DEPTH_RATIO_INVERTED`
-pub const DEFAULT_STORE_DEPTH_RATIO_INVERTED: u8 = 2;
+pub const DEFAULT_STORE_DEPTH_RATIO_INVERTED: u8 = 4;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
