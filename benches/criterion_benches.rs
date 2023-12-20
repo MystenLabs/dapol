@@ -190,7 +190,6 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 /// generation to have maximum threads.
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
-    group.sample_size(20);
 
     for h in tree_heights().iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
@@ -288,7 +287,6 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 /// verification does not depend on number of threads.
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
-    group.sample_size(20);
 
     for h in tree_heights().iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
@@ -369,7 +367,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
+    targets = bench_generate_proof, bench_verify_proof
 }
 
 // Does not work, see memory_measurement.rs
