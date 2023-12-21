@@ -132,7 +132,7 @@ impl ErrUnlessTrue for Option<bool> {
 // -------------------------------------------------------------------------------------------------
 // Testing utils.
 
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 pub mod test_utils {
     /// Check 2 errors are the same.
     /// https://stackoverflow.com/a/65618681

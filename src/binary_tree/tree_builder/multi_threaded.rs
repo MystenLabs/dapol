@@ -93,7 +93,7 @@ where
             .collect::<Vec<Node<C>>>()
     };
 
-    let max_nodes = max_nodes_to_store(leaf_nodes.len() as u64, height.clone());
+    let max_nodes = max_nodes_to_store(leaf_nodes.len() as u64, &height);
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::with_capacity(
         max_nodes as usize,
     ));
@@ -553,9 +553,21 @@ where
 }
 
 // TODO this does not work if store depth is not 100%
-fn max_nodes_to_store(num_leaf_nodes: u64, height: Height) -> u64 {
-    let k = num_leaf_nodes.ilog2();
-    2u64.pow(k) * (2 * (height.as_u64() - (k as u64) - 1) + 1) + 2u64.pow(k) - 1
+/// The maximum number of nodes that would need to be stored.
+///
+/// $$2n(h-\text{log}_2(n))-1$$
+///
+/// If we convert the result to a u64 then we should round up since we are
+/// trying to get an upper bound. Exactly the same result can be achieved
+/// by removing the -1 and flooring the result:
+///
+/// $$\text{floor}(2n(h-\text{log}_2(n)))$$
+fn max_nodes_to_store(num_leaf_nodes: u64, height: &Height) -> u64 {
+    let n = num_leaf_nodes as f64;
+    let k = n.log2();
+    let h = height.as_f64();
+
+    (2. * n * (h - k)) as u64
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -569,12 +581,13 @@ fn max_nodes_to_store(num_leaf_nodes: u64, height: Height) -> u64 {
 // TODO recursive function err - NOT x-coord max multiple of 2
 // TODO recursive function err - max - min must be power of 2
 
-#[cfg(test)]
-mod tests {
+#[cfg(any(test, fuzzing))]
+pub(crate) mod tests {
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, random_leaf_nodes, single_leaf, sparse_leaves,
+        TestContent,
     };
     use crate::utils::test_utils::{assert_err, assert_err_simple};
 
@@ -782,5 +795,64 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[cfg(fuzzing)]
+    pub fn fuzz_max_nodes_to_store(randomness: u64) {
+        // Bound the randomness.
+        let height = {
+            let max_height = 5;
+            let min_height = crate::MIN_HEIGHT.as_u8();
+            Height::from((randomness as u8 % (max_height - min_height)) + min_height)
+        };
+        let num_leaf_nodes = {
+            let upper_bound = height.max_bottom_layer_nodes();
+            let lower_bound = 1;
+            lower_bound + (randomness % (upper_bound - lower_bound))
+        };
+
+        // Value to check.
+        let max_nodes = max_nodes_to_store(num_leaf_nodes, &height);
+
+        // Max store depth.
+        let store_depth = height.as_u8();
+        let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, randomness);
+        // println!("{:?}", leaf_nodes);
+
+        let tree = TreeBuilder::new()
+            .with_height(height.clone())
+            .with_leaf_nodes(leaf_nodes)
+            .with_store_depth(store_depth)
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
+            .unwrap();
+
+        assert!(tree.store.len() <= max_nodes as usize);
+    }
+
+    #[test]
+    fn max_nodes_to_store_equality() {
+        // Got this by using the fuzzer and setting fuzz_max_nodes_to_store to
+        // assert strictly less than.
+        let seed = 15783146369096613887;
+
+        let height = Height::from(5);
+        let num_leaf_nodes = 3;
+        let store_depth = height.as_u8();
+        let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, seed);
+        let expected_number_of_nodes_in_store = max_nodes_to_store(num_leaf_nodes, &height);
+
+        let tree = TreeBuilder::new()
+            .with_height(height)
+            .with_leaf_nodes(leaf_nodes)
+            .with_store_depth(store_depth)
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
+            .unwrap();
+
+        assert_eq!(tree.store.len(), expected_number_of_nodes_in_store as usize);
+    }
+
+    #[test]
+    fn test_max_nodes_to_store() {
+        fuzz_max_nodes_to_store(16933534598778846985);
     }
 }

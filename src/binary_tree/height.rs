@@ -36,6 +36,7 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 /// let height = Height::from_str("8");
 /// ```
 #[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Height(UnderlyingInt);
 
 impl Height {
