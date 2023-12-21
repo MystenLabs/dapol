@@ -18,7 +18,7 @@ use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
 use dapol::{Accumulator, InclusionProof};
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_in_range, tree_heights};
+use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -27,7 +27,9 @@ mod utils;
 use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
 mod env_vars;
-use env_vars::{LOG_VERBOSITY, MAX_ENTITIES, MIN_ENTITIES};
+use env_vars::{
+    LOG_VERBOSITY, MAX_ENTITIES, MAX_HEIGHT, MIN_ENTITIES, MIN_HEIGHT, MIN_TOTAL_THREAD_COUNT,
+};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -49,8 +51,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
-    for h in tree_heights().iter() {
-        for t in max_thread_counts().iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
+        for t in max_thread_counts_greater_than(&MIN_TOTAL_THREAD_COUNT).iter() {
             for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 println!("=============================================================\n");
 
@@ -191,7 +193,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
@@ -276,7 +278,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 .len();
 
             println!(
-                "\nSerialized tree file size: {}\n",
+                "\nSerialized proof file size: {}\n",
                 bytes_to_string(file_size as usize)
             );
         }
@@ -288,7 +290,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
@@ -367,7 +369,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_generate_proof, bench_verify_proof
+    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
 }
 
 // Does not work, see memory_measurement.rs

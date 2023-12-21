@@ -6,17 +6,14 @@
 //! unfortunately, but this is the trade-off.
 
 use std::path::Path;
-use std::{str::FromStr, time::Instant};
+use std::time::Instant;
 
 use statistical::*;
 
 use dapol::accumulators::{Accumulator, NdmSmt, NdmSmtConfigBuilder};
 
 mod inputs;
-use inputs::{
-    max_thread_counts, max_thread_counts_greater_than, num_entities_in_range, tree_heights,
-    tree_heights_in_range,
-};
+use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
@@ -104,11 +101,16 @@ fn main() {
                 let mut memory_readings = vec![];
                 let mut timings = vec![];
 
+                // Do 3 readings (Criterion does 10 minimum).
                 for _i in 0..3 {
                     // this is necessary for the memory readings to work
                     ndm_smt = None;
 
-                    println!("building tree i {} time {}", _i, chrono::Local::now().format("%Y-%m-%d][%H:%M:%S"));
+                    println!(
+                        "building tree i {} time {}",
+                        _i,
+                        chrono::Local::now().format("%Y-%m-%d][%H:%M:%S")
+                    );
 
                     epoch.advance().unwrap();
                     let mem_before = allocated.read().unwrap();
@@ -145,21 +147,21 @@ fn main() {
                 // ==============================================================
                 // Tree serialization.
 
-                // println!("seriliazing tree");
-                // let src_dir = env!("CARGO_MANIFEST_DIR");
-                // let target_dir = Path::new(&src_dir).join("target");
-                // let dir = target_dir.join("serialized_trees");
-                // let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
-                // let acc =
-                //     Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
+                println!("seriliazing tree");
+                let src_dir = env!("CARGO_MANIFEST_DIR");
+                let target_dir = Path::new(&src_dir).join("target");
+                let dir = target_dir.join("serialized_trees");
+                let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
+                let acc =
+                    Accumulator::NdmSmt(ndm_smt.expect("NDM SMT should have been set in loop"));
 
-                // let time_start = Instant::now();
-                // acc.serialize(path.clone()).unwrap();
-                // let serialization_time = time_start.elapsed();
+                let time_start = Instant::now();
+                acc.serialize(path.clone()).unwrap();
+                let serialization_time = time_start.elapsed();
 
-                // let file_size = std::fs::metadata(path)
-                //     .expect("Unable to get serialized tree metadata for {path}")
-                //     .len();
+                let file_size = std::fs::metadata(path)
+                    .expect("Unable to get serialized tree metadata for {path}")
+                    .len();
 
                 // ==============================================================
                 // Print stats.
@@ -176,10 +178,8 @@ fn main() {
                     mean(&memory_readings),
                     standard_deviation(&memory_readings, Some(mean_mem)),
                     median(&memory_readings),
-                    "NA",
-                        "NA"
-                    // serialization_time,
-                    // bytes_to_string(file_size as usize)
+                    serialization_time,
+                    bytes_to_string(file_size as usize)
                 );
             }
         }

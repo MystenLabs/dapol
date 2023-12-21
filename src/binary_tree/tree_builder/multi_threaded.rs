@@ -37,10 +37,10 @@
 use std::fmt::Debug;
 use std::ops::Range;
 
-use log::{warn, debug};
+use log::warn;
 use logging_timer::stime;
 
-use dashmap::{DashMap};
+use dashmap::DashMap;
 use rayon::prelude::*;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -449,21 +449,13 @@ where
 
             let new_padding_node_content_ref = Arc::clone(&new_padding_node_content);
 
+            // Check if the thread pool has 1 to spare.
+            // We must atomically set the boolean.
+
             let mut spawn_thread = false;
             {
                 let mut thread_count = params.thread_count.lock().unwrap();
-                // debug!(
-                //     "id {:?} lock A params.thread_count {} y_coord {}",
-                //     std::thread::current().id(),
-                //     *thread_count,
-                //     params.y_coord
-                // );
-
                 if *thread_count < params.max_thread_count {
-                    // debug!(
-                    //     "id {:?} increasing thread_count",
-                    //     std::thread::current().id()
-                    // );
                     *thread_count += 1;
                     spawn_thread = true;
                 }
@@ -475,9 +467,7 @@ where
                 let params_clone = params.clone();
                 let map_ref = Arc::clone(&map);
 
-                // debug!("id {:?} spawning thread", std::thread::current().id());
                 let right_handler = thread::spawn(move || -> Node<C> {
-                    debug!("id {:?} thread spawned", std::thread::current().id());
                     build_node(
                         params_clone.into_right_child(),
                         right_leaves,
@@ -499,20 +489,10 @@ where
                     .join()
                     .unwrap_or_else(|_| panic!("{} Couldn't join on the associated thread", BUG));
 
+                // Give back to the thread pool again.
                 {
                     let mut thread_count = params.thread_count.lock().unwrap();
-                    // debug!(
-                    //     "id {:?} lock B params.thread_count {} y_coord {}",
-                    //     std::thread::current().id(),
-                    //     *thread_count,
-                    //     params.y_coord
-                    // );
-
                     if *thread_count > 1 {
-                        // debug!(
-                        //     "id {:?} decreasing thread_count",
-                        //     std::thread::current().id()
-                        // );
                         *thread_count -= 1;
                     }
                 }
@@ -568,6 +548,7 @@ where
     pair.merge()
 }
 
+// TODO this does not work if store depth is not 100%
 fn max_nodes_to_store(num_leaf_nodes: u64, height: Height) -> u64 {
     let k = num_leaf_nodes.ilog2();
     2u64.pow(k) * (2 * (height.as_u64() - (k as u64) - 1) + 1) + 2u64.pow(k) - 1
