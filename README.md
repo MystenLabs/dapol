@@ -15,22 +15,13 @@ See the [top-level doc for the project](https://hackmd.io/p0dy3R0RS5qpm3sX-_zreA
 ## Still to be done
 
 This project is currently still a work in progress, but is ready for
-use as is. The code has _not_ been audited yet (as of Nov 2023). Progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/91).
+use as is. The code has _not_ been audited yet (as of Nov 2023) and so it is not recommended to use it in production. Progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/91).
 
-A Rust crate has not been released yet, progress can be tracked [here](https://github.com/silversixpence-crypto/dapol/issues/13).
-
-A spec for this code still needs to be [written](https://github.com/silversixpence-crypto/dapol/issues/17).
-
-A fuzzing technique should be used for the unit [tests](https://github.com/silversixpence-crypto/dapol/issues/46).
-
-Performance can be [improved](https://github.com/silversixpence-crypto/dapol/issues/44).
-
-Alternate accumulators mentioned in the paper should be built:
-- [Deterministic mapping SMT](https://github.com/silversixpence-crypto/dapol/issues/9)
-- [ORAM-based SMT](https://github.com/silversixpence-crypto/dapol/issues/8)
-- [Hierarchical SMTs](https://github.com/silversixpence-crypto/dapol/issues/7)
-
-Other than the above there are a few minor tasks to do, each of which has an issue for tracking.
+Important tasks still to be done:
+- Write a spec: https://github.com/silversixpence-crypto/dapol/issues/17
+- Support the Deterministic mapping SMT accumulator type: https://github.com/silversixpence-crypto/dapol/issues/9
+- Fuzz some of the unit tests: https://github.com/silversixpence-crypto/dapol/issues/46
+- Sort out version issues with dependencies: https://github.com/silversixpence-crypto/dapol/issues/11
 
 ## How this code can be used
 
@@ -38,7 +29,7 @@ There is both a Rust API and a CLI. Details for both can be found in the section
 
 ### Rust API
 
-The library has not been released as a crate yet (as of Nov 2023) but the API has the following capabilities:
+The API has the following capabilities:
 - build a tree using the builder pattern or a configuration file
 - generate inclusion proofs from a list of entity IDs (tree required)
 - verify an inclusion proof using a root hash (no tree required)
@@ -47,7 +38,7 @@ See the [examples](https://github.com/silversixpence-crypto/dapol/examples) dire
 
 ### CLI
 
-You will need to have the rust compiler installed:
+There is no downloadable executable ([yet](https://github.com/silversixpence-crypto/dapol/issues/110)) so the CLI has to be built from source. You will need to have the rust compiler installed:
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs >> ./rustup-init.sh
 ./rustup-init.sh -y --no-modify-path
@@ -127,13 +118,26 @@ The root hash is logged out at info level when the tree is built or deserialized
 
 To run the benchmarks first clone the repo and then run:
 ```bash
-MAX_ENTITIES_FOR_CRITERION=100000 MIN_ENTITIES_FOR_MANUAL_BENCHES=100000 cargo bench
+# Run the benchmarks written in the Criterion framework.
+cargo bench --bench criterion_benches
+
+# Run the benchmarks written without a framework.
+cargo bench --bench manual_benches
+
+# available env vars (with their default values):
+MIN_TOTAL_THREAD_COUNT=0
+MIN_ENTITIES=0
+MAX_ENTITIES=250000000
+MIN_HEIGHT=2
+MAX_HEIGHT=64
+LOG_VERBOSITY=none # supports error, warn, info, debug
 ```
-The env vars are optional. The benches are split into 2 parts: Criterion for small benches and manual for large benches. A set of tuples is used as input to the benches:
+
+The benches are split into 2 parts: Criterion (for small benches) and manual (for large benches). Some of the values of $n$ cause the benchmarks to take *really* long (up to an hour), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. It is advised to run Criterion benches for $n<1000000$ and manual benches otherwise.
+
+A set of tuples is used as input to the benches:
 
 ![](resources/readme_eq_benchmark.svg)
-
-Some of the values of $n$ cause the benchmarks to take *really* long (multiple hours), and so using Criterion (which takes a minimum of 10 samples per bench) makes things too slow. This is why the benches are split by the $n$ input: smaller $n$ is fine for Criterion, larger $n$ is handled by manual benches that only run once. The env vars control where this split occurs.
 
 You may experience an error building the benches if you are on a fresh Linux machine. If the jemalloc-sys package fails to build then maybe [this](https://github.com/tikv/jemallocator/issues/29) will help.
 
