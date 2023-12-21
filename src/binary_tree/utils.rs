@@ -78,7 +78,7 @@ pub mod test_utils {
     // A selection of leaves dispersed sparsely along the bottom layer.
     pub fn sparse_leaves(height: &Height) -> Vec<InputLeafNode<TestContent>> {
         // Otherwise we will go over the max x-coord value.
-        assert!(height.as_raw_int() >= 4u8);
+        assert!(height.as_u8() >= 4u8);
 
         // Note the nodes are not in order here (wrt x-coord) so this test also
         // somewhat covers the sorting code in the constructor.

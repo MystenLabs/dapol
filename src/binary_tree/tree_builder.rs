@@ -185,7 +185,7 @@ where
     /// dividing it by the default ratio.
     fn store_depth(&self, height: &Height) -> u8 {
         self.store_depth
-            .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO_INVERTED)
+            .unwrap_or(height.as_u8() / DEFAULT_STORE_DEPTH_RATIO_INVERTED)
     }
 
     /// Private function used internally to retrieve height for building.

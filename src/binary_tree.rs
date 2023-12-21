@@ -335,6 +335,14 @@ impl<C: Clone> Store<C> {
             Store::SingleThreadedStore(store) => store.get_node(coord),
         }
     }
+
+    /// Simply delegate the call to the wrapped store.
+    fn len(&self) -> usize {
+        match self {
+            Store::MultiThreadedStore(store) => store.len(),
+            Store::SingleThreadedStore(store) => store.len(),
+        }
+    }
 }
 
 impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {

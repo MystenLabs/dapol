@@ -83,7 +83,7 @@ impl Height {
     }
 
     /// Return the underlying integer value.
-    pub fn as_raw_int(&self) -> UnderlyingInt {
+    pub fn as_u8(&self) -> u8 {
         self.0
     }
 
@@ -100,6 +100,11 @@ impl Height {
     /// Return the underlying integer value as type u64.
     pub fn as_u64(&self) -> u64 {
         self.0 as u64
+    }
+
+    /// Return the underlying integer value as type f64.
+    pub fn as_f64(&self) -> f64 {
+        self.0 as f64
     }
 
     /// The maximum number of leaf nodes on the bottom layer of the binary tree.
@@ -132,7 +137,7 @@ use clap::builder::{OsStr, Str};
 
 impl From<Height> for OsStr {
     fn from(height: Height) -> OsStr {
-        OsStr::from(Str::from(height.as_raw_int().to_string()))
+        OsStr::from(Str::from(height.as_u8().to_string()))
     }
 }
 

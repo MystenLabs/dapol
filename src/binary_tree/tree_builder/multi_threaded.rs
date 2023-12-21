@@ -144,6 +144,10 @@ impl<C: Clone> DashMapStore<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| n.clone())
     }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -440,7 +444,7 @@ where
 
     // NOTE this includes the root node.
     let within_store_depth_for_children =
-        params.y_coord > params.height.as_raw_int() - params.store_depth;
+        params.y_coord > params.height.as_u8() - params.store_depth;
 
     let pair = match num_nodes_left_of(params.x_coord_mid, &leaves) {
         NumNodes::Partial(index) => {
@@ -720,12 +724,12 @@ mod tests {
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
-        let middle_layer = height.as_raw_int() / 2;
-        let layer_below_root = height.as_raw_int() - 1;
+        let middle_layer = height.as_u8() / 2;
+        let layer_below_root = height.as_u8() - 1;
 
         // These nodes should be in the store.
         for y in middle_layer..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 tree.store
                     .get_node(&coord)
@@ -736,7 +740,7 @@ mod tests {
         // These nodes should not be in the store.
         // Why 1 and not 0? Because leaf nodes are checked in another test.
         for y in 1..middle_layer {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
@@ -759,10 +763,10 @@ mod tests {
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
-        let layer_below_root = height.as_raw_int() - 1;
+        let layer_below_root = height.as_u8() - 1;
 
         // Only the leaf nodes should be in the store.
-        for x in 0..2u64.pow((height.as_raw_int() - 1) as u32) {
+        for x in 0..2u64.pow((height.as_u8() - 1) as u32) {
             let coord = Coordinate { x, y: 0 };
             tree.store
                 .get_node(&coord)
@@ -771,7 +775,7 @@ mod tests {
 
         // All internal nodes should not be in the store.
         for y in 1..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
