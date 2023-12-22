@@ -3,7 +3,7 @@
 // -------------------------------------------------------------------------------------------------
 // Test utils for sub-modules.
 
-#[cfg(test)]
+#[cfg(any(test, fuzzing))]
 pub mod test_utils {
     use super::super::*;
     use primitive_types::H256;
@@ -46,6 +46,25 @@ pub mod test_utils {
         }
     }
 
+    pub fn random_leaf_nodes(num_leaf_nodes: u64, height: &Height, seed: u64) -> Vec<InputLeafNode<TestContent>> {
+        use crate::accumulators::RandomXCoordGenerator;
+
+        let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();
+        let mut x_coord_generator = RandomXCoordGenerator::from_seed(height, seed);
+
+        for i in 0..num_leaf_nodes {
+            leaf_nodes.push(InputLeafNode::<TestContent> {
+                x_coord: x_coord_generator.new_unique_x_coord().unwrap(),
+                content: TestContent {
+                    hash: H256::random(),
+                    value: i as u32,
+                },
+            });
+        }
+
+        leaf_nodes
+    }
+
     // If the tree has a full bottom layer then all other layers will also be
     // full (if construction is correct).
     pub fn full_bottom_layer(height: &Height) -> Vec<InputLeafNode<TestContent>> {
@@ -78,7 +97,7 @@ pub mod test_utils {
     // A selection of leaves dispersed sparsely along the bottom layer.
     pub fn sparse_leaves(height: &Height) -> Vec<InputLeafNode<TestContent>> {
         // Otherwise we will go over the max x-coord value.
-        assert!(height.as_raw_int() >= 4u8);
+        assert!(height.as_u8() >= 4u8);
 
         // Note the nodes are not in order here (wrt x-coord) so this test also
         // somewhat covers the sorting code in the constructor.

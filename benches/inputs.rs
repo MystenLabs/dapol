@@ -9,6 +9,13 @@ pub fn tree_heights() -> Vec<Height> {
     tree_heights.into_iter().map(|x| Height::from(x)).collect()
 }
 
+pub fn tree_heights_in_range(lower: &Height, upper: &Height) -> Vec<Height> {
+    tree_heights()
+        .into_iter()
+        .filter(|x| lower <= x && x <= upper)
+        .collect()
+}
+
 /// For <10M entities we increase linearly, bumping the increment amount an
 /// order of magnitude each time reach a new power of 10.
 /// For >10M entities we increase in greater steps because each run can take
@@ -53,12 +60,11 @@ pub fn num_entities() -> Vec<u64> {
     ])
 }
 
-pub fn num_entities_less_than_eq(n: u64) -> Vec<u64> {
-    num_entities().into_iter().filter(|x| x <= &n).collect()
-}
-
-pub fn num_entities_greater_than(n: u64) -> Vec<u64> {
-    num_entities().into_iter().filter(|x| x > &n).collect()
+pub fn num_entities_in_range(lower: u64, upper: u64) -> Vec<u64> {
+    num_entities()
+        .into_iter()
+        .filter(|x| &lower <= x && x <= &upper)
+        .collect()
 }
 
 pub fn max_thread_counts() -> Vec<MaxThreadCount> {
@@ -77,9 +83,14 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     }
     tc.push(max_thread_count);
 
-    println!("\n====================================================== \
-              \nmax_thread_counts {:?} \
-              \n======================================================", tc);
+    println!("\nmax_thread_counts {:?}\n", tc);
 
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()
+}
+
+pub fn max_thread_counts_greater_than(lower_bound: &MaxThreadCount) -> Vec<MaxThreadCount> {
+    max_thread_counts()
+        .into_iter()
+        .filter(|x| lower_bound <= x)
+        .collect()
 }

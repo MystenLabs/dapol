@@ -21,7 +21,7 @@ pub const DEFAULT_MAX_THREAD_COUNT: u8 = 4;
 /// let max_thread_count = MaxThreadCount::from(8u8);
 /// let max_thread_count = MaxThreadCount::from_str("8");
 /// ```
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, PartialOrd)]
 pub struct MaxThreadCount(u8);
 
 impl MaxThreadCount {

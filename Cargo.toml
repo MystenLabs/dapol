@@ -43,7 +43,7 @@ curve25519-dalek-ng = "4.1.1"
 thiserror = "1.0"
 displaydoc = "0.2"
 rayon = "1.7.0"
-dashmap = { version = "5.5.3", features = ["serde"] }
+dashmap = { version = "5.5.3", features = ["serde", "raw-api"] }
 
 # logging
 env_logger = "0.10.0"
@@ -64,6 +64,12 @@ bincode = "1.3.3"
 chrono = "0.4.31"
 derive_builder = "0.12.0"
 
+# fuzzing
+arbitrary = { version = "1", optional = true, features = ["derive"] }
+
+[features]
+fuzzing = ["rand/small_rng", "arbitrary"]
+
 [dev-dependencies]
 criterion = "0.5.0"
 jemalloc-ctl = "0.5.4"
@@ -71,13 +77,15 @@ jemallocator = "0.5.4"
 sysinfo = "0.29.11"
 statistical = "1.0.0"
 once_cell = "1.18.0"
+chrono = "0.4.31"
+rand = { version = "0.8.5", features = ["small_rng"] }
 
 [[bench]]
 name = "criterion_benches"
 harness = false
 
 [[bench]]
-name = "large_input_benches"
+name = "manual_benches"
 harness = false
 
 [profile.bench]
