@@ -142,7 +142,7 @@ where
     {
         let height = self.height()?;
         let max_thread_count = self.max_thread_count.clone().unwrap_or_default();
-        let store_depth = self.store_depth(&height);
+        let store_depth = self.store_depth(&height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         multi_threaded::build_tree(
@@ -168,7 +168,7 @@ where
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
-        let store_depth = self.store_depth(&height);
+        let store_depth = self.store_depth(&height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         single_threaded::build_tree(
@@ -183,9 +183,19 @@ where
     ///
     /// Default value: use the height of the tree to determine store depth by
     /// dividing it by the default ratio.
-    fn store_depth(&self, height: &Height) -> u8 {
-        self.store_depth
-            .unwrap_or(height.as_u8() / DEFAULT_STORE_DEPTH_RATIO_INVERTED)
+    fn store_depth(&self, height: &Height) -> Result<u8, TreeBuildError> {
+        let store_depth = self
+            .store_depth
+            .unwrap_or(height.as_u8() / DEFAULT_STORE_DEPTH_RATIO_INVERTED);
+
+        if store_depth < MIN_STORE_DEPTH || store_depth > height.as_u8() {
+            Err(TreeBuildError::InvalidStoreDepth {
+                height: height.clone(),
+                store_depth,
+            })
+        } else {
+            Ok(store_depth)
+        }
     }
 
     /// Private function used internally to retrieve height for building.
@@ -215,7 +225,10 @@ where
         let max_leaf_nodes = height.max_bottom_layer_nodes();
 
         if leaf_nodes.len() > max_leaf_nodes as usize {
-            return Err(TreeBuildError::TooManyLeaves);
+            return Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes.len() as u64,
+                max: max_leaf_nodes,
+            });
         }
 
         // Make sure all x-coord < max.
@@ -275,17 +288,18 @@ pub enum TreeBuildError {
     NoHeightProvided,
     #[error("The builder must be given a padding node generator function before building")]
     NoPaddingNodeContentGeneratorProvided,
-    #[error("Too many leaves for the given height")]
-    TooManyLeaves,
+    #[error("Too many leaves for the given height (given: {given:?}, max: {max:?})")]
+    TooManyLeaves { given: u64, max: u64 },
     #[error("Leaf nodes cannot be empty")]
     EmptyLeaves,
     #[error("X coords for leaves must be less than 2^height")]
     InvalidXCoord,
     #[error("Not allowed to have more than 1 leaf with the same x-coord")]
     DuplicateLeaves,
-
     #[error("Could not get ownership of the store in the multi-threaded builder")]
     StoreOwnershipFailure,
+    #[error("Store depth ({store_depth:?}) out of bounds [{MIN_STORE_DEPTH:?}, {height:?}]")]
+    InvalidStoreDepth { height: Height, store_depth: u8 },
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -421,10 +435,11 @@ mod tests {
     #[test]
     fn err_for_too_many_leaves() {
         let height = Height::from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -436,7 +451,13 @@ mod tests {
             .with_leaf_nodes(leaf_nodes)
             .leaf_nodes(&height);
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]

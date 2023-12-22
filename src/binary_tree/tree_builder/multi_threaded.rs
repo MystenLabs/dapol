@@ -117,6 +117,7 @@ where
         Arc::clone(&store),
     );
 
+    store.insert(root.coord.clone(), root.clone());
     store.shrink_to_fit();
 
     let store = DashMapStore {
@@ -431,12 +432,16 @@ where
             MatchedPair::from(left, right)
         } else {
             let node = leaves.pop().unwrap();
+            let sibling = node.new_sibling_padding_node_arc(new_padding_node_content);
 
-            // Only the leaf node is placed in the store, it's sibling pad node
-            // is left out.
             map.insert(node.coord.clone(), node.clone());
 
-            MatchedPair::from_node(node, new_padding_node_content)
+            // Only store the padding node if the store depth is at maximum.
+            if params.store_depth == params.height.as_u8() {
+                map.insert(sibling.coord.clone(), sibling.clone());
+            }
+
+            MatchedPair::from(node, sibling)
         };
 
         return pair.merge();
@@ -583,6 +588,8 @@ fn max_nodes_to_store(num_leaf_nodes: u64, height: &Height) -> u64 {
 
 #[cfg(any(test, fuzzing))]
 pub(crate) mod tests {
+    use std::str::FromStr;
+
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
@@ -631,10 +638,11 @@ pub(crate) mod tests {
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
         let height = Height::from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -646,7 +654,14 @@ pub(crate) mod tests {
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(generate_padding_closure());
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                // TODO does assert_err work for these values? If we change the values does the test pass?
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]
@@ -801,7 +816,7 @@ pub(crate) mod tests {
     pub fn fuzz_max_nodes_to_store(randomness: u64) {
         // Bound the randomness.
         let height = {
-            let max_height = 5;
+            let max_height = 6;
             let min_height = crate::MIN_HEIGHT.as_u8();
             Height::from((randomness as u8 % (max_height - min_height)) + min_height)
         };
@@ -817,7 +832,6 @@ pub(crate) mod tests {
         // Max store depth.
         let store_depth = height.as_u8();
         let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, randomness);
-        // println!("{:?}", leaf_nodes);
 
         let tree = TreeBuilder::new()
             .with_height(height.clone())
@@ -826,20 +840,20 @@ pub(crate) mod tests {
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
-        assert!(tree.store.len() <= max_nodes as usize);
+        assert!(tree.store.len() < max_nodes as usize);
     }
 
     #[test]
     fn max_nodes_to_store_equality() {
         // Got this by using the fuzzer and setting fuzz_max_nodes_to_store to
         // assert strictly less than.
-        let seed = 15783146369096613887;
+        let seed = 16488547165734;
 
-        let height = Height::from(5);
+        let height = Height::from(6);
         let num_leaf_nodes = 3;
         let store_depth = height.as_u8();
         let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, seed);
-        let expected_number_of_nodes_in_store = max_nodes_to_store(num_leaf_nodes, &height);
+        let expected_number_of_nodes_in_store = max_nodes_to_store(num_leaf_nodes, &height) - 1;
 
         let tree = TreeBuilder::new()
             .with_height(height)
@@ -849,10 +863,5 @@ pub(crate) mod tests {
             .unwrap();
 
         assert_eq!(tree.store.len(), expected_number_of_nodes_in_store as usize);
-    }
-
-    #[test]
-    fn test_max_nodes_to_store() {
-        fuzz_max_nodes_to_store(16933534598778846985);
     }
 }

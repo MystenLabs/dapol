@@ -361,10 +361,11 @@ mod tests {
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
         let height = Height::from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -376,7 +377,13 @@ mod tests {
             .with_leaf_nodes(leaf_nodes)
             .build_using_single_threaded_algorithm(generate_padding_closure());
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]
