@@ -1,5 +1,8 @@
 use dapol::{Height};
 
+// TODO we need to rather fit an arbitrary surface than a plane.
+// See the python file TODO for more details.
+
 /// Estimated memory usage in MB.
 /// The equation was calculated using the plane_of_best_fit.py script
 /// and data that was gathered from running some of the benchmarks on a Macbook Pro.
