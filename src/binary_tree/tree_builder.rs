@@ -434,7 +434,6 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves() {
-        let height = Height::from(8u8);
         let height = Height::expect_from(8u8);
         let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);

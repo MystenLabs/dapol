@@ -445,7 +445,7 @@ where
                 map.insert(sibling.coord.clone(), sibling.clone());
             }
 
-            MatchedPair::from(node, sibling)
+            MatchedPair::from((node, sibling))
         };
 
         return pair.merge();
@@ -641,7 +641,6 @@ pub(crate) mod tests {
 
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
-        let height = Height::from(8u8);
         let height = Height::expect_from(8u8);
         let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
@@ -854,7 +853,7 @@ pub(crate) mod tests {
         // assert strictly less than.
         let seed = 16488547165734;
 
-        let height = Height::from(6);
+        let height = Height::expect_from(6);
         let num_leaf_nodes = 3;
         let store_depth = height.as_u8();
         let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, seed);
