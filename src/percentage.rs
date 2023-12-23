@@ -16,11 +16,12 @@ pub struct Percentage {
 impl Percentage {
     /// Returns a new `Percentage` with the given value.
     /// Panics if the value is greater than 100.
+    ///
+    /// Note that if we try to implement the From trait then we have a collision.
     pub fn expect_from(value: u8) -> Percentage {
-        if value > 100 {
-            panic!("Invalid percentage value {}", value);
-        } else {
-            Percentage { value }
+        match Percentage::try_from(value) {
+            Err(e) => panic!("{}", e),
+            Ok(p) => p,
         }
     }
 

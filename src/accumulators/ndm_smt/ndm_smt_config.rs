@@ -55,7 +55,7 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// use dapol::{Height, MaxThreadCount};
 /// use dapol::accumulators::NdmSmtConfigBuilder;
 ///
-/// let height = Height::try_from(8).unwrap();
+/// let height = Height::expect_from(8);
 /// let max_thread_count = MaxThreadCount::default();
 ///
 /// let config = NdmSmtConfigBuilder::default()
@@ -188,7 +188,7 @@ mod tests {
 
     #[test]
     fn builder_with_entities_file() {
-        let height = Height::try_from(8).unwrap();
+        let height = Height::expect_from(8);
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn builder_with_random_entities() {
-        let height = Height::try_from(8).unwrap();
+        let height = Height::expect_from(8);
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn builder_with_all_values() {
-        let height = Height::try_from(8).unwrap();
+        let height = Height::expect_from(8);
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");

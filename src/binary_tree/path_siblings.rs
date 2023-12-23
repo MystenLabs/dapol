@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn path_works_for_full_base_layer_single_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = full_bottom_layer(&height);
 
@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn path_works_for_full_base_layer_multi_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = full_bottom_layer(&height);
 
@@ -461,7 +461,7 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_single_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = sparse_leaves(&height);
 
@@ -493,7 +493,7 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_multi_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = sparse_leaves(&height);
 
@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn path_works_for_single_leaf_single_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
@@ -559,7 +559,7 @@ mod tests {
 
     #[test]
     fn path_works_for_multi_leaf_multi_threaded() {
-        let height = Height::try_from(8u8).unwrap();
+        let height = Height::expect_from(8u8);
 
         for x_coord in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(x_coord)];

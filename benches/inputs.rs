@@ -8,7 +8,7 @@ pub fn tree_heights() -> Vec<Height> {
     let tree_heights: Vec<u8> = Vec::from([16, 32, 64]);
     tree_heights
         .into_iter()
-        .map(|x| Height::try_from(x).unwrap())
+        .map(|x| Height::expect_from(x))
         .collect()
 }
 

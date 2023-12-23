@@ -33,13 +33,24 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 /// use std::str::FromStr;
 ///
 /// let height = Height::default();
-/// let height = Height::try_from(8u8).unwrap();
+/// let height = Height::expect_from(8u8);
 /// let height = Height::from_str("8");
 /// ```
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Height(UnderlyingInt);
 
 impl Height {
+    /// Create a [Height] object from `int`.
+    ///
+    /// panics if `int` is greater than [MAX_HEIGHT] or less than
+    /// [MIN_HEIGHT].
+    pub fn expect_from(int: u8) -> Self {
+        match Height::try_from(int) {
+            Err(e) => panic!("{}", e),
+            Ok(h) => h,
+        }
+    }
+
     /// Return the height for the given y-coord.
     ///
     /// Why the offset? `y` starts from 0 but height starts from 1.

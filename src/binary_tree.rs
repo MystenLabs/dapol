@@ -257,7 +257,9 @@ impl Coordinate {
     /// Return the height for the coordinate.
     /// Why the offset? `y` starts from 0 but height starts from 1.
     fn to_height(&self) -> Height {
-        Height::try_from(self.y + 1).unwrap_or_default()
+        // Since a) y is a u8 and b) height is also:
+        // there is a small chance this panics.
+        Height::expect_from(self.y + 1)
     }
 
     /// Generate a new bottom-layer leaf coordinate from the given x-coord.
@@ -472,7 +474,7 @@ mod tests {
     // TODO fuzz on the one x-coord then calculate the other one from this
     #[test]
     fn is_sibling_of_works() {
-        let height = Height::try_from(5).unwrap();
+        let height = Height::expect_from(5);
 
         let x_coord = 16;
         let left_node = single_leaf(x_coord).into_node();

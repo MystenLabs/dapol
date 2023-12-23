@@ -123,13 +123,13 @@ mod tests {
 
     #[test]
     fn constructor_works() {
-        let height = Height::try_from(4u8).unwrap();
+        let height = Height::expect_from(4u8);
         RandomXCoordGenerator::from(&height);
     }
 
     #[test]
     fn new_unique_value_works() {
-        let height = Height::try_from(4u8).unwrap();
+        let height = Height::expect_from(4u8);
         let mut rxcg = RandomXCoordGenerator::from(&height);
         for _i in 0..height.max_bottom_layer_nodes() {
             rxcg.new_unique_x_coord().unwrap();
@@ -138,7 +138,7 @@ mod tests {
 
     #[test]
     fn generated_values_all_unique() {
-        let height = Height::try_from(4u8).unwrap();
+        let height = Height::expect_from(4u8);
         let mut rxcg = RandomXCoordGenerator::from(&height);
         let mut set = HashSet::<u64>::new();
         for _i in 0..height.max_bottom_layer_nodes() {
@@ -154,7 +154,7 @@ mod tests {
     fn new_unique_value_fails_for_large_i() {
         use crate::utils::test_utils::assert_err;
 
-        let height = Height::try_from(4u8).unwrap();
+        let height = Height::expect_from(4u8);
         let mut rxcg = RandomXCoordGenerator::from(&height);
         let max = height.max_bottom_layer_nodes();
         let mut res = rxcg.new_unique_x_coord();
