@@ -47,7 +47,9 @@ use std::thread;
 
 use serde::{Deserialize, Serialize};
 
-use crate::MaxThreadCount;
+use derive_builder::Builder;
+
+use crate::{MaxThreadCount, MAX_HEIGHT};
 
 use super::super::{
     Coordinate, Height, InputLeafNode, MatchedPair, Mergeable, Node, Sibling, Store,
@@ -97,9 +99,11 @@ where
     let store = Arc::new(DashMap::<Coordinate, Node<C>>::with_capacity(
         max_nodes as usize,
     ));
-    let params = RecursionParams::from(height.clone())
-        .with_store_depth(store_depth)
-        .with_max_thread_count(max_thread_count.as_u8());
+    let params = RecursionParamsBuilder::default()
+        .height(height)
+        .store_depth(store_depth)
+        .max_thread_count(max_thread_count.as_u8())
+        .build();
 
     if height.max_bottom_layer_nodes() / leaf_nodes.len() as u64 <= MIN_RECOMMENDED_SPARSITY as u64
     {
@@ -240,16 +244,65 @@ impl<C: Mergeable> MatchedPair<C> {
 /// `max_thread_count` is there to prevent more threads being spawned
 /// than there are cores to execute them. If too many threads are spawned then
 /// the parallelization can actually be detrimental to the run-time. Threads
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Builder)]
+#[builder(build_fn(skip))]
 pub struct RecursionParams {
+    #[builder(setter(skip))]
     x_coord_min: u64,
+    #[builder(setter(skip))]
     x_coord_mid: u64,
+    #[builder(setter(skip))]
     x_coord_max: u64,
+    #[builder(setter(skip))]
     y_coord: u8,
+    #[builder(setter(skip))]
     thread_count: Arc<Mutex<u8>>,
     max_thread_count: u8,
     store_depth: u8,
     height: Height,
+}
+
+impl RecursionParamsBuilder {
+    pub fn build(&self) -> RecursionParams {
+        let height = self
+            .height
+            .clone()
+            .expect("Height not set for RecursionParams (should have a default)");
+
+        let x_coord_min = 0;
+        // x-coords start from 0, hence the `- 1`.
+        let x_coord_max = height.max_bottom_layer_nodes() - 1;
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+        // y-coords also start from 0, hence the `- 1`.
+        let y_coord = height.as_y_coord();
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y_coord,
+            height,
+            thread_count: Arc::new(Mutex::new(1)),
+            max_thread_count: self.max_thread_count.unwrap_or(1),
+            store_depth: self.store_depth.unwrap_or(MIN_STORE_DEPTH),
+        }
+    }
+
+    pub fn build_with_coord(&self, coord: &Coordinate) -> RecursionParams {
+        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
+        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
+
+        RecursionParams {
+            x_coord_min,
+            x_coord_mid,
+            x_coord_max,
+            y_coord: coord.y,
+            thread_count: Arc::new(Mutex::new(1)),
+            height: self.height.unwrap_or(MAX_HEIGHT),
+            max_thread_count: self.max_thread_count.unwrap_or(1),
+            store_depth: self.store_depth.unwrap_or(MIN_STORE_DEPTH),
+        }
+    }
 }
 
 /// Private functions for use within this file only.
@@ -271,9 +324,7 @@ impl RecursionParams {
         self.y_coord -= 1;
         self
     }
-}
 
-impl From<Height> for RecursionParams {
     /// Construct the parameters given only the height of the tree.
     ///
     /// - `x_coord_min` points to the start of the bottom layer.
@@ -287,7 +338,7 @@ impl From<Height> for RecursionParams {
     /// - `store_depth` defaults to the min value.
     ///
     /// [parallelism]: std::thread::available_parallelism
-    fn from(height: Height) -> Self {
+    fn new_with_height(height: Height) -> Self {
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.
         let x_coord_max = height.max_bottom_layer_nodes() - 1;
@@ -307,47 +358,9 @@ impl From<Height> for RecursionParams {
             height,
         }
     }
-}
 
-/// Public functions available to [super][super][path_builder].
-impl RecursionParams {
     pub fn x_coord_range(&self) -> Range<u64> {
         self.x_coord_min..self.x_coord_max + 1
-    }
-
-    pub fn with_store_depth(mut self, store_depth: u8) -> Self {
-        self.store_depth = store_depth;
-        self
-    }
-
-    pub fn with_tree_height(mut self, height: Height) -> Self {
-        self.height = height;
-        self
-    }
-
-    pub fn with_max_thread_count(mut self, max_thread_count: u8) -> Self {
-        self.max_thread_count = max_thread_count;
-        self
-    }
-}
-
-impl From<&Coordinate> for RecursionParams {
-    fn from(coord: &Coordinate) -> Self {
-        use super::super::MAX_HEIGHT;
-
-        let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
-        let x_coord_mid = (x_coord_min + x_coord_max) / 2;
-
-        RecursionParams {
-            x_coord_min,
-            x_coord_mid,
-            x_coord_max,
-            y_coord: coord.y,
-            thread_count: Arc::new(Mutex::new(0)),
-            max_thread_count: 1,
-            store_depth: MIN_STORE_DEPTH,
-            height: MAX_HEIGHT.clone(),
-        }
     }
 }
 
@@ -707,7 +720,7 @@ pub(crate) mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
@@ -751,7 +764,7 @@ pub(crate) mod tests {
         let leaf_nodes = full_bottom_layer(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
@@ -789,7 +802,7 @@ pub(crate) mod tests {
         let store_depth = 1;
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
@@ -838,7 +851,7 @@ pub(crate) mod tests {
         let leaf_nodes = random_leaf_nodes(num_leaf_nodes, &height, randomness);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .with_store_depth(store_depth)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
