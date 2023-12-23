@@ -141,7 +141,7 @@ where
         F: Fn(&Coordinate) -> C + Send + Sync + 'static,
     {
         let height = self.height()?;
-        let max_thread_count = self.max_thread_count.clone().unwrap_or_default();
+        let max_thread_count = self.max_thread_count.unwrap_or_default();
         let store_depth = self.store_depth(&height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
@@ -190,7 +190,7 @@ where
 
         if store_depth < MIN_STORE_DEPTH || store_depth > height.as_u8() {
             Err(TreeBuildError::InvalidStoreDepth {
-                height: height.clone(),
+                height: height,
                 store_depth,
             })
         } else {
@@ -201,7 +201,7 @@ where
     /// Private function used internally to retrieve height for building.
     /// No default value, returns an error if not set.
     fn height(&self) -> Result<Height, TreeBuildError> {
-        self.height.clone().ok_or(TreeBuildError::NoHeightProvided)
+        self.height.ok_or(TreeBuildError::NoHeightProvided)
     }
 
     /// Private function used internally to retrieve leaf nodes for building.
@@ -335,13 +335,13 @@ mod tests {
         let leaf_nodes = sparse_leaves(&height);
 
         let single_threaded = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
@@ -358,13 +358,13 @@ mod tests {
         let leaf_nodes = full_bottom_layer(&height);
 
         let single_threaded = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
@@ -382,13 +382,13 @@ mod tests {
             let leaf_node = vec![single_leaf(i)];
 
             let single_threaded = TreeBuilder::new()
-                .with_height(height.clone())
+                .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .build_using_single_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             let multi_threaded = TreeBuilder::new()
-                .with_height(height.clone())
+                .with_height(height)
                 .with_leaf_nodes(leaf_node)
                 .build_using_multi_threaded_algorithm(generate_padding_closure())
                 .unwrap();
@@ -415,7 +415,7 @@ mod tests {
     fn err_when_parent_builder_leaf_nodes_not_set() {
         let height = Height::expect_from(4);
         let res = TreeBuilder::<TestContent>::new()
-            .with_height(height.clone())
+            .with_height(height)
             .leaf_nodes(&height);
 
         // cannot use assert_err because it requires Func to have the Debug trait
@@ -426,7 +426,7 @@ mod tests {
     fn err_for_empty_leaves() {
         let height = Height::expect_from(5);
         let res = TreeBuilder::<TestContent>::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(Vec::new())
             .leaf_nodes(&height);
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
@@ -447,7 +447,7 @@ mod tests {
         });
 
         let res = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes)
             .leaf_nodes(&height);
 

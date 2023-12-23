@@ -159,8 +159,8 @@ impl NdmSmtConfigBuilder {
         };
 
         NdmSmtConfig {
-            height: self.height.clone().unwrap_or_default(),
-            max_thread_count: self.max_thread_count.clone().unwrap_or_default(),
+            height: self.height.unwrap_or_default(),
+            max_thread_count: self.max_thread_count.unwrap_or_default(),
             secrets_file_path: self.secrets_file_path.clone().unwrap_or(None),
             entities,
         }
@@ -205,7 +205,7 @@ mod tests {
         let num_entities = BufReader::new(entities_file).lines().count() - 1;
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file_path)
             .entities_path(entities_file_path)
             .build()
@@ -226,7 +226,7 @@ mod tests {
         let secrets_file = resources_dir.join("ndm_smt_secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file)
             .num_random_entities(num_random_entities)
             .build()
@@ -284,7 +284,7 @@ mod tests {
         let num_entities = BufReader::new(entities_file).lines().count() - 1;
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file_path)
             .entities_path(entities_file_path)
             .num_random_entities(num_random_entities)

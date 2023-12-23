@@ -425,7 +425,7 @@ mod tests {
         let mut leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
@@ -469,7 +469,7 @@ mod tests {
         let leaf_nodes = full_bottom_layer(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
@@ -507,7 +507,7 @@ mod tests {
         let store_depth = 1;
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
             .build_using_single_threaded_algorithm(&generate_padding_closure())

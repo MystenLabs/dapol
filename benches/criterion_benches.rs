@@ -123,8 +123,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
                             ndm_smt = Some(
                                 NdmSmtConfigBuilder::default()
-                                    .height(tup.0.clone())
-                                    .max_thread_count(tup.1.clone())
+                                    .height(tup.0)
+                                    .max_thread_count(tup.1)
                                     .num_random_entities(*tup.2)
                                     .build()
                                     .parse()
@@ -233,7 +233,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             }
 
             let ndm_smt = NdmSmtConfigBuilder::default()
-                .height(h.clone())
+                .height(h)
                 .num_random_entities(*n)
                 .build()
                 .parse()
@@ -330,7 +330,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
             }
 
             let ndm_smt = NdmSmtConfigBuilder::default()
-                .height(h.clone())
+                .height(h)
                 .num_random_entities(*n)
                 .build()
                 .parse()

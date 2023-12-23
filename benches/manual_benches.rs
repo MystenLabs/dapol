@@ -118,8 +118,8 @@ fn main() {
 
                     ndm_smt = Some(
                         NdmSmtConfigBuilder::default()
-                            .height(h.clone())
-                            .max_thread_count(t.clone())
+                            .height(h)
+                            .max_thread_count(t)
                             .num_random_entities(*n)
                             .build()
                             .parse()
