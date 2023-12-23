@@ -12,10 +12,10 @@ pub fn tree_heights() -> Vec<Height> {
         .collect()
 }
 
-pub fn tree_heights_in_range(lower: &Height, upper: &Height) -> Vec<Height> {
+pub fn tree_heights_in_range(lower: Height, upper: Height) -> Vec<Height> {
     tree_heights()
         .into_iter()
-        .filter(|x| lower <= x && x <= upper)
+        .filter(|x| &lower <= x && x <= &upper)
         .collect()
 }
 
@@ -91,9 +91,9 @@ pub fn max_thread_counts() -> Vec<MaxThreadCount> {
     tc.into_iter().map(|x| MaxThreadCount::from(x)).collect()
 }
 
-pub fn max_thread_counts_greater_than(lower_bound: &MaxThreadCount) -> Vec<MaxThreadCount> {
+pub fn max_thread_counts_greater_than(lower_bound: MaxThreadCount) -> Vec<MaxThreadCount> {
     max_thread_counts()
         .into_iter()
-        .filter(|x| lower_bound <= x)
+        .filter(|x| &lower_bound <= x)
         .collect()
 }

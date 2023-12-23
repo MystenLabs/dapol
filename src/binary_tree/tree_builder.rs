@@ -142,7 +142,7 @@ where
     {
         let height = self.height()?;
         let max_thread_count = self.max_thread_count.unwrap_or_default();
-        let store_depth = self.store_depth(&height)?;
+        let store_depth = self.store_depth(height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         multi_threaded::build_tree(
@@ -168,7 +168,7 @@ where
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
-        let store_depth = self.store_depth(&height)?;
+        let store_depth = self.store_depth(height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         single_threaded::build_tree(
@@ -183,14 +183,14 @@ where
     ///
     /// Default value: use the height of the tree to determine store depth by
     /// dividing it by the default ratio.
-    fn store_depth(&self, height: &Height) -> Result<u8, TreeBuildError> {
+    fn store_depth(&self, height: Height) -> Result<u8, TreeBuildError> {
         let store_depth = self
             .store_depth
             .unwrap_or(height.as_u8() / DEFAULT_STORE_DEPTH_RATIO_INVERTED);
 
         if store_depth < MIN_STORE_DEPTH || store_depth > height.as_u8() {
             Err(TreeBuildError::InvalidStoreDepth {
-                height: height,
+                height,
                 store_depth,
             })
         } else {

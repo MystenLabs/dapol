@@ -44,9 +44,9 @@ fn main() {
               Manual benchmarks"
     );
 
-    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
-        for t in max_thread_counts_greater_than(&MIN_TOTAL_THREAD_COUNT).iter() {
-            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for t in max_thread_counts_greater_than(*MIN_TOTAL_THREAD_COUNT).into_iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
                 // ==============================================================
                 // Input validation.
 
@@ -56,7 +56,7 @@ fn main() {
                     // amount of memory available on the machine then we skip
                     // the input tuple.
 
-                    let expected_mem = estimated_total_memory_usage_mb(h, n);
+                    let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
                     if total_mem < expected_mem {
                         println!(
@@ -75,7 +75,7 @@ fn main() {
                 // Do not try build the tree if the number of entities exceeds
                 // the maximum number allowed. If this check is not done then
                 // we would get an error on tree build.
-                if n > &h.max_bottom_layer_nodes() {
+                if n > h.max_bottom_layer_nodes() {
                     println!(
                         "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -120,7 +120,7 @@ fn main() {
                         NdmSmtConfigBuilder::default()
                             .height(h)
                             .max_thread_count(t)
-                            .num_random_entities(*n)
+                            .num_random_entities(n)
                             .build()
                             .parse()
                             .expect("Unable to parse NdmSmtConfig"),

@@ -51,9 +51,9 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
-    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
-        for t in max_thread_counts_greater_than(&MIN_TOTAL_THREAD_COUNT).iter() {
-            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for t in max_thread_counts_greater_than(*MIN_TOTAL_THREAD_COUNT).into_iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
                 println!("=============================================================\n");
 
                 // =============================================================
@@ -66,7 +66,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                     // the input tuple.
 
                     let total_mem = system_total_memory_mb();
-                    let expected_mem = estimated_total_memory_usage_mb(h, n);
+                    let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
                     if total_mem < expected_mem {
                         println!(
@@ -85,7 +85,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 // Do not try build the tree if the number of entities exceeds
                 // the maximum number allowed. If this check is not done then
                 // we would get an error on tree build.
-                if n > &h.max_bottom_layer_nodes() {
+                if n > h.max_bottom_layer_nodes() {
                     println!(
                         "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -125,7 +125,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                                 NdmSmtConfigBuilder::default()
                                     .height(tup.0)
                                     .max_thread_count(tup.1)
-                                    .num_random_entities(*tup.2)
+                                    .num_random_entities(tup.2)
                                     .build()
                                     .parse()
                                     .expect("Unable to parse NdmSmtConfig"),
@@ -193,8 +193,8 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
-        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
@@ -202,7 +202,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 // the input tuple.
 
                 let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(h, n);
+                let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
                 if total_mem < expected_mem {
                     println!(
@@ -221,7 +221,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
             // Do not try build the tree if the number of entities exceeds
             // the maximum number allowed. If this check is not done then
             // we would get an error on tree build.
-            if n > &h.max_bottom_layer_nodes() {
+            if n > h.max_bottom_layer_nodes() {
                 println!(
                     "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -234,7 +234,7 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             let ndm_smt = NdmSmtConfigBuilder::default()
                 .height(h)
-                .num_random_entities(*n)
+                .num_random_entities(n)
                 .build()
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
@@ -290,8 +290,8 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
-        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
+    for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
@@ -299,7 +299,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
                 // the input tuple.
 
                 let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(h, n);
+                let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
                 if total_mem < expected_mem {
                     println!(
@@ -318,7 +318,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
             // Do not try build the tree if the number of entities exceeds
             // the maximum number allowed. If this check is not done then
             // we would get an error on tree build.
-            if n > &h.max_bottom_layer_nodes() {
+            if n > h.max_bottom_layer_nodes() {
                 println!(
                     "Skipping input height_{}/num_entities_{} since number of entities is \
                               greater than max allowed",
@@ -331,7 +331,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             let ndm_smt = NdmSmtConfigBuilder::default()
                 .height(h)
-                .num_random_entities(*n)
+                .num_random_entities(n)
                 .build()
                 .parse()
                 .expect("Unable to parse NdmSmtConfig");
