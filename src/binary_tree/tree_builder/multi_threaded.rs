@@ -183,23 +183,27 @@ impl<C> Node<C> {
     }
 }
 
-impl<C: Mergeable + Send + 'static, F: Fn(&Coordinate) -> C + Send + Sync + 'static>
-    From<(Node<C>, Arc<F>)> for MatchedPair<C>
-{
+impl<C: Mergeable> MatchedPair<C> {
     /// Create a pair of left and right sibling nodes from only 1 node and the
     /// padding node generation function.
     ///
     /// This function is made to be used by multiple threads that share
     /// `new_padding_node_content`.
-    fn from(nodes: (Node<C>, Arc<F>)) -> Self {
-        let sibling = Sibling::from(nodes.0);
+    fn from_node<F>(node: Node<C>, new_padding_node_content: Arc<F>) -> Self
+    where
+        C: Send + 'static,
+        F: Fn(&Coordinate) -> C + Send + Sync + 'static,
+    {
+        let sibling = Sibling::from(node);
         match sibling {
-            Sibling::Left(left) => {
-                MatchedPair::from((left.new_sibling_padding_node_arc(nodes.1), left))
-            }
-            Sibling::Right(right) => {
-                MatchedPair::from((right.new_sibling_padding_node_arc(nodes.1), right))
-            }
+            Sibling::Left(left) => MatchedPair::from((
+                left.new_sibling_padding_node_arc(new_padding_node_content),
+                left,
+            )),
+            Sibling::Right(right) => MatchedPair::from((
+                right.new_sibling_padding_node_arc(new_padding_node_content),
+                right,
+            )),
         }
     }
 }
@@ -427,7 +431,7 @@ where
             // is left out.
             map.insert(node.coord.clone(), node.clone());
 
-            MatchedPair::from((node, new_padding_node_content))
+            MatchedPair::from_node(node, new_padding_node_content)
         };
 
         return pair.merge();
