@@ -1,0 +1,28 @@
+[package]
+name = "dapol-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.dapol]
+path = ".."
+features = ["fuzzing"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "max_nodes_to_store"
+path = "fuzz_targets/max_nodes_to_store.rs"
+test = false
+doc = false

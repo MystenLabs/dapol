@@ -49,7 +49,7 @@ impl Measurement for Memory {
 struct MemoryFormatter;
 impl ValueFormatter for MemoryFormatter {
     fn format_value(&self, value: f64) -> String {
-        bytes_as_string(value as usize)
+        bytes_to_string(value as usize)
     }
 
     fn format_throughput(&self, throughput: &Throughput, value: f64) -> String {
@@ -60,7 +60,7 @@ impl ValueFormatter for MemoryFormatter {
         }
     }
 
-    fn scale_values(&self, typical_value: f64, values: &mut [f64]) -> &'static str {
+    fn scale_values(&self, _typical_value: f64, values: &mut [f64]) -> &'static str {
         for val in values {
             *val = ((*val / 1024u64.pow(2) as f64) * 1000.0).round() / 1000.0;
         }
@@ -69,7 +69,7 @@ impl ValueFormatter for MemoryFormatter {
 
     fn scale_throughputs(
         &self,
-        typical_value: f64,
+        _typical_value: f64,
         throughput: &Throughput,
         values: &mut [f64],
     ) -> &'static str {
@@ -105,7 +105,7 @@ impl ValueFormatter for MemoryFormatter {
     }
 }
 
-fn bytes_as_string(num_bytes: usize) -> String {
+fn bytes_to_string(num_bytes: usize) -> String {
     if num_bytes < 1024 {
         format!("{} bytes", num_bytes)
     } else if num_bytes >= 1024 && num_bytes < 1024usize.pow(2) {

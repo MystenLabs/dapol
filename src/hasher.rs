@@ -1,5 +1,7 @@
 use primitive_types::H256;
 
+const DELIMITER: &[u8] = ";".as_bytes();
+
 /// Abstraction of a hash function, allows easy switching of hash function.
 ///
 /// The main purpose of the hash function is usage in the binary tree merge
@@ -25,6 +27,7 @@ impl Hasher {
 
     pub fn update(&mut self, input: &[u8]) -> &mut Self {
         self.0.update(input);
+        self.0.update(DELIMITER);
         self
     }
 
@@ -58,7 +61,7 @@ mod tests {
         let hash = hasher.finalize();
         assert_eq!(
             hash,
-            H256::from_str("e4bf4e238e74eb8d253191a56b594565514201a71373c86e304628ed623c4850")
+            H256::from_str("09eb9ee70fc9df4d767b07cc5befc6f7a303fa0025fca014e22e8c3dc9927767")
                 .unwrap()
         );
     }

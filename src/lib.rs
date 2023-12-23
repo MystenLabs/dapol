@@ -190,3 +190,10 @@ pub use inclusion_proof::{
 
 mod entity;
 pub use entity::{Entity, EntityId, EntityIdsParser, EntityIdsParserError};
+
+/// Used for surfacing fuzzing tests to the fuzzing module in the ./fuzz
+/// directory.
+#[cfg(fuzzing)]
+pub mod fuzz {
+    pub use super::binary_tree::multi_threaded::tests::fuzz_max_nodes_to_store;
+}

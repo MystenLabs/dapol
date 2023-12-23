@@ -87,7 +87,7 @@ impl HiddenNodeContent {
         // Compute the hash: `H("pad" | coordinate | salt)`
         let mut hasher = Hasher::new();
         hasher.update("pad".as_bytes());
-        hasher.update(&coord.as_bytes());
+        hasher.update(&coord.to_bytes());
         hasher.update(&salt_bytes);
         let hash = hasher.finalize();
 

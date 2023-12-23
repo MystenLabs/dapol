@@ -96,6 +96,10 @@ impl<C: Clone> HashMapStore<C> {
     pub fn get_node(&self, coord: &Coordinate) -> Option<Node<C>> {
         self.map.get(coord).map(|n| (*n).clone())
     }
+
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -219,7 +223,7 @@ where
             MIN_STORE_DEPTH
         );
         assert!(
-            store_depth <= height.as_raw_int(),
+            store_depth <= height.as_u8(),
             "{} Store depth cannot exceed the height of the tree",
             BUG
         );
@@ -280,7 +284,7 @@ where
                 // a) node is a bottom layer leaf node (including padding nodes)
                 // b) node is in one of the top X layers where X = store_depth
                 // NOTE this includes the root node.
-                if y == 0 || y >= height.as_raw_int() - store_depth {
+                if y == 0 || y >= height.as_u8() - store_depth {
                     map.insert(pair.left.coord.clone(), pair.left);
                     map.insert(pair.right.coord.clone(), pair.right);
                 }
@@ -313,7 +317,7 @@ where
 mod tests {
     use super::super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
     };
     use crate::utils::test_utils::{assert_err, assert_err_simple};
 
@@ -326,7 +330,7 @@ mod tests {
         let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoHeightProvided));
@@ -337,7 +341,7 @@ mod tests {
         let height = Height::expect_from(4);
         let res = TreeBuilder::new()
             .with_height(height)
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::NoLeafNodesProvided));
@@ -349,7 +353,7 @@ mod tests {
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
         assert_err!(res, Err(TreeBuildError::EmptyLeaves));
     }
@@ -357,10 +361,11 @@ mod tests {
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
         let height = Height::expect_from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -370,9 +375,15 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]
@@ -384,7 +395,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::DuplicateLeaves));
@@ -398,7 +409,7 @@ mod tests {
         let res = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(vec![leaf_node])
-            .build_using_single_threaded_algorithm(get_padding_function());
+            .build_using_single_threaded_algorithm(generate_padding_closure());
 
         // cannot use assert_err because it requires Func to have the Debug trait
         assert_err_simple!(res, Err(TreeBuildError::InvalidXCoord));
@@ -416,7 +427,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(&get_padding_function())
+            .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
         let root = tree.root();
 
@@ -425,7 +436,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes)
-            .build_using_single_threaded_algorithm(&get_padding_function())
+            .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
         assert_eq!(root, tree.root());
@@ -439,7 +450,7 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(&get_padding_function())
+            .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
         for leaf in leaf_nodes {
@@ -460,15 +471,15 @@ mod tests {
         let tree = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(&get_padding_function())
+            .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
-        let middle_layer = height.as_raw_int() / 2;
-        let layer_below_root = height.as_raw_int() - 1;
+        let middle_layer = height.as_u8() / 2;
+        let layer_below_root = height.as_u8() - 1;
 
         // These nodes should be in the store.
         for y in middle_layer..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 tree.store
                     .get_node(&coord)
@@ -479,7 +490,7 @@ mod tests {
         // These nodes should not be in the store.
         // Why 1 and not 0? Because leaf nodes are checked in another test.
         for y in 1..middle_layer {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);
@@ -499,13 +510,13 @@ mod tests {
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
-            .build_using_single_threaded_algorithm(&get_padding_function())
+            .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
 
-        let layer_below_root = height.as_raw_int() - 1;
+        let layer_below_root = height.as_u8() - 1;
 
         // Only the leaf nodes should be in the store.
-        for x in 0..2u64.pow((height.as_raw_int() - 1) as u32) {
+        for x in 0..2u64.pow((height.as_u8() - 1) as u32) {
             let coord = Coordinate { x, y: 0 };
             tree.store
                 .get_node(&coord)
@@ -514,7 +525,7 @@ mod tests {
 
         // All internal nodes should not be in the store.
         for y in 1..layer_below_root {
-            for x in 0..2u64.pow((height.as_raw_int() - y - 1) as u32) {
+            for x in 0..2u64.pow((height.as_u8() - y - 1) as u32) {
                 let coord = Coordinate { x, y };
                 if tree.store.get_node(&coord).is_some() {
                     panic!("{:?} was expected to not be in the store", coord);

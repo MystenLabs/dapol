@@ -54,21 +54,21 @@ impl AggregationFactor {
     pub fn apply_to(&self, tree_height: &Height) -> u8 {
         match self {
             Self::Divisor(div) => {
-                if *div == 0 || *div > tree_height.as_raw_int() {
+                if *div == 0 || *div > tree_height.as_u8() {
                     0
                 } else {
-                    tree_height.as_raw_int() / div
+                    tree_height.as_u8() / div
                 }
             }
-            Self::Percent(per) => per.apply_to(tree_height.as_raw_int()),
-            Self::Number(num) => *num.min(&tree_height.as_raw_int()),
+            Self::Percent(per) => per.apply_to(tree_height.as_u8()),
+            Self::Number(num) => *num.min(&tree_height.as_u8()),
         }
     }
 
     /// True if `apply_to` would result in 0 no matter the input `tree_height`.
     pub fn is_zero(&self, tree_height: &Height) -> bool {
         match self {
-            Self::Divisor(div) => *div == 0 || *div > tree_height.as_raw_int(),
+            Self::Divisor(div) => *div == 0 || *div > tree_height.as_u8(),
             Self::Percent(per) => per.value() == 0,
             Self::Number(num) => *num == 0,
         }
@@ -79,7 +79,7 @@ impl AggregationFactor {
         match self {
             Self::Divisor(div) => *div == 1,
             Self::Percent(per) => per == &ONE_HUNDRED_PERCENT,
-            Self::Number(num) => *num >= tree_height.as_raw_int(),
+            Self::Number(num) => *num >= tree_height.as_u8(),
         }
     }
 }
@@ -110,7 +110,7 @@ mod tests {
             let aggregation_factor = AggregationFactor::Divisor(1);
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
-                tree_height.as_raw_int()
+                tree_height.as_u8()
             );
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(aggregation_factor.is_max(&tree_height));
@@ -120,7 +120,7 @@ mod tests {
         #[test]
         fn tree_height_divisor_gives_one_aggregation() {
             let tree_height = Height::expect_from(10);
-            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_raw_int());
+            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_u8());
             assert_eq!(aggregation_factor.apply_to(&tree_height), 1);
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(!aggregation_factor.is_max(&tree_height));
@@ -130,7 +130,7 @@ mod tests {
         #[test]
         fn greater_than_tree_height_divisor_gives_zero_aggregation() {
             let tree_height = Height::expect_from(10);
-            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_raw_int() + 1);
+            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_u8() + 1);
             assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
             assert!(aggregation_factor.is_zero(&tree_height));
             assert!(!aggregation_factor.is_max(&tree_height));
@@ -149,7 +149,7 @@ mod tests {
             let aggregation_factor = AggregationFactor::Percent(ONE_HUNDRED_PERCENT);
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
-                tree_height.as_raw_int()
+                tree_height.as_u8()
             );
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(aggregation_factor.is_max(&tree_height));
@@ -162,7 +162,7 @@ mod tests {
             let aggregation_factor = AggregationFactor::Percent(Percentage::expect_from(50));
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
-                tree_height.as_raw_int() / 2
+                tree_height.as_u8() / 2
             );
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(!aggregation_factor.is_max(&tree_height));
@@ -207,10 +207,10 @@ mod tests {
         #[test]
         fn tree_height_number_gives_full_aggregation() {
             let tree_height = Height::expect_from(10);
-            let aggregation_factor = AggregationFactor::Number(tree_height.as_raw_int());
+            let aggregation_factor = AggregationFactor::Number(tree_height.as_u8());
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
-                tree_height.as_raw_int()
+                tree_height.as_u8()
             );
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(aggregation_factor.is_max(&tree_height));
@@ -220,10 +220,10 @@ mod tests {
         #[test]
         fn greater_than_tree_height_number_gives_full_aggregation() {
             let tree_height = Height::expect_from(10);
-            let aggregation_factor = AggregationFactor::Number(tree_height.as_raw_int() + 1);
+            let aggregation_factor = AggregationFactor::Number(tree_height.as_u8() + 1);
             assert_eq!(
                 aggregation_factor.apply_to(&tree_height),
-                tree_height.as_raw_int()
+                tree_height.as_u8()
             );
             assert!(!aggregation_factor.is_zero(&tree_height));
             assert!(aggregation_factor.is_max(&tree_height));

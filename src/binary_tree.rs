@@ -187,7 +187,7 @@ impl Coordinate {
     /// the next 8 elements of the array, directly after the first element.
     /// Both x- & y-coords are given in Little Endian byte order.
     /// https://stackoverflow.com/questions/71788974/concatenating-two-u16s-to-a-single-array-u84
-    pub fn as_bytes(&self) -> [u8; 32] {
+    pub fn to_bytes(&self) -> [u8; 32] {
         let mut c = [0u8; 32];
         let (left, mid) = c.split_at_mut(1);
         left.copy_from_slice(&self.y.to_le_bytes());
@@ -337,6 +337,14 @@ impl<C: Clone> Store<C> {
             Store::SingleThreadedStore(store) => store.get_node(coord),
         }
     }
+
+    /// Simply delegate the call to the wrapped store.
+    fn len(&self) -> usize {
+        match self {
+            Store::MultiThreadedStore(store) => store.len(),
+            Store::SingleThreadedStore(store) => store.len(),
+        }
+    }
 }
 
 // impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
@@ -429,7 +437,7 @@ mod tests {
         let x = 258;
         let y = 12;
         let coord = Coordinate { x, y };
-        let bytes = coord.as_bytes();
+        let bytes = coord.to_bytes();
 
         assert_eq!(bytes.len(), 32, "Byte array should be 256 bits");
 

@@ -116,7 +116,7 @@ impl FullNodeContent {
         let commitment =
             PedersenGens::default().commit(Scalar::from(liability), blinding_factor_scalar);
 
-        let coord_bytes = coord.as_bytes();
+        let coord_bytes = coord.to_bytes();
         let salt_bytes: [u8; 32] = salt.into();
 
         // Compute the hash: `H("pad" | coordinate | salt)`

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use primitive_types::H256;
 use serde::{Deserialize, Serialize};
 
-use log::error;
+use log::{error, info};
 use logging_timer::{timer, Level};
 
 use rayon::prelude::*;
@@ -89,12 +89,26 @@ impl NdmSmt {
         let salt_b_bytes = secrets.salt_b.as_bytes();
         let salt_s_bytes = secrets.salt_s.as_bytes();
 
+        info!(
+            "\nCreating NDM-SMT with the following configuration:\n \
+             - height: {}\n \
+             - number of entities: {}\n \
+             - master secret: 0x{}\n \
+             - salt b: 0x{}\n \
+             - salt s: 0x{}",
+            height.as_u32(),
+            entities.len(),
+            master_secret_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            salt_b_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+            salt_s_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>(),
+        );
+
         let (leaf_nodes, entity_coord_tuples) = {
             // Map the entities to bottom-layer leaf nodes.
 
             let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::from(&height);
+            let mut x_coord_generator = RandomXCoordGenerator::from_height(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for _i in 0..entities.len() {
@@ -263,7 +277,7 @@ fn new_padding_node_content_closure(
     move |coord: &Coordinate| {
         // TODO unfortunately we copy data here, maybe there is a way to do without
         // copying
-        let coord_bytes = coord.as_bytes();
+        let coord_bytes = coord.to_bytes();
         // pad_secret is given as 'w' in the DAPOL+ paper
         let pad_secret = generate_key(None, &master_secret_bytes, Some(&coord_bytes));
         let pad_secret_bytes: [u8; 32] = pad_secret.into();

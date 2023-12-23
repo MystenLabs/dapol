@@ -12,33 +12,24 @@ use std::path::Path;
 use criterion::measurement::Measurement;
 use criterion::{criterion_group, criterion_main};
 use criterion::{BenchmarkId, Criterion, SamplingMode};
-use once_cell::sync::Lazy;
 use statistical::*;
 
 use dapol::accumulators::{NdmSmt, NdmSmtConfigBuilder};
-use dapol::{initialize_machine_parallelism, Accumulator};
+use dapol::{Accumulator, InclusionProof};
 
 mod inputs;
-use inputs::{max_thread_counts, num_entities_less_than_eq, tree_heights};
+use inputs::{max_thread_counts_greater_than, num_entities_in_range, tree_heights_in_range};
 
 mod memory_usage_estimation;
 use memory_usage_estimation::estimated_total_memory_usage_mb;
 
 mod utils;
-use utils::{abs_diff, bytes_as_string, system_total_memory_mb};
+use utils::{abs_diff, bytes_to_string, system_total_memory_mb};
 
-/// Determines how many runs are done for number of entities.
-/// The higher this value the more runs that are done.
-///
-/// Some of the tree builds can take a few hours, and Criterion does a minimum
-/// of 10 samples per bench. So this value gives us to decide how much of the
-/// num_entities
-static MAX_ENTITIES_FOR_CRITERION_BENCHES: Lazy<u64> = Lazy::new(|| {
-    std::env::var("MAX_ENTITIES_FOR_CRITERION")
-        .unwrap_or("100000".to_string())
-        .parse()
-        .unwrap()
-});
+mod env_vars;
+use env_vars::{
+    LOG_VERBOSITY, MAX_ENTITIES, MAX_HEIGHT, MIN_ENTITIES, MIN_HEIGHT, MIN_TOTAL_THREAD_COUNT,
+};
 
 /// This is required to get jemalloc_ctl to work properly.
 #[global_allocator]
@@ -52,16 +43,17 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
     let epoch = jemalloc_ctl::epoch::mib().unwrap();
     let allocated = jemalloc_ctl::stats::allocated::mib().unwrap();
 
-    initialize_machine_parallelism();
+    dapol::initialize_machine_parallelism();
+    dapol::utils::activate_logging(*LOG_VERBOSITY);
 
     let mut group = c.benchmark_group("build_tree");
     // `SamplingMode::Flat` is used here as that is what Criterion recommends for long-running benches
     // https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html#sampling-mode
     group.sampling_mode(SamplingMode::Flat);
 
-    for h in tree_heights().iter() {
-        for t in max_thread_counts().iter() {
-            for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
+        for t in max_thread_counts_greater_than(&MIN_TOTAL_THREAD_COUNT).iter() {
+            for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
                 println!("=============================================================\n");
 
                 // =============================================================
@@ -116,7 +108,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
@@ -168,19 +160,18 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 let path = Accumulator::parse_accumulator_serialization_path(dir).unwrap();
                 let acc = Accumulator::NdmSmt(ndm_smt.expect("Tree should have been built"));
 
-                group.bench_with_input(
+                group.bench_function(
                     BenchmarkId::new(
                         "serialize_tree",
                         format!(
                             "height_{}/max_thread_count_{}/num_entities_{}",
                             h.as_u32(),
-                            t.get_value(),
+                            t.as_u8(),
                             n
                         ),
                     ),
-                    &(h, t, n),
-                    |bench, tup| {
-                        bench.iter(|| acc.serialize(path.clone()));
+                    |bench| {
+                        bench.iter(|| acc.serialize(path.clone()).unwrap());
                     },
                 );
 
@@ -190,7 +181,7 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 
                 println!(
                     "\nSerialized tree file size: {}\n",
-                    bytes_as_string(file_size as usize)
+                    bytes_to_string(file_size as usize)
                 );
             }
         }
@@ -200,11 +191,10 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because we want proof
 /// generation to have maximum threads.
 pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
-    group.sample_size(20);
+    let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
@@ -255,18 +245,41 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
                 .next()
                 .expect("Tree should have at least 1 entity");
 
+            let mut proof = Option::<InclusionProof>::None;
+
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "generate_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
                     bench.iter(|| {
-                        let _proof = ndm_smt
-                            .generate_inclusion_proof(entity_id)
-                            .expect("Proof should have been generated successfully");
+                        proof = Some(
+                            ndm_smt
+                                .generate_inclusion_proof(entity_id)
+                                .expect("Proof should have been generated successfully"),
+                        );
                     });
                 },
+            );
+
+            // =============================================================
+            // Proof serialization.
+
+            let src_dir = env!("CARGO_MANIFEST_DIR");
+            let target_dir = Path::new(&src_dir).join("target");
+            let dir = target_dir.join("serialized_proofs");
+            let path = proof
+                .expect("Proof should be set")
+                .serialize(entity_id, dir)
+                .unwrap();
+            let file_size = std::fs::metadata(path)
+                .expect("Unable to get serialized tree metadata for {path}")
+                .len();
+
+            println!(
+                "\nSerialized proof file size: {}\n",
+                bytes_to_string(file_size as usize)
             );
         }
     }
@@ -275,11 +288,10 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
 /// We only loop through `tree_heights` & `num_entities` because proof
 /// verification does not depend on number of threads.
 pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
-    let mut group = c.benchmark_group("generate_proof");
-    group.sample_size(20);
+    let mut group = c.benchmark_group("proofs");
 
-    for h in tree_heights().iter() {
-        for n in num_entities_less_than_eq(*MAX_ENTITIES_FOR_CRITERION_BENCHES).iter() {
+    for h in tree_heights_in_range(&MIN_HEIGHT, &MAX_HEIGHT).iter() {
+        for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).iter() {
             {
                 // We attempt to guess the amount of memory that the tree
                 // build will require, and if that is greater than the
@@ -338,7 +350,7 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
 
             group.bench_function(
                 BenchmarkId::new(
-                    "build_tree",
+                    "verify_proof",
                     format!("height_{}/num_entities_{}", h.as_u32(), n),
                 ),
                 |bench| {
@@ -357,7 +369,7 @@ use std::time::Duration;
 criterion_group! {
     name = wall_clock_time;
     config = Criterion::default().sample_size(10).measurement_time(Duration::from_secs(600));
-    targets = bench_build_tree, bench_generate_proof, bench_verify_proof,
+    targets = bench_build_tree, bench_generate_proof, bench_verify_proof
 }
 
 // Does not work, see memory_measurement.rs

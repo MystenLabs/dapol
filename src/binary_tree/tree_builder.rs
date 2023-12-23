@@ -19,8 +19,8 @@ pub mod multi_threaded;
 pub mod single_threaded;
 
 /// This equates to half of the layers being stored.
-/// `height / DEFAULT_STORE_DEPTH_RATIO`
-pub const DEFAULT_STORE_DEPTH_RATIO: u8 = 2;
+/// `height / DEFAULT_STORE_DEPTH_RATIO_INVERTED`
+pub const DEFAULT_STORE_DEPTH_RATIO_INVERTED: u8 = 2;
 
 /// The root node is not actually put in the hashmap because it is
 /// returned along with the hashmap, but it is considered to be stored so
@@ -142,7 +142,7 @@ where
     {
         let height = self.height()?;
         let max_thread_count = self.max_thread_count.clone().unwrap_or_default();
-        let store_depth = self.store_depth(&height);
+        let store_depth = self.store_depth(&height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         multi_threaded::build_tree(
@@ -168,7 +168,7 @@ where
         F: Fn(&Coordinate) -> C,
     {
         let height = self.height()?;
-        let store_depth = self.store_depth(&height);
+        let store_depth = self.store_depth(&height)?;
         let input_leaf_nodes = self.leaf_nodes(&height)?;
 
         single_threaded::build_tree(
@@ -183,9 +183,19 @@ where
     ///
     /// Default value: use the height of the tree to determine store depth by
     /// dividing it by the default ratio.
-    fn store_depth(&self, height: &Height) -> u8 {
-        self.store_depth
-            .unwrap_or(height.as_raw_int() / DEFAULT_STORE_DEPTH_RATIO)
+    fn store_depth(&self, height: &Height) -> Result<u8, TreeBuildError> {
+        let store_depth = self
+            .store_depth
+            .unwrap_or(height.as_u8() / DEFAULT_STORE_DEPTH_RATIO_INVERTED);
+
+        if store_depth < MIN_STORE_DEPTH || store_depth > height.as_u8() {
+            Err(TreeBuildError::InvalidStoreDepth {
+                height: height.clone(),
+                store_depth,
+            })
+        } else {
+            Ok(store_depth)
+        }
     }
 
     /// Private function used internally to retrieve height for building.
@@ -215,7 +225,10 @@ where
         let max_leaf_nodes = height.max_bottom_layer_nodes();
 
         if leaf_nodes.len() > max_leaf_nodes as usize {
-            return Err(TreeBuildError::TooManyLeaves);
+            return Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes.len() as u64,
+                max: max_leaf_nodes,
+            });
         }
 
         // Make sure all x-coord < max.
@@ -275,17 +288,18 @@ pub enum TreeBuildError {
     NoHeightProvided,
     #[error("The builder must be given a padding node generator function before building")]
     NoPaddingNodeContentGeneratorProvided,
-    #[error("Too many leaves for the given height")]
-    TooManyLeaves,
+    #[error("Too many leaves for the given height (given: {given:?}, max: {max:?})")]
+    TooManyLeaves { given: u64, max: u64 },
     #[error("Leaf nodes cannot be empty")]
     EmptyLeaves,
     #[error("X coords for leaves must be less than 2^height")]
     InvalidXCoord,
     #[error("Not allowed to have more than 1 leaf with the same x-coord")]
     DuplicateLeaves,
-
     #[error("Could not get ownership of the store in the multi-threaded builder")]
     StoreOwnershipFailure,
+    #[error("Store depth ({store_depth:?}) out of bounds [{MIN_STORE_DEPTH:?}, {height:?}]")]
+    InvalidStoreDepth { height: Height, store_depth: u8 },
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -296,7 +310,7 @@ mod tests {
     use super::super::*;
     use super::*;
     use crate::binary_tree::utils::test_utils::{
-        full_bottom_layer, get_padding_function, single_leaf, sparse_leaves, TestContent,
+        full_bottom_layer, generate_padding_closure, single_leaf, sparse_leaves, TestContent,
     };
 
     use crate::utils::test_utils::{assert_err, assert_err_simple};
@@ -323,13 +337,13 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -346,13 +360,13 @@ mod tests {
         let single_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes.clone())
-            .build_using_single_threaded_algorithm(get_padding_function())
+            .build_using_single_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         let multi_threaded = TreeBuilder::new()
             .with_height(height.clone())
             .with_leaf_nodes(leaf_nodes)
-            .build_using_multi_threaded_algorithm(get_padding_function())
+            .build_using_multi_threaded_algorithm(generate_padding_closure())
             .unwrap();
 
         assert_eq!(single_threaded.root, multi_threaded.root);
@@ -370,13 +384,13 @@ mod tests {
             let single_threaded = TreeBuilder::new()
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node.clone())
-                .build_using_single_threaded_algorithm(get_padding_function())
+                .build_using_single_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             let multi_threaded = TreeBuilder::new()
                 .with_height(height.clone())
                 .with_leaf_nodes(leaf_node)
-                .build_using_multi_threaded_algorithm(get_padding_function())
+                .build_using_multi_threaded_algorithm(generate_padding_closure())
                 .unwrap();
 
             assert_eq!(single_threaded.root, multi_threaded.root);
@@ -420,11 +434,13 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves() {
+        let height = Height::from(8u8);
         let height = Height::expect_from(8u8);
+        let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
         leaf_nodes.push(InputLeafNode::<TestContent> {
-            x_coord: height.max_bottom_layer_nodes() + 1,
+            x_coord: max_nodes + 1,
             content: TestContent {
                 hash: H256::random(),
                 value: thread_rng().gen(),
@@ -436,7 +452,13 @@ mod tests {
             .with_leaf_nodes(leaf_nodes)
             .leaf_nodes(&height);
 
-        assert_err!(res, Err(TreeBuildError::TooManyLeaves));
+        assert_err!(
+            res,
+            Err(TreeBuildError::TooManyLeaves {
+                given: leaf_nodes,
+                max: max_nodes,
+            })
+        );
     }
 
     #[test]

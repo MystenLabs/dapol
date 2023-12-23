@@ -14,7 +14,7 @@ use super::{ndm_smt, Accumulator};
 /// accumulator_type = "ndm-smt"
 /// ```
 ///
-/// The rest of the config details can be found in the submodules:
+/// The rest of the config details can be found in the sub-modules:
 /// - [crate][accumulators][NdmSmtConfig]
 ///
 /// Config deserialization example:
