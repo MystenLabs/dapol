@@ -2,6 +2,7 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 
+/// This value allows us to change the type of Height easily.
 const UNDERLYING_INT_TYPE_STR: &str = "u8";
 type UnderlyingInt = u8;
 

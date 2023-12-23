@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn try_from_happy_case() {
         let test = 15;
-        assert_eq!(test, Percentage::try_from(15).unwrap().value);
+        assert_eq!(test, Percentage::expect_from(15).value);
     }
 
     #[test]
