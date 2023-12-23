@@ -1,4 +1,4 @@
-height,max_threads,num_users,compute_time(s),mem_usage(MB),file_size(MB)
+height,max_threads,num_entities,compute_time(s),memory(MB),file_size(MB)
 16,4,10000,0.8653,14.38,2.06
 16,4,20000,0.8632,11.33,4.08
 16,4,30000,0.7593,22.39,6.11
