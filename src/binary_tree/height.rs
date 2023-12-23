@@ -45,6 +45,8 @@ impl Height {
     ///
     /// panics if `int` is greater than [MAX_HEIGHT] or less than
     /// [MIN_HEIGHT].
+    ///
+    /// Note that if we try to implement the From trait then we have a collision.
     pub fn expect_from(int: u8) -> Self {
         match Height::try_from(int) {
             Err(e) => panic!("{}", e),

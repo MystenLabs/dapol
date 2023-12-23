@@ -87,7 +87,7 @@ where
 // -------------------------------------------------------------------------------------------------
 // Store.
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct HashMapStore<C> {
     map: Map<C>,
 }

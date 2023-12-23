@@ -140,7 +140,7 @@ where
 
 type Map<C> = DashMap<Coordinate, Node<C>>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct DashMapStore<C> {
     map: Map<C>,
 }
@@ -264,10 +264,7 @@ pub struct RecursionParams {
 
 impl RecursionParamsBuilder {
     pub fn build(&self) -> RecursionParams {
-        let height = self
-            .height
-            .clone()
-            .expect("Height not set for RecursionParams (should have a default)");
+        let height = self.height.unwrap_or(MAX_HEIGHT);
 
         let x_coord_min = 0;
         // x-coords start from 0, hence the `- 1`.

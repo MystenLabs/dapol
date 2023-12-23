@@ -31,18 +31,6 @@ pub struct NdmSmtSecretsParser {
 }
 
 impl NdmSmtSecretsParser {
-    // /// Constructor.
-    // ///
-    // /// `Option` is used to wrap the parameter to make the code work more
-    // /// seamlessly with the config builders in [crate][accumulators].
-    // pub fn from_opt(path: Option<PathBuf>) -> Self {
-    //     NdmSmtSecretsParser { path }
-    // }
-
-    // pub fn from(path: PathBuf) -> Self {
-    //     NdmSmtSecretsParser { path: Some(path) }
-    // }
-
     /// Open and parse the file, returning a [NdmSmtSecrets] struct.
     ///
     /// An error is returned if:

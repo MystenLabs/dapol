@@ -79,7 +79,7 @@ pub const MIN_RECOMMENDED_SPARSITY: u8 = 2;
 /// according to logic in [tree_builder].
 ///
 /// The generic type `C` is for the content contained within each node.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BinaryTree<C> {
     root: Node<C>,
     store: Store<C>,
@@ -114,7 +114,7 @@ pub struct Coordinate {
 /// are [erased_serde] and [typetag] but none support deserialization of generic
 /// traits; for more details see
 /// [this issue](https://github.com/dtolnay/typetag/issues/1).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub enum Store<C> {
     MultiThreadedStore(multi_threaded::DashMapStore<C>),
     SingleThreadedStore(single_threaded::HashMapStore<C>),
@@ -347,11 +347,13 @@ impl<C: Clone> Store<C> {
     }
 }
 
-// impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "root: {:?}, height: {:?}", self.root, self.height)
-//     }
-// }
+/// We can't use the default Debug implementation because it prints the whole
+/// store.
+impl<C: fmt::Debug + Clone> fmt::Debug for BinaryTree<C> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "root: {:?}, height: {:?}", self.root, self.height)
+    }
+}
 
 // -------------------------------------------------------------------------------------------------
 // Supporting structs & implementations.
