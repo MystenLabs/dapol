@@ -51,25 +51,28 @@ fn main() {
                 // Input validation.
 
                 {
+                    // TODO the python script needs to be run again.
+                    // see memory_usage_estimation.rs for more info.
+
                     // We attempt to guess the amount of memory that the tree
                     // build will require, and if that is greater than the
                     // amount of memory available on the machine then we skip
                     // the input tuple.
 
-                    let expected_mem = estimated_total_memory_usage_mb(&h, &n);
+                    // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                    if total_mem < expected_mem {
-                        println!(
-                            "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                            h.as_u32(),
-                            n,
-                            expected_mem,
-                            total_mem
-                        );
+                    // if total_mem < expected_mem {
+                    //     println!(
+                    //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                    //               usage {} is greater than the system max {}",
+                    //         h.as_u32(),
+                    //         n,
+                    //         expected_mem,
+                    //         total_mem
+                    //     );
 
-                        continue;
-                    }
+                    //     continue;
+                    // }
                 }
 
                 // Do not try build the tree if the number of entities exceeds

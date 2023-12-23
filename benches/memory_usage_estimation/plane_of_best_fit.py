@@ -16,6 +16,16 @@
 # )
 
 # ///////////////////////////////////////////////////////////
+# https://stackoverflow.com/questions/56439930/how-to-use-the-datasets-to-fit-the-3d-surface
+
+# TODO we need to rather fit an arbitrary surface than a plane.
+# (see data in results/memory directory)
+
+# If you look at the points in bench_data_combined.csv then you can clearly see that a
+# plane is not the best way to fit the data. Better would be just to fit it using some
+# number of iterations of the Taylor series. The above link seems to show this.
+
+# ///////////////////////////////////////////////////////////
 # https://math.stackexchange.com/questions/99299/best-fitting-plane-given-a-set-of-points
 
 import matplotlib.pyplot as plt
@@ -34,8 +44,8 @@ NOISE = 5
 
 csvfile = pd.read_csv(sys.argv[1], dtype=np.float64)
 xs = csvfile["height"].to_list()
-ys = csvfile["num_users"].to_list()
-zs = csvfile["mem_usage(MB)"].to_list()
+ys = csvfile["num_entities"].to_list()
+zs = csvfile["memory(MB)"].to_list()
 
 # Create random data.
 # In your solution, you would provide your own xs, ys, and zs data.
@@ -84,7 +94,7 @@ c = np.repeat(fit[2], len(xs)*len(ys)).reshape(X.shape)
 Z = np.multiply(a, X) + np.multiply(b, Y) + c
 
 # Plot the surface
-ax.plot_surface(X, Y, Z, cmap=cm.Blues)
+#ax.plot_surface(X, Y, Z, cmap=cm.Blues)
 ax.set_xlabel('Height')
 ax.set_ylabel('Number of entities')
 ax.set_zlabel('Memory (MB)')

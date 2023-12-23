@@ -60,26 +60,29 @@ pub fn bench_build_tree<T: Measurement>(c: &mut Criterion<T>) {
                 // Input validation.
 
                 {
-                    // We attempt to guess the amount of memory that the tree
-                    // build will require, and if that is greater than the
-                    // amount of memory available on the machine then we skip
-                    // the input tuple.
+                    // TODO the python script needs to be run again.
+                    // see memory_usage_estimation.rs for more info.
 
-                    let total_mem = system_total_memory_mb();
-                    let expected_mem = estimated_total_memory_usage_mb(&h, &n);
+                    // // We attempt to guess the amount of memory that the tree
+                    // // build will require, and if that is greater than the
+                    // // amount of memory available on the machine then we skip
+                    // // the input tuple.
 
-                    if total_mem < expected_mem {
-                        println!(
-                            "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                            h.as_u32(),
-                            n,
-                            expected_mem,
-                            total_mem
-                        );
+                    // let total_mem = system_total_memory_mb();
+                    // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                        continue;
-                    }
+                    // if total_mem < expected_mem {
+                    //     println!(
+                    //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                    //               usage {} is greater than the system max {}",
+                    //         h.as_u32(),
+                    //         n,
+                    //         expected_mem,
+                    //         total_mem
+                    //     );
+
+                    //     continue;
+                    // }
                 }
 
                 // Do not try build the tree if the number of entities exceeds
@@ -196,26 +199,29 @@ pub fn bench_generate_proof<T: Measurement>(c: &mut Criterion<T>) {
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
-                // We attempt to guess the amount of memory that the tree
-                // build will require, and if that is greater than the
-                // amount of memory available on the machine then we skip
-                // the input tuple.
+                // TODO the python script needs to be run again.
+                // see memory_usage_estimation.rs for more info.
 
-                let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(&h, &n);
+                // // We attempt to guess the amount of memory that the tree
+                // // build will require, and if that is greater than the
+                // // amount of memory available on the machine then we skip
+                // // the input tuple.
 
-                if total_mem < expected_mem {
-                    println!(
-                        "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                        h.as_u32(),
-                        n,
-                        expected_mem,
-                        total_mem
-                    );
+                // let total_mem = system_total_memory_mb();
+                // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                    continue;
-                }
+                // if total_mem < expected_mem {
+                //     println!(
+                //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                //                   usage {} is greater than the system max {}",
+                //         h.as_u32(),
+                //         n,
+                //         expected_mem,
+                //         total_mem
+                //     );
+
+                //     continue;
+                // }
             }
 
             // Do not try build the tree if the number of entities exceeds
@@ -293,26 +299,29 @@ pub fn bench_verify_proof<T: Measurement>(c: &mut Criterion<T>) {
     for h in tree_heights_in_range(*MIN_HEIGHT, *MAX_HEIGHT).into_iter() {
         for n in num_entities_in_range(*MIN_ENTITIES, *MAX_ENTITIES).into_iter() {
             {
-                // We attempt to guess the amount of memory that the tree
-                // build will require, and if that is greater than the
-                // amount of memory available on the machine then we skip
-                // the input tuple.
+                // TODO the python script needs to be run again.
+                // see memory_usage_estimation.rs for more info.
 
-                let total_mem = system_total_memory_mb();
-                let expected_mem = estimated_total_memory_usage_mb(&h, &n);
+                // // We attempt to guess the amount of memory that the tree
+                // // build will require, and if that is greater than the
+                // // amount of memory available on the machine then we skip
+                // // the input tuple.
 
-                if total_mem < expected_mem {
-                    println!(
-                        "Skipping input height_{}/num_entities_{} since estimated memory \
-                                  usage {} is greater than the system max {}",
-                        h.as_u32(),
-                        n,
-                        expected_mem,
-                        total_mem
-                    );
+                // let total_mem = system_total_memory_mb();
+                // let expected_mem = estimated_total_memory_usage_mb(&h, &n);
 
-                    continue;
-                }
+                // if total_mem < expected_mem {
+                //     println!(
+                //         "Skipping input height_{}/num_entities_{} since estimated memory \
+                //                   usage {} is greater than the system max {}",
+                //         h.as_u32(),
+                //         n,
+                //         expected_mem,
+                //         total_mem
+                //     );
+
+                //     continue;
+                // }
             }
 
             // Do not try build the tree if the number of entities exceeds
