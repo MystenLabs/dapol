@@ -87,7 +87,7 @@ fn main() {
                 .consume(|path| accumulator.serialize(path).unwrap());
 
             if let Some(patharg) = gen_proofs {
-                let entity_ids = EntityIdsParser::from_path(
+                let entity_ids = EntityIdsParser::from(
                     patharg.into_path().expect("Expected file path, not stdin"),
                 )
                 .parse()
@@ -119,7 +119,7 @@ fn main() {
             .log_on_err_unwrap();
 
             // TODO for entity IDs: accept either path or stdin
-            let entity_ids = EntityIdsParser::from_path(
+            let entity_ids = EntityIdsParser::from(
                 entity_ids
                     .into_path()
                     .expect("Expected file path, not stdin"),

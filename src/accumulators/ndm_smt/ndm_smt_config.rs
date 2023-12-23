@@ -55,7 +55,7 @@ use super::{ndm_smt_secrets_parser, NdmSmt, NdmSmtSecretsParser};
 /// use dapol::{Height, MaxThreadCount};
 /// use dapol::accumulators::NdmSmtConfigBuilder;
 ///
-/// let height = Height::from(8);
+/// let height = Height::expect_from(8);
 /// let max_thread_count = MaxThreadCount::default();
 ///
 /// let config = NdmSmtConfigBuilder::default()
@@ -86,7 +86,7 @@ impl NdmSmtConfig {
     pub fn parse(self) -> Result<NdmSmt, NdmSmtConfigParserError> {
         debug!("Parsing config to create a new NDM-SMT: {:?}", self);
 
-        let secrets = NdmSmtSecretsParser::from_path_opt(self.secrets_file_path)
+        let secrets = NdmSmtSecretsParser::from(self.secrets_file_path)
             .parse_or_generate_random()?;
 
         let height = self.height;
@@ -131,21 +131,21 @@ impl NdmSmtConfigBuilder {
         self.entities_path_opt(Some(path))
     }
 
-    pub fn num_random_entities_opt(&mut self, num_entites: Option<u64>) -> &mut Self {
+    pub fn num_random_entities_opt(&mut self, num_entities: Option<u64>) -> &mut Self {
         match &mut self.entities {
             None => {
                 self.entities = Some(EntityConfig {
                     file_path: None,
-                    num_random_entities: num_entites,
+                    num_random_entities: num_entities,
                 })
             }
-            Some(entities) => entities.num_random_entities = num_entites,
+            Some(entities) => entities.num_random_entities = num_entities,
         }
         self
     }
 
-    pub fn num_random_entities(&mut self, num_entites: u64) -> &mut Self {
-        self.num_random_entities_opt(Some(num_entites))
+    pub fn num_random_entities(&mut self, num_entities: u64) -> &mut Self {
+        self.num_random_entities_opt(Some(num_entities))
     }
 
     pub fn build(&self) -> NdmSmtConfig {
@@ -159,8 +159,8 @@ impl NdmSmtConfigBuilder {
         };
 
         NdmSmtConfig {
-            height: self.height.clone().unwrap_or_default(),
-            max_thread_count: self.max_thread_count.clone().unwrap_or_default(),
+            height: self.height.unwrap_or_default(),
+            max_thread_count: self.max_thread_count.unwrap_or_default(),
             secrets_file_path: self.secrets_file_path.clone().unwrap_or(None),
             entities,
         }
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn builder_with_entities_file() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
         let resources_dir = Path::new(&src_dir).join("examples");
@@ -205,7 +205,7 @@ mod tests {
         let num_entities = BufReader::new(entities_file).lines().count() - 1;
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file_path)
             .entities_path(entities_file_path)
             .build()
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn builder_with_random_entities() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
@@ -226,7 +226,7 @@ mod tests {
         let secrets_file = resources_dir.join("ndm_smt_secrets_example.toml");
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file)
             .num_random_entities(num_random_entities)
             .build()
@@ -270,7 +270,7 @@ mod tests {
 
     #[test]
     fn builder_with_all_values() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let num_random_entities = 10;
 
         let src_dir = env!("CARGO_MANIFEST_DIR");
@@ -284,7 +284,7 @@ mod tests {
         let num_entities = BufReader::new(entities_file).lines().count() - 1;
 
         let ndm_smt = NdmSmtConfigBuilder::default()
-            .height(height.clone())
+            .height(height)
             .secrets_file_path(secrets_file_path)
             .entities_path(entities_file_path)
             .num_random_entities(num_random_entities)

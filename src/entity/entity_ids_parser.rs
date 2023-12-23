@@ -19,7 +19,7 @@ use crate::entity::{EntityId, ENTITY_ID_MAX_BYTES};
 ///
 /// let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 /// path.push("./examples/entities_example.csv");
-/// let entities = EntityIdsParser::from_path(path).parse().unwrap();
+/// let entities = EntityIdsParser::from(path).parse().unwrap();
 /// ```
 pub struct EntityIdsParser {
     path: Option<PathBuf>,
@@ -31,10 +31,6 @@ enum FileType {
 }
 
 impl EntityIdsParser {
-    pub fn from_path(path: PathBuf) -> Self {
-        EntityIdsParser { path: Some(path) }
-    }
-
     /// Open and parse the file, returning a vector of entity IDs.
     /// The file is expected to hold 1 or more entity records.
     ///
@@ -70,6 +66,12 @@ impl EntityIdsParser {
         debug!("Successfully parsed entity IDs file",);
 
         Ok(entity_ids)
+    }
+}
+
+impl From<PathBuf> for EntityIdsParser {
+    fn from(path: PathBuf) -> Self {
+        Self { path: Some(path) }
     }
 }
 
@@ -120,7 +122,7 @@ mod tests {
         let resources_dir = Path::new(&src_dir).join("examples");
         let path = resources_dir.join("entities_example.csv");
 
-        let entities = EntityIdsParser::from_path(path).parse().unwrap();
+        let entities = EntityIdsParser::from(path).parse().unwrap();
 
         let first_entity = EntityId::from_str("john.doe@example.com").unwrap();
 

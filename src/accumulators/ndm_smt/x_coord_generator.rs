@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// Used for generating unique x-coordinate values on the bottom layer of the
 /// tree.
 ///
-/// A struct is needed as apposed to just a function because the algorithm used
+/// A struct is needed as opposed to just a function because the algorithm used
 /// to generate new values requires keeping a memory of previously used values
 /// so that it can generate new ones that are different from previous ones.
 ///
@@ -22,7 +22,7 @@ use std::collections::HashMap;
 /// use dapol::accumulators::RandomXCoordGenerator;
 ///
 /// let height = dapol::Height::default();
-/// let mut x_coord_generator = RandomXCoordGenerator::from_height(&height);
+/// let mut x_coord_generator = RandomXCoordGenerator::new(&height);
 /// let x_coord = x_coord_generator.new_unique_x_coord().unwrap();
 /// ```
 ///
@@ -79,7 +79,7 @@ impl RandomXCoordGenerator {
     /// `height` is used to determine `max_x_coords`: `2^(height-1)`. This means
     /// that `max_x_coords` is the total number of available leaf nodes on the
     /// bottom layer of the tree.
-    pub fn from_height(height: &Height) -> Self {
+    pub fn new(height: &Height) -> Self {
         RandomXCoordGenerator {
             used_x_coords: HashMap::<u64, u64>::new(),
             max_x_coord: height.max_bottom_layer_nodes(),
@@ -89,11 +89,11 @@ impl RandomXCoordGenerator {
     }
 
     #[cfg(any(test, fuzzing))]
-    pub fn from_seed(height: &Height, seed: u64) -> Self {
+    pub fn new_with_seed(height: &Height, seed: u64) -> Self {
         RandomXCoordGenerator {
             used_x_coords: HashMap::<u64, u64>::new(),
             max_x_coord: height.max_bottom_layer_nodes(),
-            rng: RngSelector::from_seed(seed),
+            rng: RngSelector::new_with_seed(seed),
             i: 0,
         }
     }
@@ -128,9 +128,6 @@ impl RandomXCoordGenerator {
         Ok(x)
     }
 }
-
-// -------------------------------------------------------------------------------------------------
-// Errors.
 
 #[derive(thiserror::Error, Debug)]
 #[error("Counter i cannot exceed max value {max_value:?}")]
@@ -186,7 +183,7 @@ mod rng_selector {
     }
 
     impl RngSelector {
-        pub fn from_seed(seed: u64) -> Self {
+        pub fn new_with_seed(seed: u64) -> Self {
             let mut bytes = [0u8; 32];
             let (left, _right) = bytes.split_at_mut(8);
             left.copy_from_slice(&seed.to_le_bytes());
@@ -212,14 +209,14 @@ mod tests {
 
     #[test]
     fn constructor_works() {
-        let height = Height::from(4u8);
-        RandomXCoordGenerator::from_height(&height);
+        let height = Height::expect_from(4u8);
+        RandomXCoordGenerator::new(&height);
     }
 
     #[test]
     fn new_unique_value_works() {
-        let height = Height::from(4u8);
-        let mut rxcg = RandomXCoordGenerator::from_height(&height);
+        let height = Height::expect_from(4u8);
+        let mut rxcg = RandomXCoordGenerator::new(&height);
         for _i in 0..height.max_bottom_layer_nodes() {
             rxcg.new_unique_x_coord().unwrap();
         }
@@ -227,8 +224,8 @@ mod tests {
 
     #[test]
     fn generated_values_all_unique() {
-        let height = Height::from(4u8);
-        let mut rxcg = RandomXCoordGenerator::from_height(&height);
+        let height = Height::expect_from(4u8);
+        let mut rxcg = RandomXCoordGenerator::new(&height);
         let mut set = HashSet::<u64>::new();
         for _i in 0..height.max_bottom_layer_nodes() {
             let x = rxcg.new_unique_x_coord().unwrap();
@@ -243,8 +240,8 @@ mod tests {
     fn new_unique_value_fails_for_large_i() {
         use crate::utils::test_utils::assert_err;
 
-        let height = Height::from(4u8);
-        let mut rxcg = RandomXCoordGenerator::from_height(&height);
+        let height = Height::expect_from(4u8);
+        let mut rxcg = RandomXCoordGenerator::new(&height);
         let max = height.max_bottom_layer_nodes();
         let mut res = rxcg.new_unique_x_coord();
 

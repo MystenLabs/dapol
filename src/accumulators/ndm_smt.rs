@@ -108,7 +108,7 @@ impl NdmSmt {
 
             let tmr = timer!(Level::Debug; "Entity to leaf node conversion");
 
-            let mut x_coord_generator = RandomXCoordGenerator::from_height(&height);
+            let mut x_coord_generator = RandomXCoordGenerator::new(&height);
             let mut x_coords = Vec::<u64>::with_capacity(entities.len());
 
             for _i in 0..entities.len() {
@@ -332,7 +332,7 @@ mod tests {
             salt_s,
         };
 
-        let height = Height::from(4u8);
+        let height = Height::expect_from(4u8);
         let max_thread_count = MaxThreadCount::default();
         let entities = vec![Entity {
             liability: 5u64,

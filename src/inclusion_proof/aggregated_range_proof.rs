@@ -400,7 +400,7 @@ mod tests {
         }
 
         #[test]
-        fn verfication_error_when_commitment_not_same_as_secret_used_for_generation() {
+        fn verification_error_when_commitment_not_same_as_secret_used_for_generation() {
             let secret = 7u64; // for generation
             let other_secret = 8u64; // for the commitment, for verification
 
@@ -520,7 +520,7 @@ mod tests {
     }
 
     #[test]
-    fn verfication_error_when_commitment_not_same_as_secret_used_for_generation() {
+    fn verification_error_when_commitment_not_same_as_secret_used_for_generation() {
         let secret = 7u64; // for generation
         let other_secret = 8u64; // for the commitment, for verification
 

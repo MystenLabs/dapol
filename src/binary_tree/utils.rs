@@ -50,7 +50,7 @@ pub mod test_utils {
         use crate::accumulators::RandomXCoordGenerator;
 
         let mut leaf_nodes = Vec::<InputLeafNode<TestContent>>::new();
-        let mut x_coord_generator = RandomXCoordGenerator::from_seed(height, seed);
+        let mut x_coord_generator = RandomXCoordGenerator::new_with_seed(height, seed);
 
         for i in 0..num_leaf_nodes {
             leaf_nodes.push(InputLeafNode::<TestContent> {

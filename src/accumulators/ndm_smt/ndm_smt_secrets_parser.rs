@@ -31,18 +31,6 @@ pub struct NdmSmtSecretsParser {
 }
 
 impl NdmSmtSecretsParser {
-    /// Constructor.
-    ///
-    /// `Option` is used to wrap the parameter to make the code work more
-    /// seamlessly with the config builders in [crate][accumulators].
-    pub fn from_path_opt(path: Option<PathBuf>) -> Self {
-        NdmSmtSecretsParser { path }
-    }
-
-    pub fn from_path(path: PathBuf) -> Self {
-        NdmSmtSecretsParser { path: Some(path) }
-    }
-
     /// Open and parse the file, returning a [NdmSmtSecrets] struct.
     ///
     /// An error is returned if:
@@ -87,6 +75,22 @@ impl NdmSmtSecretsParser {
                 Ok(NdmSmtSecrets::generate_random())
             }
         }
+    }
+}
+
+impl From<Option<PathBuf>> for NdmSmtSecretsParser {
+    /// Convert `PathBuf` to `NdmSmtSecretsParser`.
+    ///
+    /// `Option` is used to wrap the parameter to make the code work more
+    /// seamlessly with the config builders in [crate][accumulators].
+    fn from(path: Option<PathBuf>) -> Self {
+        Self { path }
+    }
+}
+
+impl From<PathBuf> for NdmSmtSecretsParser {
+    fn from(path: PathBuf) -> Self {
+        Self { path: Some(path) }
     }
 }
 
@@ -138,7 +142,7 @@ mod tests {
         let resources_dir = Path::new(&src_dir).join("examples");
         let path = resources_dir.join("ndm_smt_secrets_example.toml");
 
-        let secrets = NdmSmtSecretsParser::from_path(path).parse().unwrap();
+        let secrets = NdmSmtSecretsParser::from(path).parse().unwrap();
 
         assert_eq!(
             secrets.master_secret,
@@ -154,7 +158,7 @@ mod tests {
         let path = PathBuf::from(this_file);
 
         assert_err!(
-            NdmSmtSecretsParser::from_path(path).parse(),
+            NdmSmtSecretsParser::from(path).parse(),
             Err(NdmSmtSecretsParserError::UnsupportedFileType { ext: _ })
         );
     }
@@ -163,7 +167,7 @@ mod tests {
     fn unknown_file_type() {
         let path = PathBuf::from("./");
         assert_err!(
-            NdmSmtSecretsParser::from_path(path).parse(),
+            NdmSmtSecretsParser::from(path).parse(),
             Err(NdmSmtSecretsParserError::UnknownFileType(_))
         );
     }

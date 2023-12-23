@@ -22,7 +22,7 @@
 //! [super][tree_builder][single_threaded].
 
 use super::{BinaryTree, Coordinate, Mergeable, Node, MIN_STORE_DEPTH};
-use crate::utils::Consume;
+use crate::{utils::Consume, binary_tree::multi_threaded::RecursionParamsBuilder};
 
 use std::fmt::Debug;
 
@@ -66,11 +66,12 @@ impl<C> PathSiblings<C> {
         let new_padding_node_content = Arc::new(new_padding_node_content);
 
         let node_builder = |coord: &Coordinate, tree: &BinaryTree<C>| {
-            let params = RecursionParams::from_coordinate(coord)
+            let params = RecursionParamsBuilder::default()
                 // We don't want to store anything because the store already exists
                 // inside the binary tree struct.
-                .with_store_depth(MIN_STORE_DEPTH)
-                .with_tree_height(tree.height.clone());
+                .store_depth(MIN_STORE_DEPTH)
+                .height(tree.height)
+                .build_with_coord(coord);
 
             // TODO This cloning can be optimized away by changing the
             // build_node function to use a pre-populated map instead of the
@@ -129,7 +130,7 @@ impl<C> PathSiblings<C> {
             let (x_coord_min, x_coord_max) = coord.subtree_x_coord_bounds();
 
             // TODO This copying of leaf nodes could be optimized away by
-            // changing the build function to accept a map parameter as apposed
+            // changing the build function to accept a map parameter as opposed
             // to the leaf node vector.
             let mut leaf_nodes = Vec::<Node<C>>::new();
             for x in x_coord_min..x_coord_max + 1 {
@@ -397,7 +398,7 @@ mod tests {
 
     #[test]
     fn path_works_for_full_base_layer_single_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = full_bottom_layer(&height);
 
@@ -429,7 +430,7 @@ mod tests {
 
     #[test]
     fn path_works_for_full_base_layer_multi_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = full_bottom_layer(&height);
 
@@ -461,7 +462,7 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_single_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = sparse_leaves(&height);
 
@@ -493,7 +494,7 @@ mod tests {
 
     #[test]
     fn path_works_for_sparse_leaves_multi_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         let leaf_nodes = sparse_leaves(&height);
 
@@ -525,13 +526,13 @@ mod tests {
 
     #[test]
     fn path_works_for_single_leaf_single_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         for i in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(i)];
 
             let tree_single_threaded = TreeBuilder::new()
-                .with_height(height.clone())
+                .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
                 .build_using_single_threaded_algorithm(generate_padding_closure())
@@ -559,13 +560,13 @@ mod tests {
 
     #[test]
     fn path_works_for_multi_leaf_multi_threaded() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
 
         for x_coord in 0..height.max_bottom_layer_nodes() {
             let leaf_node = vec![single_leaf(x_coord)];
 
             let tree_multi_threaded = TreeBuilder::new()
-                .with_height(height.clone())
+                .with_height(height)
                 .with_leaf_nodes(leaf_node.clone())
                 .with_store_depth(MIN_STORE_DEPTH)
                 .build_using_multi_threaded_algorithm(generate_padding_closure())

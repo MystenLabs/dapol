@@ -1,6 +1,8 @@
 use log::error;
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 
+/// This value allows us to change the type of Height easily.
 const UNDERLYING_INT_TYPE_STR: &str = "u8";
 type UnderlyingInt = u8;
 
@@ -31,39 +33,24 @@ pub const DEFAULT_HEIGHT: UnderlyingInt = 32;
 /// use std::str::FromStr;
 ///
 /// let height = Height::default();
-/// let height = Height::from_with_err(8u8).unwrap();
-/// let height = Height::from(8u8);
+/// let height = Height::expect_from(8u8);
 /// let height = Height::from_str("8");
 /// ```
-#[derive(Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 pub struct Height(UnderlyingInt);
 
 impl Height {
     /// Create a [Height] object from `int`.
     ///
-    /// Returns an error if `int` is greater than [MAX_HEIGHT] or less than
+    /// panics if `int` is greater than [MAX_HEIGHT] or less than
     /// [MIN_HEIGHT].
-    pub fn from_with_err(int: UnderlyingInt) -> Result<Self, HeightError> {
-        if int < MIN_HEIGHT.0 {
-            Err(HeightError::InputTooSmall)
-        } else if int > MAX_HEIGHT.0 {
-            Err(HeightError::InputTooBig)
-        } else {
-            Ok(Height(int))
-        }
-    }
-
-    /// Create a [Height] object from `int`.
     ///
-    /// Panics if `int` is greater than [MAX_HEIGHT] or less than [MIN_HEIGHT].
-    pub fn from(int: UnderlyingInt) -> Self {
-        match Self::from_with_err(int) {
+    /// Note that if we try to implement the From trait then we have a collision.
+    pub fn expect_from(int: u8) -> Self {
+        match Height::try_from(int) {
+            Err(e) => panic!("{}", e),
             Ok(h) => h,
-            Err(e) => {
-                error!("Malformed input, error: {:?}", e);
-                panic!("Malformed input, error: {:?}", e);
-            }
         }
     }
 
@@ -72,7 +59,13 @@ impl Height {
     /// Why the offset? `y` starts from 0 but height starts from 1.
     /// See [crate][binary_tree][Coordinate] for more details.
     pub fn from_y_coord(y_coord: u8) -> Self {
-        Self::from(y_coord + 1)
+        match Self::try_from(y_coord + 1) {
+            Ok(h) => h,
+            Err(e) => {
+                error!("Malformed input, error: {:?}", e);
+                panic!("Malformed input, error: {:?}", e);
+            }
+        }
     }
 
     /// Return the y-coord for the given height.
@@ -117,6 +110,27 @@ impl Height {
 }
 
 // -------------------------------------------------------------------------------------------------
+// TryFrom for u8.
+
+/// Create a [Height] object from `int`.
+///
+/// Returns an error if `int` is greater than [MAX_HEIGHT] or less than
+/// [MIN_HEIGHT].
+impl TryFrom<u8> for Height {
+    type Error = HeightError;
+
+    fn try_from(int: u8) -> Result<Self, Self::Error> {
+        if int < MIN_HEIGHT.0 {
+            Err(HeightError::InputTooSmall)
+        } else if int > MAX_HEIGHT.0 {
+            Err(HeightError::InputTooBig)
+        } else {
+            Ok(Height(int))
+        }
+    }
+}
+
+// -------------------------------------------------------------------------------------------------
 // From for str.
 
 use std::str::FromStr;
@@ -127,7 +141,7 @@ impl FromStr for Height {
     /// Constructor that takes in a string slice.
     /// If the length of the str is greater than the max then Err is returned.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Height::from_with_err(UnderlyingInt::from_str(s)?)
+        Height::try_from(UnderlyingInt::from_str(s)?)
     }
 }
 

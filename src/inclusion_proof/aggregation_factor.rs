@@ -96,44 +96,44 @@ mod tests {
         // TODO fuzz on tree height
         #[test]
         fn zero_divisor_gives_zero_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Divisor(0);
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
-            assert!(aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Divisor(0);
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
+            assert!(aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn one_divisor_gives_full_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Divisor(1);
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Divisor(1);
             assert_eq!(
-                aggregagation_factor.apply_to(&tree_height),
+                aggregation_factor.apply_to(&tree_height),
                 tree_height.as_u8()
             );
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(aggregagation_factor.is_max(&tree_height));
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn tree_height_divisor_gives_one_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Divisor(tree_height.as_u8());
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 1);
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_u8());
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 1);
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height & the number added to tree height
         #[test]
         fn greater_than_tree_height_divisor_gives_zero_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Divisor(tree_height.as_u8() + 1);
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
-            assert!(aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Divisor(tree_height.as_u8() + 1);
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
+            assert!(aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
     }
 
@@ -145,37 +145,37 @@ mod tests {
         // TODO fuzz on tree height
         #[test]
         fn one_hundred_percent_gives_full_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Percent(ONE_HUNDRED_PERCENT);
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Percent(ONE_HUNDRED_PERCENT);
             assert_eq!(
-                aggregagation_factor.apply_to(&tree_height),
+                aggregation_factor.apply_to(&tree_height),
                 tree_height.as_u8()
             );
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(aggregagation_factor.is_max(&tree_height));
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn fifty_percent_gives_half_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Percent(Percentage::from(50));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Percent(Percentage::expect_from(50));
             assert_eq!(
-                aggregagation_factor.apply_to(&tree_height),
+                aggregation_factor.apply_to(&tree_height),
                 tree_height.as_u8() / 2
             );
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn zero_percent_gives_zero_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Percent(Percentage::from(0));
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
-            assert!(aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Percent(Percentage::expect_from(0));
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
+            assert!(aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
     }
 
@@ -186,47 +186,47 @@ mod tests {
         // TODO fuzz on tree height
         #[test]
         fn zero_number_gives_zero_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Number(0);
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 0);
-            assert!(aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Number(0);
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 0);
+            assert!(aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn one_number_gives_one_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Number(1);
-            assert_eq!(aggregagation_factor.apply_to(&tree_height), 1);
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(!aggregagation_factor.is_max(&tree_height));
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Number(1);
+            assert_eq!(aggregation_factor.apply_to(&tree_height), 1);
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(!aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height
         #[test]
         fn tree_height_number_gives_full_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Number(tree_height.as_u8());
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Number(tree_height.as_u8());
             assert_eq!(
-                aggregagation_factor.apply_to(&tree_height),
+                aggregation_factor.apply_to(&tree_height),
                 tree_height.as_u8()
             );
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(aggregagation_factor.is_max(&tree_height));
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(aggregation_factor.is_max(&tree_height));
         }
 
         // TODO fuzz on tree height and the number added to tree height
         #[test]
         fn greater_than_tree_height_number_gives_full_aggregation() {
-            let tree_height = Height::from(10);
-            let aggregagation_factor = AggregationFactor::Number(tree_height.as_u8() + 1);
+            let tree_height = Height::expect_from(10);
+            let aggregation_factor = AggregationFactor::Number(tree_height.as_u8() + 1);
             assert_eq!(
-                aggregagation_factor.apply_to(&tree_height),
+                aggregation_factor.apply_to(&tree_height),
                 tree_height.as_u8()
             );
-            assert!(!aggregagation_factor.is_zero(&tree_height));
-            assert!(aggregagation_factor.is_max(&tree_height));
+            assert!(!aggregation_factor.is_zero(&tree_height));
+            assert!(aggregation_factor.is_max(&tree_height));
         }
     }
 }

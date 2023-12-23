@@ -128,15 +128,15 @@ impl<C> MaybeUnmatchedPair<C> {
         F: Fn(&Coordinate) -> C,
     {
         match (self.left, self.right) {
-            (Some(left), Some(right)) => MatchedPair::from(left, right),
-            (Some(left), None) => MatchedPair::from(
+            (Some(left), Some(right)) => MatchedPair::from((left, right)),
+            (Some(left), None) => MatchedPair::from((
                 left.new_sibling_padding_node(new_padding_node_content),
                 left,
-            ),
-            (None, Some(right)) => MatchedPair::from(
+            )),
+            (None, Some(right)) => MatchedPair::from((
                 right.new_sibling_padding_node(new_padding_node_content),
                 right,
-            ),
+            )),
             (None, None) => {
                 panic!("{} Invalid pair (None, None) found", BUG)
             }
@@ -240,7 +240,7 @@ where
             .into_iter()
             // Sort nodes into pairs (left & right siblings).
             .fold(Vec::<MaybeUnmatchedPair<C>>::new(), |mut pairs, node| {
-                let sibling = Sibling::from_node(node);
+                let sibling = Sibling::from(node);
                 match sibling {
                     // If we have found a left sibling then create a new pair.
                     Sibling::Left(left_sibling) => pairs.push(MaybeUnmatchedPair {
@@ -326,7 +326,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_height_not_set() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let leaf_nodes = full_bottom_layer(&height);
         let res = TreeBuilder::new()
             .with_leaf_nodes(leaf_nodes)
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn err_when_parent_builder_leaf_nodes_not_set() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let res = TreeBuilder::new()
             .with_height(height)
             .build_using_single_threaded_algorithm(generate_padding_closure());
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn err_for_empty_leaves() {
-        let height = Height::from(5);
+        let height = Height::expect_from(5);
         let res = TreeBuilder::<TestContent>::new()
             .with_height(height)
             .with_leaf_nodes(Vec::<InputLeafNode<TestContent>>::new())
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn err_for_too_many_leaves_with_height_first() {
-        let height = Height::from(8u8);
+        let height = Height::expect_from(8u8);
         let max_nodes = height.max_bottom_layer_nodes();
         let mut leaf_nodes = full_bottom_layer(&height);
 
@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn err_for_duplicate_leaves() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let mut leaf_nodes = sparse_leaves(&height);
         leaf_nodes.push(single_leaf(leaf_nodes.get(0).unwrap().x_coord));
 
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn err_when_x_coord_greater_than_max() {
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let leaf_node = single_leaf(height.max_bottom_layer_nodes() + 1);
 
         let res = TreeBuilder::new()
@@ -421,11 +421,11 @@ mod tests {
         use rand::seq::SliceRandom;
         use rand::thread_rng;
 
-        let height = Height::from(4);
+        let height = Height::expect_from(4);
         let mut leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
@@ -444,7 +444,7 @@ mod tests {
 
     #[test]
     fn bottom_layer_leaf_nodes_all_present_in_store() {
-        let height = Height::from(5);
+        let height = Height::expect_from(5);
         let leaf_nodes = sparse_leaves(&height);
 
         let tree = TreeBuilder::new()
@@ -465,11 +465,11 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_default_store_depth() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let leaf_nodes = full_bottom_layer(&height);
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .build_using_single_threaded_algorithm(&generate_padding_closure())
             .unwrap();
@@ -501,13 +501,13 @@ mod tests {
 
     #[test]
     fn expected_internal_nodes_are_in_the_store_for_custom_store_depth() {
-        let height = Height::from(8);
+        let height = Height::expect_from(8);
         let leaf_nodes = full_bottom_layer(&height);
         // TODO fuzz on this store depth
         let store_depth = 1;
 
         let tree = TreeBuilder::new()
-            .with_height(height.clone())
+            .with_height(height)
             .with_leaf_nodes(leaf_nodes.clone())
             .with_store_depth(store_depth)
             .build_using_single_threaded_algorithm(&generate_padding_closure())
